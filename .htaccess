@@ -1,0 +1,56 @@
+Options -Indexes
+
+# Enable the rewrite engine
+RewriteEngine On
+
+# Set the base path for this subdirectory install
+RewriteBase /collection/
+
+# ─── Allow direct access to real files and directories ────────────────────────
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# ─── Clean URL: Item Detail ───────────────────────────────────────────────────
+# Matches: /collection/item/42
+# Matches: /collection/item/42/steam-engine-ballarat  (with optional slug)
+RewriteRule ^item/([0-9]+)(/[a-zA-Z0-9_-]+)?/?$ item_detail.php?id=$1 [L,QSA]
+
+# ─── Clean URL: Category Browse ───────────────────────────────────────────────
+# Matches: /collection/category/social-history
+RewriteRule ^category/([a-zA-Z0-9_-]+)/?$ search.php?category=$1 [L,QSA]
+
+# ─── Clean URL: Search ────────────────────────────────────────────────────────
+# Matches: /collection/search  (query string passed through via QSA)
+RewriteRule ^search/?$ search.php [L,QSA]
+
+# ─── Clean URL: Story / Narrative ────────────────────────────────────────────
+# Matches: /collection/story/5
+RewriteRule ^story/([0-9]+)/?$ story.php?id=$1 [L,QSA]
+
+# ─── Security: block sensitive files ─────────────────────────────────────────
+<FilesMatch "\.(sql|env|json|lock)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+<Files "config.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# ─── PHP settings (XAMPP-compatible) ─────────────────────────────────────────
+<IfModule mod_php.c>
+    php_flag display_errors Off
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+</IfModule>
+
+# ─── Performance: cache static assets ────────────────────────────────────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/webp             "access plus 1 month"
+    ExpiresByType image/jpeg             "access plus 1 month"
+    ExpiresByType image/png              "access plus 1 month"
+    ExpiresByType text/css               "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+</IfModule>

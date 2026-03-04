@@ -25,11 +25,14 @@ if (!$item) {
     die("Item not found.");
 }
 
-// 2. Fetch Media for the item
-$mediaStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id");
+// 2. Fetch Media for the item — split by type
+$mediaStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY is_primary DESC, upload_date ASC");
 $mediaStmt->execute([':id' => $id]);
-$mediaItems = $mediaStmt->fetchAll();
-$primaryMedia = $mediaItems[0] ?? null;
+$mediaItems   = $mediaStmt->fetchAll();
+$imageMedia   = array_values(array_filter($mediaItems, fn($m) => ($m['media_type'] ?? 'image') === 'image'));
+$pdfMedia     = array_values(array_filter($mediaItems, fn($m) => ($m['media_type'] ?? '') === 'pdf'));
+$youtubeMedia = array_values(array_filter($mediaItems, fn($m) => ($m['media_type'] ?? '') === 'youtube'));
+$primaryMedia = $imageMedia[0] ?? null;   // primary is always image-type
 
 // 3. Fetch Related Stories (Narratives)
 $narrativeStmt = $pdo->prepare("
@@ -249,6 +252,56 @@ $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
                             <?php endif; ?>
                         </dl>
                     </div>
+
+                    <!-- YouTube Videos -->
+                    <?php if ($youtubeMedia): ?>
+                    <div class="mb-10">
+                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <span class="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded">▶ VIDEO</span>
+                            Video<?= count($youtubeMedia) > 1 ? 's' : '' ?>
+                        </h3>
+                        <div class="space-y-4">
+                            <?php foreach ($youtubeMedia as $yt): ?>
+                            <div class="rounded-lg overflow-hidden shadow-sm border border-gray-200">
+                                <div class="relative w-full" style="padding-top:56.25%">
+                                    <iframe class="absolute inset-0 w-full h-full"
+                                            src="https://www.youtube.com/embed/<?= htmlspecialchars($yt['file_path']) ?>"
+                                            title="<?= htmlspecialchars($yt['caption'] ?? $item['title']) ?>"
+                                            frameborder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowfullscreen></iframe>
+                                </div>
+                                <?php if (!empty($yt['caption'])): ?>
+                                <div class="bg-gray-50 px-4 py-2 text-sm text-gray-500 italic"><?= htmlspecialchars($yt['caption']) ?></div>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- PDF Documents -->
+                    <?php if ($pdfMedia): ?>
+                    <div class="mb-10">
+                        <h3 class="text-lg font-bold mb-4">📄 Documents</h3>
+                        <div class="space-y-2">
+                            <?php foreach ($pdfMedia as $pdf): ?>
+                            <a href="<?= SITE_URL ?>/uploads/pdfs/<?= rawurlencode($pdf['file_path']) ?>"
+                               target="_blank"
+                               class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-red-400 hover:shadow-sm transition group">
+                                <svg class="w-8 h-8 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-800 group-hover:text-red-700"><?= htmlspecialchars($pdf['caption'] ?: basename($pdf['file_path'])) ?></p>
+                                    <?php if (!empty($pdf['file_size'])): ?>
+                                    <p class="text-xs text-gray-400"><?= round($pdf['file_size'] / 1024, 1) ?> KB · PDF</p>
+                                    <?php endif; ?>
+                                </div>
+                                <svg class="w-4 h-4 text-gray-400 ml-auto group-hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                            </a>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- Related Stories (Narratives) -->
                     <?php if (count($stories) > 0): ?>

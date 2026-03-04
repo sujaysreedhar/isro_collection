@@ -132,8 +132,8 @@ $(document).ready(function() {
         columnDefs: [{
             targets: 0,
             render: function(data, type, row) {
-                // Extract the item id from the Edit button URL
-                const match = row[7].match(/edit_item\.php\?id=(\d+)/);
+                // Extract the item id from the Edit button URL (which is in row[6], the 7th returned field)
+                const match = row[6].match(/edit_item\.php\?id=(\d+)/);
                 const id = match ? match[1] : '';
                 return `<input type="checkbox" class="row-checkbox h-4 w-4 text-gray-900 border-gray-300 rounded" data-id="${id}">`;
             }

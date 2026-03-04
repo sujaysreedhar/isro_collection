@@ -72,17 +72,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // — Image via MediaProcessor —
         if (isset($_FILES['media_upload']) && $_FILES['media_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
             $result = $mp->process(
-                $_FILES['media_upload'],
-                $id,
+                $_FILES['media_upload'], $id,
                 trim($_POST['media_caption'] ?? ''),
                 $_POST['media_license'] ?? 'Public Domain',
                 isset($_POST['is_primary'])
             );
-            if ($result['success']) {
-                $success .= ' ' . $result['message'];
-            } else {
-                $error = $result['message'];
-            }
+            $result['success'] ? ($success .= ' ' . $result['message']) : ($error = $result['message']);
+        }
+
+        // — PDF via MediaProcessor —
+        if (isset($_FILES['pdf_upload']) && $_FILES['pdf_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $result = $mp->processPdf(
+                $_FILES['pdf_upload'], $id,
+                trim($_POST['pdf_caption'] ?? '')
+            );
+            $result['success'] ? ($success .= ' ' . $result['message']) : ($error = $result['message']);
+        }
+
+        // — YouTube via MediaProcessor —
+        $ytUrl = trim($_POST['youtube_url'] ?? '');
+        if ($ytUrl !== '') {
+            $result = $mp->processYoutube($ytUrl, $id, trim($_POST['youtube_caption'] ?? ''));
+            $result['success'] ? ($success .= ' ' . $result['message']) : ($error = $result['message']);
         }
 
         // — Narrative pivot sync —
@@ -208,33 +219,53 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                 </div>
             </div>
 
-            <!-- Image Upload -->
-            <div class="p-6 border-t border-gray-200 bg-gray-50">
-                <h3 class="font-semibold text-gray-800 mb-4">
-                    Attach New Image
-                    <span class="text-xs font-normal text-gray-400 ml-2">JPG · PNG · WebP · max 5 MB → auto-converted to WebP in 3 sizes</span>
-                </h3>
-                <div class="space-y-4">
+            <!-- ── Attach Media (tabbed) ────────────────────────── -->
+            <div class="border-t border-gray-200">
+                <!-- Tab buttons -->
+                <div class="flex border-b border-gray-200 bg-gray-50" role="tablist">
+                    <button type="button" onclick="showTab('tab-image')" id="btn-image"
+                            class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-gray-900 text-gray-900">🖼 Image</button>
+                    <button type="button" onclick="showTab('tab-pdf')" id="btn-pdf"
+                            class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">📄 PDF</button>
+                    <button type="button" onclick="showTab('tab-youtube')" id="btn-youtube"
+                            class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">▶ YouTube</button>
+                </div>
+
+                <!-- Image tab -->
+                <div id="tab-image" class="media-tab p-6 space-y-4">
+                    <p class="text-xs text-gray-400">JPG · PNG · WebP · max 5 MB → auto-converted to WebP in 3 sizes</p>
                     <input type="file" name="media_upload" accept=".jpg,.jpeg,.png,.webp,.gif"
                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label class="label">Caption</label>
-                            <input type="text" name="media_caption" class="input">
-                        </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label class="label">Caption</label><input type="text" name="media_caption" class="input"></div>
                         <div>
                             <label class="label">License</label>
                             <select name="media_license" class="input">
-                                <option>Public Domain</option>
-                                <option>CC BY 4.0</option>
-                                <option>All Rights Reserved</option>
+                                <option>Public Domain</option><option>CC BY 4.0</option><option>All Rights Reserved</option>
                             </select>
                         </div>
                     </div>
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="is_primary" value="1" class="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900">
-                        <span class="text-sm text-gray-700">Set as <strong>Primary Image</strong> <span class="text-gray-400">(displayed in search results)</span></span>
+                        <input type="checkbox" name="is_primary" value="1" class="h-4 w-4 rounded border-gray-300">
+                        <span class="text-sm text-gray-700">Set as <strong>Primary Image</strong> <span class="text-gray-400">(shown in search results)</span></span>
                     </label>
+                </div>
+
+                <!-- PDF tab -->
+                <div id="tab-pdf" class="media-tab p-6 space-y-4 hidden">
+                    <p class="text-xs text-gray-400">Upload a PDF document — max 20 MB. Visitors will be able to view or download it on the item page.</p>
+                    <input type="file" name="pdf_upload" accept=".pdf,application/pdf"
+                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-red-100 file:text-red-700 hover:file:bg-red-200">
+                    <div><label class="label">Caption / Document Title</label><input type="text" name="pdf_caption" class="input" placeholder="e.g. Original auction catalogue, 1887"></div>
+                </div>
+
+                <!-- YouTube tab -->
+                <div id="tab-youtube" class="media-tab p-6 space-y-4 hidden">
+                    <p class="text-xs text-gray-400">Paste any YouTube URL — standard, short (youtu.be), Shorts, or embed format.</p>
+                    <div><label class="label">YouTube URL</label>
+                        <input type="url" name="youtube_url" class="input" placeholder="https://www.youtube.com/watch?v=..."></div>
+                    <div><label class="label">Caption</label>
+                        <input type="text" name="youtube_caption" class="input" placeholder="e.g. Museum documentary, 2022"></div>
                 </div>
             </div>
 
@@ -253,23 +284,50 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
         <h3 class="font-semibold text-gray-800">Attached Media <span class="text-gray-400 font-normal text-sm">(<?= count($mediaList) ?>)</span></h3>
         <?php if ($mediaList): ?>
             <?php foreach ($mediaList as $m): ?>
+            <?php $mType = $m['media_type'] ?? 'image'; ?>
             <div class="bg-white border <?= $m['is_primary'] ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200' ?> rounded-lg overflow-hidden shadow-sm">
                 <?php if ($m['is_primary']): ?>
                     <div class="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 text-center tracking-widest">PRIMARY</div>
                 <?php endif; ?>
-                <div class="h-36 bg-gray-100">
-                    <img src="<?= MediaProcessor::url($m['file_path'], 'thumbs') ?>"
-                         onerror="this.src='<?= MediaProcessor::url($m['file_path'], 'display') ?>'"
-                         class="object-cover w-full h-full" alt="Media thumbnail">
-                </div>
-                <div class="p-3 text-xs space-y-1 text-gray-500">
+
+                <?php if ($mType === 'youtube'): ?>
+                    <!-- YouTube preview -->
+                    <div class="relative h-36 bg-black">
+                        <img src="https://img.youtube.com/vi/<?= htmlspecialchars($m['file_path']) ?>/mqdefault.jpg"
+                             class="w-full h-full object-cover opacity-80">
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">▶ YouTube</span>
+                        </div>
+                    </div>
+                <?php elseif ($mType === 'pdf'): ?>
+                    <!-- PDF preview -->
+                    <div class="h-36 bg-red-50 flex flex-col items-center justify-center gap-1">
+                        <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                        <span class="text-xs text-red-500 font-medium">PDF Document</span>
+                        <a href="<?= MediaProcessor::url($m['file_path'], 'display', 'pdf') ?>" target="_blank"
+                           class="text-xs text-blue-600 hover:underline">Open PDF</a>
+                    </div>
+                <?php else: ?>
+                    <!-- Image preview -->
+                    <div class="h-36 bg-gray-100">
+                        <img src="<?= MediaProcessor::url($m['file_path'], 'thumbs', 'image') ?>"
+                             onerror="this.src='<?= MediaProcessor::url($m['file_path'], 'display', 'image') ?>'"
+                             class="object-cover w-full h-full" alt="thumbnail">
+                    </div>
+                <?php endif; ?>
+
+                <div class="p-3 text-xs space-y-0.5 text-gray-500">
                     <p class="font-mono break-all"><?= htmlspecialchars($m['file_path']) ?></p>
+                    <?php if (!empty($m['caption'])): ?><p class="text-gray-700"><?= htmlspecialchars($m['caption']) ?></p><?php endif; ?>
                     <?php if (!empty($m['dimensions'])): ?><p>📐 <?= $m['dimensions'] ?></p><?php endif; ?>
                     <?php if (!empty($m['file_size'])): ?><p>💾 <?= round($m['file_size']/1024, 1) ?> KB</p><?php endif; ?>
-                    <?php if (!empty($m['mime_type'])): ?><p>🎨 <?= htmlspecialchars($m['mime_type']) ?></p><?php endif; ?>
+                    <?php if ($mType === 'youtube' && !empty($m['youtube_url'])): ?>
+                        <a href="<?= htmlspecialchars($m['youtube_url']) ?>" target="_blank" class="text-blue-500 hover:underline">View on YouTube ↗</a>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endforeach; ?>
+
         <?php else: ?>
             <div class="border border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-gray-400">
                 No images yet. Upload one using the form.
@@ -293,6 +351,20 @@ new TomSelect('#narrative-select', {
     placeholder: 'Search for a story…',
     maxOptions: 200,
 });
+
+// Media upload tab switcher
+function showTab(id) {
+    document.querySelectorAll('.media-tab').forEach(el => el.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    const labels = { 'tab-image': 'btn-image', 'tab-pdf': 'btn-pdf', 'tab-youtube': 'btn-youtube' };
+    Object.values(labels).forEach(btn => {
+        document.getElementById(btn).classList.remove('border-gray-900', 'text-gray-900');
+        document.getElementById(btn).classList.add('border-transparent', 'text-gray-500');
+    });
+    const activeBtn = document.getElementById(labels[id]);
+    activeBtn.classList.remove('border-transparent', 'text-gray-500');
+    activeBtn.classList.add('border-gray-900', 'text-gray-900');
+}
 </script>
 
 <?= renderAdminFooter(); ?>
