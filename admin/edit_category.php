@@ -22,6 +22,10 @@ if ($id > 0) {
 
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        die('Invalid CSRF token.');
+    }
     $name = trim($_POST['name'] ?? '');
 
     if (empty($name)) {
@@ -46,7 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Unique constraint violation
                 $error = "A category with that name already exists.";
             } else {
-                $error = "Database Error: " . $e->getMessage();
+                error_log('Category save failed: ' . $e->getMessage());
+                $error = "Unable to save category right now.";
             }
         }
     }
@@ -76,6 +81,7 @@ echo renderAdminHeader($id > 0 ? "Edit Category - " . htmlspecialchars($category
 
 <div class="max-w-2xl">
     <form method="POST" action="" class="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
         <div class="p-6">
             <div class="mb-4">
                 <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Category Name *</label>

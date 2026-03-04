@@ -9,11 +9,23 @@ $offset = ($page - 1) * $limit;
 
 // Delete Narrative Logic
 if (isset($_POST['delete_id'])) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        die('Invalid CSRF token.');
+    }
     $deleteId = (int)$_POST['delete_id'];
-    $delStmt = $pdo->prepare("DELETE FROM narratives WHERE id = :id");
-    $delStmt->execute([':id' => $deleteId]);
+    try {
+        $delStmt = $pdo->prepare("DELETE FROM narratives WHERE id = :id");
+        $delStmt->execute([':id' => $deleteId]);
+    } catch (\PDOException $e) {
+        error_log('Narrative delete failed: ' . $e->getMessage());
+        $error = 'Unable to delete this story right now.';
+    }
+
+    if (!isset($error)) {
     header("Location: " . SITE_URL . "/admin/narratives.php?msg=deleted");
-    exit;
+        exit;
+    }
 }
 
 // Fetch Total Count for Pagination
@@ -80,6 +92,7 @@ echo renderAdminHeader("Manage Stories & Narratives");
                             <a href="<?= SITE_URL ?>/admin/edit_narrative.php?id=<?= $nar['id'] ?>" class="text-blue-600 hover:text-blue-900 mr-3">Edit</a>
                             
                             <form method="POST" action="" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this narrative?');">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                                 <input type="hidden" name="delete_id" value="<?= $nar['id'] ?>">
                                 <button type="submit" class="text-red-600 hover:text-red-900">
                                     Delete
