@@ -203,7 +203,7 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
 
     <!-- MAIN FORM -->
     <div class="flex-1 min-w-0">
-        <form method="POST" enctype="multipart/form-data" class="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <form id="item-form" method="POST" enctype="multipart/form-data" class="bg-white rounded-lg border border-gray-200 shadow-sm">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
 
             <!-- Metadata -->
@@ -372,7 +372,7 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                     <?php endif; ?>
 
                     <label class="mt-2 inline-flex items-center gap-2 text-red-600 cursor-pointer">
-                        <input type="checkbox" name="delete_media[]" value="<?= (int) $m['id'] ?>" class="h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500">
+                        <input type="checkbox" name="delete_media[]" value="<?= (int) $m['id'] ?>" form="item-form" class="h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500">
                         <span class="font-medium">Delete this media on save</span>
                     </label>
                 </div>
