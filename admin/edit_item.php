@@ -148,7 +148,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->rollBack();
         }
         error_log('Item save failed: ' . $e->getMessage());
-        $error = "Unable to save item right now. Please try again.";
+        $success = '';
+        $error = $e instanceof RuntimeException
+            ? $e->getMessage()
+            : "Unable to save item right now. Please try again.";
     }
 }
 
