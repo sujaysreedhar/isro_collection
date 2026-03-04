@@ -49,16 +49,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('Invalid CSRF token.');
     }
 
-    $reg_number             = trim($_POST['reg_number'] ?? '');
-    $title                  = trim($_POST['title'] ?? '');
-    $physical_description   = trim($_POST['physical_description'] ?? '');
-    $historical_significance= trim($_POST['historical_significance'] ?? '');
-    $production_date        = trim($_POST['production_date'] ?? '');
-    $credit_line            = trim($_POST['credit_line'] ?? '');
-    $category_id            = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
+    if (($_POST['action'] ?? '') === 'make_primary' && $id > 0) {
+        $mediaId = (int) ($_POST['primary_media_id'] ?? 0);
 
-    try {
-        $pdo->beginTransaction();
+        try {
+            if (!$hasIsPrimary) {
+                throw new RuntimeException('Primary media is not supported in this database schema.');
+            }
+
+            $stmt = $pdo->prepare("SELECT id FROM media WHERE id = :media_id AND item_id = :item_id AND media_type = 'image' LIMIT 1");
+            $stmt->execute([':media_id' => $mediaId, ':item_id' => $id]);
+            if (!$stmt->fetchColumn()) {
+                throw new RuntimeException('Only image media can be set as primary.');
+            }
+
+            $pdo->beginTransaction();
+            $pdo->prepare('UPDATE media SET is_primary = 0 WHERE item_id = :item_id')->execute([':item_id' => $id]);
+            $pdo->prepare('UPDATE media SET is_primary = 1 WHERE id = :media_id AND item_id = :item_id')
+                ->execute([':media_id' => $mediaId, ':item_id' => $id]);
+            $pdo->commit();
+            $success = 'Primary image updated.';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $error = $e instanceof RuntimeException
+                ? $e->getMessage()
+                : 'Unable to set primary image right now. Please try again.';
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM items WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $item = $stmt->fetch();
+        $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date DESC");
+        $mStmt->execute([':id' => $id]);
+        $mediaList = $mStmt->fetchAll();
+        $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
+        $nStmt->execute([':id' => $id]);
+        $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
+    } else {
+
+        $reg_number             = trim($_POST['reg_number'] ?? '');
+        $title                  = trim($_POST['title'] ?? '');
+        $physical_description   = trim($_POST['physical_description'] ?? '');
+        $historical_significance= trim($_POST['historical_significance'] ?? '');
+        $production_date        = trim($_POST['production_date'] ?? '');
+        $credit_line            = trim($_POST['credit_line'] ?? '');
+        $category_id            = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
+
+        try {
+            $pdo->beginTransaction();
 
         if ($id > 0) {
             $pdo->prepare("
@@ -142,28 +182,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach (array_filter($sel) as $nid) { $ls->execute([':i' => $id, ':n' => $nid]); }
         }
 
-        $pdo->commit();
+            $pdo->commit();
 
         // Reload
-        $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ?");
-        $stmt->execute([$id]);
-        $item = $stmt->fetch();
-        $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date DESC");
-        $mStmt->execute([':id' => $id]);
-        $mediaList = $mStmt->fetchAll();
-        $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
-        $nStmt->execute([':id' => $id]);
-        $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
+            $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ?");
+            $stmt->execute([$id]);
+            $item = $stmt->fetch();
+            $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date DESC");
+            $mStmt->execute([':id' => $id]);
+            $mediaList = $mStmt->fetchAll();
+            $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
+            $nStmt->execute([':id' => $id]);
+            $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
 
-    } catch (Throwable $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('Item save failed: ' . $e->getMessage());
+            $success = '';
+            $error = $e instanceof RuntimeException
+                ? $e->getMessage()
+                : "Unable to save item right now. Please try again.";
         }
-        error_log('Item save failed: ' . $e->getMessage());
-        $success = '';
-        $error = $e instanceof RuntimeException
-            ? $e->getMessage()
-            : "Unable to save item right now. Please try again.";
     }
 }
 
@@ -369,6 +410,17 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                     <?php if (!empty($m['file_size'])): ?><p>💾 <?= round($m['file_size']/1024, 1) ?> KB</p><?php endif; ?>
                     <?php if ($mType === 'youtube' && !empty($m['youtube_url'])): ?>
                         <a href="<?= htmlspecialchars($m['youtube_url']) ?>" target="_blank" class="text-blue-500 hover:underline">View on YouTube ↗</a>
+                    <?php endif; ?>
+
+                    <?php if ($hasIsPrimary && $mType === 'image' && empty($m['is_primary'])): ?>
+                        <form method="POST" class="mt-2">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+                            <input type="hidden" name="action" value="make_primary">
+                            <input type="hidden" name="primary_media_id" value="<?= (int) $m['id'] ?>">
+                            <button type="submit" class="w-full px-3 py-1.5 rounded border border-blue-200 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 transition">
+                                Make Primary
+                            </button>
+                        </form>
                     <?php endif; ?>
 
                     <label class="mt-2 inline-flex items-center gap-2 text-red-600 cursor-pointer">
