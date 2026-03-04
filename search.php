@@ -7,13 +7,15 @@ $searchEngine = new SearchEngine($pdo);
 // Extract parameters — category_ids is now an array
 $params = [
     'q'            => trim($_GET['q'] ?? ''),
-    'category_ids' => array_values(array_filter(array_map('intval', (array)($_GET['category_ids'] ?? [])))),
+    'category_ids' => array_values(array_filter(array_map('intval', (array)($params['category_ids'] ?? (array)($_GET['category_ids'] ?? []))))),
     'has_images'   => isset($_GET['has_images']) && $_GET['has_images'] === '1',
+    'exact'        => isset($_GET['exact']) && $_GET['exact'] === '1',
 ];
 
 $searchData = $searchEngine->search($params);
 $results    = $searchData['results'];
 $facets     = $searchData['facets'];
+$searchMeta = $searchData['search_meta'] ?? null;
 
 /**
  * Build a URL that toggles one category id in/out of the category_ids array,
@@ -49,6 +51,7 @@ function buildQuery(array $p): string {
         }
     }
     if (!empty($p['has_images']))  $out[] = 'has_images=1';
+    if (!empty($p['exact']))       $out[] = 'exact=1';
     return implode('&', $out);
 }
 
@@ -197,15 +200,36 @@ $catNameMap = array_column($facets['categories'], 'name', 'id');
         <!-- Main Results -->
         <main class="flex-1 min-w-0">
             <div class="mb-6 flex justify-between items-end border-b border-gray-200 pb-4">
-                <h1 class="text-3xl font-bold serif">
+                <h1 class="text-3xl font-bold serif flex items-center gap-3">
                     <?php if (!empty($params['q'])): ?>
-                        Results for "<?= htmlspecialchars($params['q']) ?>"
+                        <span>Results for "<?= htmlspecialchars($searchMeta['corrected_query'] ?? $params['q']) ?>"</span>
                     <?php else: ?>
                         All Items
                     <?php endif; ?>
                 </h1>
                 <span class="text-gray-500 text-sm"><?= count($results) ?> result(s)</span>
             </div>
+
+            <?php if (!empty($searchMeta['was_corrected']) && $searchMeta['was_corrected']): ?>
+            <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+                <svg class="w-5 h-5 text-yellow-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <div>
+                    <p class="text-sm text-yellow-800">
+                        Showing results for <strong><?= htmlspecialchars($searchMeta['corrected_query']) ?></strong> instead of <?= htmlspecialchars($searchMeta['original_query']) ?>.
+                    </p>
+                    <?php
+                        // Build URL to search for original query exactly (no correction)
+                        // Note: For a real implementation we'd probably want a ?exact=1 flag 
+                        // but since the original query spelling will be sent, the spelling corrector
+                        // will normally correct it again. To fix this fully, search engine needs an bypass flag.
+                        // We will implement `&exact=1` behavior down the line, but for now we link back.
+                    ?>
+                    <a href="<?= SITE_URL ?>/search.php?<?= buildQuery(array_merge($params, ['q' => $searchMeta['original_query'], 'exact' => 1])) ?>" class="text-sm text-blue-600 hover:text-blue-800 hover:underline mt-1 inline-block">
+                        Search instead for <?= htmlspecialchars($searchMeta['original_query']) ?>
+                    </a>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <?php if ($results): ?>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

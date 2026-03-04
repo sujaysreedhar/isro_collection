@@ -235,21 +235,33 @@ $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
                             <?php if (!empty($item['category_name'])): ?>
                             <div class="py-3 flex justify-between">
                                 <dt class="text-gray-500 font-medium w-1/3">Category</dt>
-                                <dd class="text-gray-900 w-2/3 text-right"><?= htmlspecialchars($item['category_name']) ?></dd>
+                                <dd class="text-gray-900 w-2/3 text-right">
+                                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= htmlspecialchars($item['category_id']) ?>" class="text-blue-600 hover:text-blue-800 hover:underline" title="Find more items in this category">
+                                        <?= htmlspecialchars($item['category_name']) ?>
+                                    </a>
+                                </dd>
                             </div>
                             <?php endif; ?>
                             
                             <?php if (!empty($item['production_date'])): ?>
                             <div class="py-3 flex justify-between">
                                 <dt class="text-gray-500 font-medium w-1/3">Production Date</dt>
-                                <dd class="text-gray-900 w-2/3 text-right"><?= htmlspecialchars($item['production_date']) ?></dd>
+                                <dd class="text-gray-900 w-2/3 text-right">
+                                    <a href="<?= SITE_URL ?>/search.php?q=<?= urlencode($item['production_date']) ?>" class="text-blue-600 hover:text-blue-800 hover:underline" title="Find more items from this period">
+                                        <?= htmlspecialchars($item['production_date']) ?>
+                                    </a>
+                                </dd>
                             </div>
                             <?php endif; ?>
                             
                             <?php if (!empty($item['credit_line'])): ?>
                             <div class="py-3 flex justify-between">
                                 <dt class="text-gray-500 font-medium w-1/3">Credit Line</dt>
-                                <dd class="text-gray-900 w-2/3 text-right"><?= htmlspecialchars($item['credit_line']) ?></dd>
+                                <dd class="text-gray-900 w-2/3 text-right">
+                                    <a href="<?= SITE_URL ?>/search.php?q=<?= urlencode($item['credit_line']) ?>" class="text-blue-600 hover:text-blue-800 hover:underline" title="Find more items from this collection/donor">
+                                        <?= htmlspecialchars($item['credit_line']) ?>
+                                    </a>
+                                </dd>
                             </div>
                             <?php endif; ?>
 
