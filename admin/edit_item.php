@@ -83,6 +83,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = "Item created.";
         }
 
+        // — Delete selected media (image/pdf/youtube) —
+        $deleteMediaIds = array_map('intval', (array) ($_POST['delete_media'] ?? []));
+        foreach (array_filter($deleteMediaIds) as $mediaId) {
+            $result = $mp->deleteMedia($mediaId, $id);
+            if (!$result['success']) {
+                throw new RuntimeException($result['message']);
+            }
+        }
+        if (!empty($deleteMediaIds)) {
+            $success .= ' Selected media deleted.';
+        }
+
         // — Image via MediaProcessor —
         if (isset($_FILES['media_upload']) && $_FILES['media_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
             $result = $mp->process(
@@ -358,6 +370,11 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                     <?php if ($mType === 'youtube' && !empty($m['youtube_url'])): ?>
                         <a href="<?= htmlspecialchars($m['youtube_url']) ?>" target="_blank" class="text-blue-500 hover:underline">View on YouTube ↗</a>
                     <?php endif; ?>
+
+                    <label class="mt-2 inline-flex items-center gap-2 text-red-600 cursor-pointer">
+                        <input type="checkbox" name="delete_media[]" value="<?= (int) $m['id'] ?>" class="h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500">
+                        <span class="font-medium">Delete this media on save</span>
+                    </label>
                 </div>
             </div>
             <?php endforeach; ?>

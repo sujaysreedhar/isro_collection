@@ -168,6 +168,41 @@ class MediaProcessor {
         }
     }
 
+    // ── Public: Delete media ────────────────────────────────────────────────
+
+    public function deleteMedia(int $mediaId, int $itemId): array {
+        try {
+            $stmt = $this->db->prepare('SELECT id, file_path, media_type FROM media WHERE id = ? AND item_id = ? LIMIT 1');
+            $stmt->execute([$mediaId, $itemId]);
+            $media = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$media) {
+                return ['success' => false, 'message' => 'Media item not found.'];
+            }
+
+            $this->db->prepare('DELETE FROM media WHERE id = ?')->execute([$mediaId]);
+
+            $filePath = (string) ($media['file_path'] ?? '');
+            $mediaType = (string) ($media['media_type'] ?? 'image');
+
+            if ($filePath !== '') {
+                if ($mediaType === 'pdf') {
+                    $this->deleteFileIfExists($this->uploadRoot . 'pdfs' . DIRECTORY_SEPARATOR . $filePath);
+                } elseif ($mediaType === 'image') {
+                    foreach (['thumbs', 'display', 'original'] as $dir) {
+                        foreach (glob($this->uploadRoot . $dir . DIRECTORY_SEPARATOR . pathinfo($filePath, PATHINFO_FILENAME) . '.*') ?: [] as $candidate) {
+                            $this->deleteFileIfExists($candidate);
+                        }
+                    }
+                }
+            }
+
+            return ['success' => true, 'message' => 'Media deleted successfully.'];
+        } catch (\PDOException $e) {
+            return ['success' => false, 'message' => 'DB error: ' . $e->getMessage()];
+        }
+    }
+
     // ── Static helpers ───────────────────────────────────────────────────────
 
     /**
@@ -305,5 +340,11 @@ class MediaProcessor {
             UPLOAD_ERR_CANT_WRITE => 'Server could not write to disk.',
             default               => "Upload failed (error code {$code}).",
         };
+    }
+
+    private function deleteFileIfExists(string $path): void {
+        if (is_file($path)) {
+            @unlink($path);
+        }
     }
 }
