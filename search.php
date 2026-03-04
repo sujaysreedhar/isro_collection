@@ -210,10 +210,24 @@ $catNameMap = array_column($facets['categories'], 'name', 'id');
             <?php if ($results): ?>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <?php foreach ($results as $item): ?>
+                        <?php
+                            $previewPath = trim((string)($item['preview_file_path'] ?? ''));
+                            $previewUrl = '';
+                            if ($previewPath !== '') {
+                                $displayPath = __DIR__ . '/uploads/display/' . $previewPath;
+                                $previewUrl = file_exists($displayPath)
+                                    ? SITE_URL . '/uploads/display/' . rawurlencode($previewPath)
+                                    : SITE_URL . '/uploads/originals/' . rawurlencode($previewPath);
+                            }
+                        ?>
                         <a href="<?= SITE_URL ?>/item/<?= $item['id'] ?>"
                            class="group block border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition bg-white flex flex-col">
                             <div class="h-48 bg-gray-100 flex items-center justify-center p-4">
-                                <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                <?php if ($previewUrl): ?>
+                                    <img src="<?= htmlspecialchars($previewUrl) ?>" alt="<?= htmlspecialchars($item['title']) ?>" class="object-cover w-full h-full">
+                                <?php else: ?>
+                                    <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                <?php endif; ?>
                             </div>
                             <div class="p-4 flex flex-col flex-grow">
                                 <div class="text-xs font-bold text-gray-500 mb-1"><?= htmlspecialchars($item['reg_number']) ?></div>

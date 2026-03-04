@@ -23,7 +23,17 @@ class SearchEngine {
         $hasImages   = !empty($params['has_images']);
 
         // ── 1. Items query ───────────────────────────────────────────────
-        $sql      = "SELECT DISTINCT i.* FROM items i ";
+        $sql      = "SELECT DISTINCT i.*, pm.file_path AS preview_file_path FROM items i ";
+        $sql     .= "LEFT JOIN ("
+                .  "SELECT m.item_id, m.file_path "
+                .  "FROM media m "
+                .  "INNER JOIN ("
+                .      "SELECT item_id, MIN(id) AS min_media_id "
+                .      "FROM media "
+                .      "WHERE media_type = 'image' "
+                .      "GROUP BY item_id"
+                .  ") first_media ON first_media.min_media_id = m.id"
+                .  ") pm ON pm.item_id = i.id ";
         $where    = [];
         $bindings = [];
 
@@ -125,7 +135,17 @@ class SearchEngine {
      * Build and execute the main items query cleanly avoiding PDO named+positional mixing.
      */
     private function buildAndRun(string $searchTerm, array $categoryIds, bool $hasImages, bool $dummy) {
-        $sql      = "SELECT DISTINCT i.* FROM items i ";
+        $sql      = "SELECT DISTINCT i.*, pm.file_path AS preview_file_path FROM items i ";
+        $sql     .= "LEFT JOIN ("
+                .  "SELECT m.item_id, m.file_path "
+                .  "FROM media m "
+                .  "INNER JOIN ("
+                .      "SELECT item_id, MIN(id) AS min_media_id "
+                .      "FROM media "
+                .      "WHERE media_type = 'image' "
+                .      "GROUP BY item_id"
+                .  ") first_media ON first_media.min_media_id = m.id"
+                .  ") pm ON pm.item_id = i.id ";
         $parts    = [];
         $values   = [];   // positional only
 
