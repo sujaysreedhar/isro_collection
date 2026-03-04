@@ -36,6 +36,10 @@ class MediaProcessor {
         string $license   = 'Public Domain',
         bool   $isPrimary = false
     ): array {
+        $runtimeError = $this->imageRuntimeError();
+        if ($runtimeError !== null)
+            return ['success' => false, 'message' => $runtimeError];
+
         if ($file['error'] !== UPLOAD_ERR_OK)
             return ['success' => false, 'message' => $this->uploadError($file['error'])];
         if ($file['size'] > self::MAX_IMG_BYTES)
@@ -253,6 +257,23 @@ class MediaProcessor {
         imagealphablending($img, false);
         imagesavealpha($img, true);
         imagefilledrectangle($img, 0, 0, imagesx($img), imagesy($img), imagecolorallocatealpha($img, 255, 255, 255, 127));
+    }
+
+    private function imageRuntimeError(): ?string {
+        $required = [
+            'imagecreatefromjpeg', 'imagecreatefrompng', 'imagecreatefromgif', 'imagecreatefromwebp',
+            'imagecreatetruecolor', 'imagecopyresampled', 'imagecopy', 'imagewebp', 'imagedestroy',
+            'imagealphablending', 'imagesavealpha', 'imagefilledrectangle', 'imagecolorallocatealpha',
+            'imagesx', 'imagesy',
+        ];
+
+        foreach ($required as $fn) {
+            if (!function_exists($fn)) {
+                return 'Image processing is currently unavailable on this server (missing GD support). Please contact an administrator.';
+            }
+        }
+
+        return null;
     }
 
     private function gdLoad(string $path, string $mime) {
