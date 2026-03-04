@@ -10,6 +10,7 @@ class MediaProcessor {
 
     private PDO    $db;
     private string $uploadRoot;
+    private bool   $hasIsPrimary;
 
     const MAX_IMG_BYTES = 5  * 1024 * 1024;   // 5 MB for images
     const MAX_PDF_BYTES = 20 * 1024 * 1024;   // 20 MB for PDFs
@@ -18,6 +19,7 @@ class MediaProcessor {
     public function __construct(PDO $db) {
         $this->db         = $db;
         $this->uploadRoot = realpath(__DIR__ . '/uploads') . DIRECTORY_SEPARATOR;
+        $this->hasIsPrimary = $this->columnExists('media', 'is_primary');
 
         foreach (['thumbs','display','original','pdfs'] as $dir) {
             $path = $this->uploadRoot . $dir;
@@ -62,14 +64,23 @@ class MediaProcessor {
         imagedestroy($src);
 
         try {
-            if ($isPrimary)
+            if ($this->hasIsPrimary && $isPrimary) {
                 $this->db->prepare('UPDATE media SET is_primary = 0 WHERE item_id = ?')->execute([$itemId]);
+            }
 
-            $this->db->prepare("
-                INSERT INTO media (item_id, file_path, caption, license_type, is_primary,
-                                   file_size, mime_type, dimensions, media_type, upload_date)
-                VALUES (?, ?, ?, ?, ?, ?, 'image/webp', ?, 'image', NOW())
-            ")->execute([$itemId, $webpName, $caption, $license, $isPrimary ? 1 : 0, $file['size'], "{$origW}x{$origH}"]);
+            if ($this->hasIsPrimary) {
+                $this->db->prepare("
+                    INSERT INTO media (item_id, file_path, caption, license_type, is_primary,
+                                       file_size, mime_type, dimensions, media_type, upload_date)
+                    VALUES (?, ?, ?, ?, ?, ?, 'image/webp', ?, 'image', NOW())
+                " )->execute([$itemId, $webpName, $caption, $license, $isPrimary ? 1 : 0, $file['size'], "{$origW}x{$origH}"]);
+            } else {
+                $this->db->prepare("
+                    INSERT INTO media (item_id, file_path, caption, license_type,
+                                       file_size, mime_type, dimensions, media_type, upload_date)
+                    VALUES (?, ?, ?, ?, ?, 'image/webp', ?, 'image', NOW())
+                " )->execute([$itemId, $webpName, $caption, $license, $file['size'], "{$origW}x{$origH}"]);
+            }
 
             return ['success' => true, 'message' => 'Image saved in three sizes (thumbnail, display, original).', 'file' => $webpName];
         } catch (\PDOException $e) {
@@ -100,11 +111,19 @@ class MediaProcessor {
             return ['success' => false, 'message' => 'Failed to write PDF to disk.'];
 
         try {
-            $this->db->prepare("
-                INSERT INTO media (item_id, file_path, caption, is_primary, file_size,
-                                   mime_type, media_type, upload_date)
-                VALUES (?, ?, ?, ?, ?, 'application/pdf', 'pdf', NOW())
-            ")->execute([$itemId, $filename, $caption, $isPrimary ? 1 : 0, $file['size']]);
+            if ($this->hasIsPrimary) {
+                $this->db->prepare("
+                    INSERT INTO media (item_id, file_path, caption, is_primary, file_size,
+                                       mime_type, media_type, upload_date)
+                    VALUES (?, ?, ?, ?, ?, 'application/pdf', 'pdf', NOW())
+                ")->execute([$itemId, $filename, $caption, $isPrimary ? 1 : 0, $file['size']]);
+            } else {
+                $this->db->prepare("
+                    INSERT INTO media (item_id, file_path, caption, file_size,
+                                       mime_type, media_type, upload_date)
+                    VALUES (?, ?, ?, ?, 'application/pdf', 'pdf', NOW())
+                ")->execute([$itemId, $filename, $caption, $file['size']]);
+            }
 
             return ['success' => true, 'message' => 'PDF uploaded successfully.', 'file' => $filename];
         } catch (\PDOException $e) {
@@ -120,11 +139,19 @@ class MediaProcessor {
             return ['success' => false, 'message' => 'Could not parse a valid YouTube video ID from that URL.'];
 
         try {
-            $this->db->prepare("
-                INSERT INTO media (item_id, file_path, caption, is_primary, mime_type,
-                                   media_type, youtube_url, upload_date)
-                VALUES (?, ?, ?, 0, 'video/youtube', 'youtube', ?, NOW())
-            ")->execute([$itemId, $videoId, $caption, $youtubeUrl]);
+            if ($this->hasIsPrimary) {
+                $this->db->prepare("
+                    INSERT INTO media (item_id, file_path, caption, is_primary, mime_type,
+                                       media_type, youtube_url, upload_date)
+                    VALUES (?, ?, ?, 0, 'video/youtube', 'youtube', ?, NOW())
+                ")->execute([$itemId, $videoId, $caption, $youtubeUrl]);
+            } else {
+                $this->db->prepare("
+                    INSERT INTO media (item_id, file_path, caption, mime_type,
+                                       media_type, youtube_url, upload_date)
+                    VALUES (?, ?, ?, 'video/youtube', 'youtube', ?, NOW())
+                ")->execute([$itemId, $videoId, $caption, $youtubeUrl]);
+            }
 
             return [
                 'success'   => true,
@@ -175,6 +202,17 @@ class MediaProcessor {
             }
         }
         return $orphans;
+    }
+
+
+    private function columnExists(string $table, string $column): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
+            $stmt->execute([$column]);
+            return (bool) $stmt->fetch();
+        } catch (\PDOException) {
+            return false;
+        }
     }
 
     // ── Private GD helpers ───────────────────────────────────────────────────

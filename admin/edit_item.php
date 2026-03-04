@@ -4,6 +4,13 @@ require_once __DIR__ . '/layout.php';
 require_once __DIR__ . '/../MediaProcessor.php';
 
 $mp = new MediaProcessor($pdo);
+$hasIsPrimary = false;
+try {
+    $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
+    $hasIsPrimary = (bool) $columnStmt->fetch();
+} catch (\PDOException) {
+    $hasIsPrimary = false;
+}
 
 $id  = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $item = [
@@ -24,7 +31,7 @@ if ($id > 0) {
     $fetched = $stmt->fetch();
     if ($fetched) {
         $item = $fetched;
-        $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY is_primary DESC");
+        $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date DESC");
         $mStmt->execute([':id' => $id]);
         $mediaList = $mStmt->fetchAll();
         $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
@@ -109,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ?");
             $stmt->execute([$id]);
             $item = $stmt->fetch();
-            $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY is_primary DESC");
+            $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date DESC");
             $mStmt->execute([':id' => $id]);
             $mediaList = $mStmt->fetchAll();
             $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
@@ -285,8 +292,8 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
         <?php if ($mediaList): ?>
             <?php foreach ($mediaList as $m): ?>
             <?php $mType = $m['media_type'] ?? 'image'; ?>
-            <div class="bg-white border <?= $m['is_primary'] ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200' ?> rounded-lg overflow-hidden shadow-sm">
-                <?php if ($m['is_primary']): ?>
+            <div class="bg-white border <?= !empty($m['is_primary']) ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200' ?> rounded-lg overflow-hidden shadow-sm">
+                <?php if (!empty($m['is_primary'])): ?>
                     <div class="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 text-center tracking-widest">PRIMARY</div>
                 <?php endif; ?>
 
