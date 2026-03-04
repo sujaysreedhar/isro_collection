@@ -26,7 +26,16 @@ if (!$item) {
 }
 
 // 2. Fetch Media for the item — split by type
-$mediaStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY is_primary DESC, upload_date ASC");
+
+$hasIsPrimary = false;
+try {
+    $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
+    $hasIsPrimary = (bool) $columnStmt->fetch();
+} catch (\PDOException) {
+    $hasIsPrimary = false;
+}
+
+$mediaStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date ASC");
 $mediaStmt->execute([':id' => $id]);
 $mediaItems   = $mediaStmt->fetchAll();
 $imageMedia   = array_values(array_filter($mediaItems, fn($m) => ($m['media_type'] ?? 'image') === 'image'));
