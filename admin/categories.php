@@ -4,6 +4,10 @@ require_once __DIR__ . '/layout.php';
 
 // Delete Category Logic
 if (isset($_POST['delete_id'])) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        die('Invalid CSRF token.');
+    }
     $deleteId = (int)$_POST['delete_id'];
     try {
         $delStmt = $pdo->prepare("DELETE FROM categories WHERE id = :id");
@@ -77,6 +81,7 @@ echo renderAdminHeader("Manage Categories");
                             <a href="<?= SITE_URL ?>/admin/edit_category.php?id=<?= $cat['id'] ?>" class="text-blue-600 hover:text-blue-900 mr-3">Edit</a>
                             
                             <form method="POST" action="" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this category?');">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                                 <input type="hidden" name="delete_id" value="<?= $cat['id'] ?>">
                                 <button type="submit" class="text-red-600 hover:text-red-900" <?= $cat['item_count'] > 0 ? 'disabled title="Cannot delete category with items" class="text-gray-400 cursor-not-allowed"' : '' ?>>
                                     Delete

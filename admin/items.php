@@ -108,6 +108,7 @@ echo renderAdminHeader("Manage Items");
 
 <script>
 const AJAX_URL = '<?= SITE_URL ?>/admin/ajax.php';
+const CSRF_TOKEN = '<?= htmlspecialchars(ensureCsrfToken()) ?>';
 let selectedIds = new Set();
 let dataTable;
 
@@ -187,7 +188,7 @@ function updateBulkBar() {
 
 // Toggle visibility via AJAX - no page reload
 function toggleVisibility(id, btn) {
-    $.post(AJAX_URL, { action: 'toggle_visibility', id: id }, function(res) {
+    $.post(AJAX_URL, { action: 'toggle_visibility', id: id, csrf_token: CSRF_TOKEN }, function(res) {
         if (res.success) {
             dataTable.ajax.reload(null, false); // Reload preserving page position
         }
@@ -213,7 +214,7 @@ function closeBulkDeleteModal() {
 
 function executeBulkDelete() {
     const ids = Array.from(selectedIds);
-    $.post(AJAX_URL, { action: 'bulk_delete', ids: ids }, function(res) {
+    $.post(AJAX_URL, { action: 'bulk_delete', ids: ids, csrf_token: CSRF_TOKEN }, function(res) {
         closeBulkDeleteModal();
         if (res.success) {
             selectedIds.clear();

@@ -12,6 +12,8 @@ header('Content-Type: application/json');
 // Validate we have an action parameter
 $action = $_REQUEST['action'] ?? '';
 
+$csrfToken = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+
 switch ($action) {
     
     // --- DataTables Server-Side Processing ---
@@ -90,25 +92,46 @@ switch ($action) {
     // --- AJAX Toggle Visibility ---
     case 'toggle_visibility':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
+        if (!verifyCsrfToken($csrfToken)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token.']);
+            exit;
+        }
+
         $id = (int)($_POST['id'] ?? 0);
-        if ($id <= 0) { echo json_encode(['success' => false]); exit; }
-        
-        // Fetch current state and flip it
-        $current = (int)$pdo->prepare("SELECT is_visible FROM items WHERE id = ?")->execute([$id]) && ($row = $pdo->query("SELECT is_visible FROM items WHERE id = {$id}")->fetchColumn());
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid item id.']);
+            exit;
+        }
+
         $stmt = $pdo->prepare("SELECT is_visible FROM items WHERE id = :id");
         $stmt->execute([':id' => $id]);
-        $current = (int)$stmt->fetchColumn();
-        $newState = $current === 1 ? 0 : 1;
-        
+        $current = $stmt->fetchColumn();
+
+        if ($current === false) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Item not found.']);
+            exit;
+        }
+
+        $newState = ((int)$current) === 1 ? 0 : 1;
+
         $pdo->prepare("UPDATE items SET is_visible = :v WHERE id = :id")
             ->execute([':v' => $newState, ':id' => $id]);
-        
+
         echo json_encode(['success' => true, 'is_visible' => $newState]);
         break;
     
     // --- AJAX Bulk Delete ---
     case 'bulk_delete':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
+        if (!verifyCsrfToken($csrfToken)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token.']);
+            exit;
+        }
+
         $ids = $_POST['ids'] ?? [];
         
         if (!is_array($ids) || empty($ids)) {

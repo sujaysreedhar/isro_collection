@@ -28,6 +28,11 @@ if ($id > 0) {
 
 // Handle save
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        die('Invalid CSRF token.');
+    }
+
     $title        = trim($_POST['title'] ?? '');
     $content_body = trim($_POST['content_body'] ?? '');
     $selectedItems = $_POST['related_items'] ?? [];
@@ -36,6 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Title and content body are required.";
     } else {
         try {
+            $pdo->beginTransaction();
+
             if ($id > 0) {
                 $stmt = $pdo->prepare("UPDATE narratives SET title = :title, content_body = :content_body WHERE id = :id");
                 $stmt->execute([':title' => $title, ':content_body' => $content_body, ':id' => $id]);
@@ -59,6 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            $pdo->commit();
+
             // Reload linked IDs
             $liStmt = $pdo->prepare("SELECT i.id, i.title FROM items i INNER JOIN item_narrative inv ON i.id = inv.item_id WHERE inv.narrative_id = :id");
             $liStmt->execute([':id' => $id]);
@@ -66,8 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $linkedItemIds = array_column($linkedItems, 'id');
             $narrative['title'] = $title;
             $narrative['content_body'] = $content_body;
-        } catch (\PDOException $e) {
-            $error = "Database error: " . $e->getMessage();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('Narrative save failed: ' . $e->getMessage());
+            $error = "Unable to save story right now. Please try again.";
         }
     }
 }
@@ -126,6 +139,7 @@ echo renderAdminHeader($id > 0 ? "Edit Story" : "New Story");
     <!-- Blog Editor Column (wide) -->
     <div class="xl:col-span-2">
         <form method="POST" action="" id="narrative-form" class="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
             <div class="p-6 space-y-6">
                 <div>
                     <label for="title" class="block text-sm font-medium text-gray-700 mb-1">Story Title *</label>

@@ -44,6 +44,11 @@ if ($id > 0) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        die('Invalid CSRF token.');
+    }
+
     $reg_number             = trim($_POST['reg_number'] ?? '');
     $title                  = trim($_POST['title'] ?? '');
     $physical_description   = trim($_POST['physical_description'] ?? '');
@@ -53,6 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $category_id            = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
 
     try {
+        $pdo->beginTransaction();
+
         if ($id > 0) {
             $pdo->prepare("
                 UPDATE items SET reg_number=:reg, title=:title, physical_description=:desc,
@@ -84,7 +91,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['media_license'] ?? 'Public Domain',
                 isset($_POST['is_primary'])
             );
-            $result['success'] ? ($success .= ' ' . $result['message']) : ($error = $result['message']);
+            if ($result['success']) {
+                $success .= ' ' . $result['message'];
+            } else {
+                throw new RuntimeException($result['message']);
+            }
         }
 
         // — PDF via MediaProcessor —
@@ -93,14 +104,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_FILES['pdf_upload'], $id,
                 trim($_POST['pdf_caption'] ?? '')
             );
-            $result['success'] ? ($success .= ' ' . $result['message']) : ($error = $result['message']);
+            if ($result['success']) {
+                $success .= ' ' . $result['message'];
+            } else {
+                throw new RuntimeException($result['message']);
+            }
         }
 
         // — YouTube via MediaProcessor —
         $ytUrl = trim($_POST['youtube_url'] ?? '');
         if ($ytUrl !== '') {
             $result = $mp->processYoutube($ytUrl, $id, trim($_POST['youtube_caption'] ?? ''));
-            $result['success'] ? ($success .= ' ' . $result['message']) : ($error = $result['message']);
+            if ($result['success']) {
+                $success .= ' ' . $result['message'];
+            } else {
+                throw new RuntimeException($result['message']);
+            }
         }
 
         // — Narrative pivot sync —
@@ -111,21 +130,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach (array_filter($sel) as $nid) { $ls->execute([':i' => $id, ':n' => $nid]); }
         }
 
-        // Reload
-        if (empty($error)) {
-            $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ?");
-            $stmt->execute([$id]);
-            $item = $stmt->fetch();
-            $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date DESC");
-            $mStmt->execute([':id' => $id]);
-            $mediaList = $mStmt->fetchAll();
-            $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
-            $nStmt->execute([':id' => $id]);
-            $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
-        }
+        $pdo->commit();
 
-    } catch (\PDOException $e) {
-        $error = "Database Error: " . $e->getMessage();
+        // Reload
+        $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ?");
+        $stmt->execute([$id]);
+        $item = $stmt->fetch();
+        $mStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date DESC");
+        $mStmt->execute([':id' => $id]);
+        $mediaList = $mStmt->fetchAll();
+        $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
+        $nStmt->execute([':id' => $id]);
+        $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('Item save failed: ' . $e->getMessage());
+        $error = "Unable to save item right now. Please try again.";
     }
 }
 
@@ -166,6 +189,7 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
     <!-- MAIN FORM -->
     <div class="flex-1 min-w-0">
         <form method="POST" enctype="multipart/form-data" class="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
 
             <!-- Metadata -->
             <div class="p-6 border-b border-gray-200 bg-gray-50 rounded-t-lg">
