@@ -198,7 +198,7 @@ class SearchEngine {
         }
 
         if (!empty($searchTerm)) {
-            $facetWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :search_like OR i.physical_description LIKE :search_like OR i.production_date LIKE :search_like OR i.credit_line LIKE :search_like)";
+            $facetWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
             // For boolean mode, add * to the end of each word if we don't have exact quotes
             $boolTerm = $searchTerm;
             if (strpos($boolTerm, '"') === false) {
@@ -207,7 +207,11 @@ class SearchEngine {
             }
             $facetBind[':search'] = $boolTerm;
             $facetBind[':search_nl'] = $searchTerm;
-            $facetBind[':search_like'] = '%' . $searchTerm . '%';
+            $likeTerm = '%' . $searchTerm . '%';
+            $facetBind[':sl1'] = $likeTerm;
+            $facetBind[':sl2'] = $likeTerm;
+            $facetBind[':sl3'] = $likeTerm;
+            $facetBind[':sl4'] = $likeTerm;
         }
 
         if ($facetWhere) {
@@ -227,7 +231,7 @@ class SearchEngine {
         $imgBind  = [];
 
         if (!empty($searchTerm)) {
-            $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :search_like OR i.physical_description LIKE :search_like OR i.production_date LIKE :search_like OR i.credit_line LIKE :search_like)";
+            $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
             // For boolean mode, add * to the end of each word if we don't have exact quotes
             $boolTerm = $searchTerm;
             if (strpos($boolTerm, '"') === false) {
@@ -236,7 +240,11 @@ class SearchEngine {
             }
             $imgBind[':search'] = $boolTerm;
             $imgBind[':search_nl'] = $searchTerm;
-            $imgBind[':search_like'] = '%' . $searchTerm . '%';
+            $likeTerm = '%' . $searchTerm . '%';
+            $imgBind[':sl1'] = $likeTerm;
+            $imgBind[':sl2'] = $likeTerm;
+            $imgBind[':sl3'] = $likeTerm;
+            $imgBind[':sl4'] = $likeTerm;
         }
 
         if (!empty($categoryIds)) {
