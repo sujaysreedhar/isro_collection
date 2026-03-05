@@ -42,6 +42,15 @@ class SearchEngine {
                 if (strlen($w) > 2) $vocab[$w] = true;
             }
         }
+
+        // Load from tags
+        $stmt = $this->db->query("SELECT name FROM tags");
+        while ($row = $stmt->fetchColumn()) {
+            $words = str_word_count(strtolower($row), 1);
+            foreach ($words as $w) {
+                if (strlen($w) > 2) $vocab[$w] = true;
+            }
+        }
         
         $this->vocabulary = array_keys($vocab);
         return $this->vocabulary;
@@ -109,6 +118,7 @@ class SearchEngine {
         $originalSearchTerm = trim($params['q'] ?? '');
         $categoryIds = array_values(array_filter(array_map('intval', (array)($params['category_ids'] ?? []))));
         $hasImages   = !empty($params['has_images']);
+        $tagSlug     = trim($params['tag'] ?? '');
         
         $searchMeta = [
             'original_query' => $originalSearchTerm,
@@ -173,7 +183,7 @@ class SearchEngine {
         }
         // Positional bindings for IN() are after named ones in the SQL
         // Actually, mix of named+positional is not allowed in PDO — rebuild properly:
-        $stmt = $this->buildAndRun($searchTerm, $categoryIds, $hasImages, false);
+        $stmt = $this->buildAndRun($searchTerm, $categoryIds, $hasImages, $tagSlug, false);
 
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -245,12 +255,41 @@ class SearchEngine {
         $imgStmt->execute();
         $hasImagesCount = $imgStmt->fetchColumn();
 
+        // ── 4. Tag facet counts ─────────────────────────────────────────────
+        $tagFacetSql = "SELECT t.id, t.name, t.slug, COUNT(DISTINCT it.item_id) AS facet_count
+            FROM tags t
+            INNER JOIN item_tag it ON t.id = it.tag_id
+            INNER JOIN items i ON it.item_id = i.id";
+        $tagFacetWhere = [];
+        $tagFacetBind  = [];
+
+        if (!empty($searchTerm)) {
+            $tagFacetWhere[] = "(i.title LIKE :tfl OR i.physical_description LIKE :tfl)";
+            $tagFacetBind[':tfl'] = '%' . $searchTerm . '%';
+        }
+        if (!empty($categoryIds)) {
+            $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
+            $tagFacetWhere[] = "i.category_id IN ({$placeholders})";
+        }
+        if ($tagFacetWhere) {
+            $tagFacetSql .= " WHERE " . implode(" AND ", $tagFacetWhere);
+        }
+        $tagFacetSql .= " GROUP BY t.id, t.name, t.slug HAVING facet_count > 0 ORDER BY facet_count DESC, t.name ASC";
+
+        $tagFacetStmt = $this->db->prepare($tagFacetSql);
+        $tpi = 1;
+        foreach ($tagFacetBind as $k => $v) { $tagFacetStmt->bindValue($k, $v); }
+        foreach ($categoryIds as $cid) { $tagFacetStmt->bindValue($tpi++, $cid, PDO::PARAM_INT); }
+        $tagFacetStmt->execute();
+        $tagFacets = $tagFacetStmt->fetchAll(PDO::FETCH_ASSOC);
+
         return [
             'results' => $items,
             'search_meta' => $searchMeta,
             'facets'  => [
                 'categories' => $categoryFacets,
                 'has_images' => $hasImagesCount,
+                'tags'       => $tagFacets,
             ],
         ];
     }
@@ -258,7 +297,7 @@ class SearchEngine {
     /**
      * Build and execute the main items query cleanly avoiding PDO named+positional mixing.
      */
-    private function buildAndRun(string $searchTerm, array $categoryIds, bool $hasImages, bool $dummy) {
+    private function buildAndRun(string $searchTerm, array $categoryIds, bool $hasImages, string $tagSlug, bool $dummy) {
         $sql      = "SELECT DISTINCT i.*, pm.file_path AS preview_file_path FROM items i ";
         $sql     .= "LEFT JOIN ("
                 .  "SELECT m.item_id, m.file_path "
@@ -275,6 +314,12 @@ class SearchEngine {
 
         if ($hasImages) {
             $sql .= "INNER JOIN media m ON i.id = m.item_id ";
+        }
+
+        if (!empty($tagSlug)) {
+            $sql .= "INNER JOIN item_tag it_filter ON i.id = it_filter.item_id ";
+            $sql .= "INNER JOIN tags t_filter ON it_filter.tag_id = t_filter.id AND t_filter.slug = ? ";
+            $values[] = $tagSlug;
         }
 
         if (!empty($searchTerm)) {

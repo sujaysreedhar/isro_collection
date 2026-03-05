@@ -7,9 +7,10 @@ $searchEngine = new SearchEngine($pdo);
 // Extract parameters — category_ids is now an array
 $params = [
     'q'            => trim($_GET['q'] ?? ''),
-    'category_ids' => array_values(array_filter(array_map('intval', (array)($params['category_ids'] ?? (array)($_GET['category_ids'] ?? []))))),
+    'category_ids' => array_values(array_filter(array_map('intval', (array)($_GET['category_ids'] ?? [])))),
     'has_images'   => isset($_GET['has_images']) && $_GET['has_images'] === '1',
     'exact'        => isset($_GET['exact']) && $_GET['exact'] === '1',
+    'tag'          => trim($_GET['tag'] ?? ''),
 ];
 
 $searchData = $searchEngine->search($params);
@@ -52,6 +53,7 @@ function buildQuery(array $p): string {
     }
     if (!empty($p['has_images']))  $out[] = 'has_images=1';
     if (!empty($p['exact']))       $out[] = 'exact=1';
+    if (!empty($p['tag']))         $out[] = 'tag=' . urlencode($p['tag']);
     return implode('&', $out);
 }
 
@@ -92,11 +94,17 @@ $catNameMap = array_column($facets['categories'], 'name', 'id');
                     <?php if ($params['has_images']): ?>
                         <input type="hidden" name="has_images" value="1">
                     <?php endif; ?>
+                    <?php if (!empty($params['tag'])): ?>
+                        <input type="hidden" name="tag" value="<?= htmlspecialchars($params['tag']) ?>">
+                    <?php endif; ?>
                     <input type="text" name="q" value="<?= htmlspecialchars($params['q']) ?>"
                            class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-gray-50 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
                            placeholder="Search the collections...">
                 </form>
             </div>
+            <nav class="hidden lg:flex space-x-8 ml-8 flex-shrink-0">
+                <a href="<?= SITE_URL ?>/gallery.php" class="text-gray-500 hover:text-gray-900 font-medium text-sm">Gallery</a>
+            </nav>
         </div>
     </header>
 
@@ -108,7 +116,7 @@ $catNameMap = array_column($facets['categories'], 'name', 'id');
                 <h3 class="text-sm font-bold uppercase tracking-wider text-gray-900 mb-4">Refine Search</h3>
 
                 <!-- Active Filters chips -->
-                <?php $hasActiveFilters = !empty($params['q']) || !empty($params['category_ids']) || $params['has_images']; ?>
+                <?php $hasActiveFilters = !empty($params['q']) || !empty($params['category_ids']) || $params['has_images'] || !empty($params['tag']); ?>
                 <?php if ($hasActiveFilters): ?>
                 <div class="mb-5 bg-gray-100 p-3 rounded text-sm">
                     <div class="flex items-center justify-between mb-2">
@@ -144,6 +152,15 @@ $catNameMap = array_column($facets['categories'], 'name', 'id');
                             <a href="<?= SITE_URL ?>/search.php?<?= buildQuery($noImg) ?>"
                                class="inline-flex items-center px-2 py-1 rounded bg-gray-800 text-white text-xs hover:bg-red-600 transition">
                                 Has Images
+                                <span class="ml-1 leading-none">&times;</span>
+                            </a>
+                        <?php endif; ?>
+
+                        <?php if (!empty($params['tag'])): ?>
+                            <?php $noTag = $params; $noTag['tag'] = ''; ?>
+                            <a href="<?= SITE_URL ?>/search.php?<?= buildQuery($noTag) ?>"
+                               class="inline-flex items-center px-2 py-1 rounded bg-gray-800 text-white text-xs hover:bg-red-600 transition">
+                                #<?= htmlspecialchars($params['tag']) ?>
                                 <span class="ml-1 leading-none">&times;</span>
                             </a>
                         <?php endif; ?>
@@ -194,6 +211,31 @@ $catNameMap = array_column($facets['categories'], 'name', 'id');
                     </div>
                 </div>
 
+                <!-- Tag Facet -->
+                <?php if (!empty($facets['tags'])): ?>
+                <div class="mb-6">
+                    <h4 class="font-semibold text-gray-800 mb-2 border-b border-gray-200 pb-2">Tags</h4>
+                    <div class="flex flex-wrap gap-1.5 mt-3">
+                        <?php foreach ($facets['tags'] as $tagFacet): ?>
+                            <?php $isActiveTag = ($params['tag'] === $tagFacet['slug']); ?>
+                            <?php
+                                $tagUrl = $params;
+                                $tagUrl['tag'] = $isActiveTag ? '' : $tagFacet['slug'];
+                            ?>
+                            <a href="<?= SITE_URL ?>/search.php?<?= buildQuery($tagUrl) ?>"
+                               class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors
+                                   <?= $isActiveTag
+                                       ? 'bg-gray-900 text-white'
+                                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900' ?>">
+                                <span class="mr-0.5 <?= $isActiveTag ? 'text-gray-400' : 'text-gray-400' ?>">#</span>
+                                <?= htmlspecialchars($tagFacet['name']) ?>
+                                <span class="ml-1 text-gray-400 font-normal">(<?= $tagFacet['facet_count'] ?>)</span>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
             </div>
         </aside>
 
@@ -232,16 +274,33 @@ $catNameMap = array_column($facets['categories'], 'name', 'id');
             <?php endif; ?>
 
             <?php if ($results): ?>
+                <?php
+                    // Batch-fetch tags for all result items
+                    $resultTags = [];
+                    $rids = array_column($results, 'id');
+                    if ($rids) {
+                        $ph = implode(',', array_fill(0, count($rids), '?'));
+                        $rtStmt = $pdo->prepare("SELECT it.item_id, t.name, t.slug FROM item_tag it INNER JOIN tags t ON it.tag_id = t.id WHERE it.item_id IN ({$ph}) ORDER BY t.name ASC");
+                        $rtStmt->execute($rids);
+                        foreach ($rtStmt->fetchAll() as $r) {
+                            $resultTags[$r['item_id']][] = $r;
+                        }
+                    }
+                ?>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <?php foreach ($results as $item): ?>
                         <?php
                             $previewPath = trim((string)($item['preview_file_path'] ?? ''));
                             $previewUrl = '';
                             if ($previewPath !== '') {
-                                $displayPath = __DIR__ . '/uploads/display/' . $previewPath;
-                                $previewUrl = file_exists($displayPath)
-                                    ? SITE_URL . '/uploads/display/' . rawurlencode($previewPath)
-                                    : SITE_URL . '/uploads/originals/' . rawurlencode($previewPath);
+                                if (isset($storage)) {
+                                    $previewUrl = $storage->url('display/' . $previewPath);
+                                } else {
+                                    $displayPath = __DIR__ . '/uploads/display/' . $previewPath;
+                                    $previewUrl = file_exists($displayPath)
+                                        ? SITE_URL . '/uploads/display/' . rawurlencode($previewPath)
+                                        : SITE_URL . '/uploads/originals/' . rawurlencode($previewPath);
+                                }
                             }
                         ?>
                         <a href="<?= SITE_URL ?>/item/<?= $item['id'] ?>"
@@ -256,6 +315,19 @@ $catNameMap = array_column($facets['categories'], 'name', 'id');
                             <div class="p-4 flex flex-col flex-grow">
                                 <div class="text-xs font-bold text-gray-500 mb-1"><?= htmlspecialchars($item['reg_number']) ?></div>
                                 <h3 class="font-bold serif text-lg text-gray-900 group-hover:text-blue-800 transition line-clamp-2"><?= htmlspecialchars($item['title']) ?></h3>
+                                <?php $rTags = $resultTags[$item['id']] ?? []; ?>
+                                <?php if ($rTags): ?>
+                                <div class="flex flex-wrap gap-1 mt-2">
+                                    <?php foreach (array_slice($rTags, 0, 3) as $rt): ?>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">
+                                            <span class="mr-0.5 text-gray-400">#</span><?= htmlspecialchars($rt['name']) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                    <?php if (count($rTags) > 3): ?>
+                                        <span class="text-xs text-gray-400">+<?= count($rTags) - 3 ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </a>
                     <?php endforeach; ?>

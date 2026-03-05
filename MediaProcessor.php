@@ -11,15 +11,17 @@ class MediaProcessor {
     private PDO    $db;
     private string $uploadRoot;
     private bool   $hasIsPrimary;
+    private ?StorageInterface $storage;
 
     const MAX_IMG_BYTES = 5  * 1024 * 1024;   // 5 MB for images
     const MAX_PDF_BYTES = 20 * 1024 * 1024;   // 20 MB for PDFs
     const ALLOWED_IMG   = ['image/jpeg','image/png','image/gif','image/webp'];
 
-    public function __construct(PDO $db) {
+    public function __construct(PDO $db, ?StorageInterface $storage = null) {
         $this->db         = $db;
         $this->uploadRoot = realpath(__DIR__ . '/uploads') . DIRECTORY_SEPARATOR;
         $this->hasIsPrimary = $this->columnExists('media', 'is_primary');
+        $this->storage    = $storage;
 
         foreach (['thumbs','display','original','pdfs'] as $dir) {
             $path = $this->uploadRoot . $dir;
@@ -58,8 +60,13 @@ class MediaProcessor {
         $baseName = sprintf('img_%d_%s', $itemId, bin2hex(random_bytes(8)));
 
         // Save untouched original
-        $origPath = $this->uploadRoot . 'original' . DIRECTORY_SEPARATOR . $baseName . '.' . $this->mimeExt($mime);
+        $origExt  = $this->mimeExt($mime);
+        $origPath = $this->uploadRoot . 'original' . DIRECTORY_SEPARATOR . $baseName . '.' . $origExt;
         move_uploaded_file($file['tmp_name'], $origPath);
+        // Upload original to storage backend
+        if ($this->storage) {
+            $this->storage->put('original/' . $baseName . '.' . $origExt, $origPath, $mime);
+        }
 
         // WebP variants
         $webpName = $baseName . '.webp';
@@ -113,6 +120,11 @@ class MediaProcessor {
         $dest     = $this->uploadRoot . 'pdfs' . DIRECTORY_SEPARATOR . $filename;
         if (!move_uploaded_file($file['tmp_name'], $dest))
             return ['success' => false, 'message' => 'Failed to write PDF to disk.'];
+
+        // Upload PDF to storage backend
+        if ($this->storage) {
+            $this->storage->put('pdfs/' . $filename, $dest, 'application/pdf');
+        }
 
         try {
             if ($this->hasIsPrimary) {
@@ -188,10 +200,22 @@ class MediaProcessor {
             if ($filePath !== '') {
                 if ($mediaType === 'pdf') {
                     $this->deleteFileIfExists($this->uploadRoot . 'pdfs' . DIRECTORY_SEPARATOR . $filePath);
+                    if ($this->storage) {
+                        $this->storage->delete('pdfs/' . $filePath);
+                    }
                 } elseif ($mediaType === 'image') {
                     foreach (['thumbs', 'display', 'original'] as $dir) {
                         foreach (glob($this->uploadRoot . $dir . DIRECTORY_SEPARATOR . pathinfo($filePath, PATHINFO_FILENAME) . '.*') ?: [] as $candidate) {
                             $this->deleteFileIfExists($candidate);
+                        }
+                        if ($this->storage) {
+                            // Delete WebP variant from storage
+                            $this->storage->delete($dir . '/' . $filePath);
+                            // Also try original extension variants
+                            $fBase = pathinfo($filePath, PATHINFO_FILENAME);
+                            foreach (['jpg','png','gif','webp'] as $ext) {
+                                $this->storage->delete($dir . '/' . $fBase . '.' . $ext);
+                            }
                         }
                     }
                 }
@@ -219,12 +243,24 @@ class MediaProcessor {
      *   pdf     → /uploads/pdfs/{file_path}
      *   youtube → https://www.youtube.com/embed/{file_path (videoId)}
      */
-    public static function url(string $filename, string $variant = 'display', string $mediaType = 'image'): string {
-        return match ($mediaType) {
-            'pdf'     => SITE_URL . '/uploads/pdfs/'   . htmlspecialchars($filename),
-            'youtube' => 'https://www.youtube.com/embed/' . htmlspecialchars($filename),
-            default   => SITE_URL . '/uploads/' . $variant . '/' . htmlspecialchars($filename),
+    public static function url(string $filename, string $variant = 'display', string $mediaType = 'image', ?StorageInterface $storage = null): string {
+        if ($mediaType === 'youtube') {
+            return 'https://www.youtube.com/embed/' . htmlspecialchars($filename);
+        }
+
+        $subdir = match ($mediaType) {
+            'pdf'   => 'pdfs',
+            default => $variant,
         };
+
+        $storagePath = $subdir . '/' . $filename;
+
+        if ($storage) {
+            return $storage->url($storagePath);
+        }
+
+        // Fallback to local URL
+        return SITE_URL . '/uploads/' . $subdir . '/' . htmlspecialchars($filename);
     }
 
     /**
@@ -270,6 +306,11 @@ class MediaProcessor {
         }
         imagewebp($img, $path, 85);
         imagedestroy($img);
+
+        // Upload the variant to storage backend
+        if ($this->storage) {
+            $this->storage->put($folder . '/' . $fn, $path, 'image/webp');
+        }
     }
 
     private function smartCropSquare($src, int $srcW, int $srcH, int $size) {

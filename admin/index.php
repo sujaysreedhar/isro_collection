@@ -15,7 +15,7 @@ $itemsHidden    = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE is_visible 
 
 // Orphaned files check via MediaProcessor
 require_once __DIR__ . '/../MediaProcessor.php';
-$mp = new MediaProcessor($pdo);
+$mp = new MediaProcessor($pdo, $storage ?? null);
 $orphanedFiles = $mp->orphanedFiles();
 
 // Fetch 5 most recent items for a quick overview

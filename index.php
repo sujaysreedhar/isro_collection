@@ -13,6 +13,24 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute();
 $featuredItems = $stmt->fetchAll();
+
+// Fetch tags for all featured items in one query
+$featuredTags = []; // item_id => [tag, tag, ...]
+if ($featuredItems) {
+    $fids = array_column($featuredItems, 'id');
+    $placeholders = implode(',', array_fill(0, count($fids), '?'));
+    $tStmt = $pdo->prepare("
+        SELECT it.item_id, t.name, t.slug
+        FROM item_tag it
+        INNER JOIN tags t ON it.tag_id = t.id
+        WHERE it.item_id IN ({$placeholders})
+        ORDER BY t.name ASC
+    ");
+    $tStmt->execute($fids);
+    foreach ($tStmt->fetchAll() as $row) {
+        $featuredTags[$row['item_id']][] = $row;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,6 +61,7 @@ $featuredItems = $stmt->fetchAll();
             </div>
             <nav class="hidden md:flex space-x-8">
                 <a href="<?= SITE_URL ?>/search.php" class="text-gray-500 hover:text-gray-900 font-medium">Explore Collections</a>
+                <a href="<?= SITE_URL ?>/gallery.php" class="text-gray-500 hover:text-gray-900 font-medium">Gallery</a>
                 <a href="#" class="text-gray-500 hover:text-gray-900 font-medium">About</a>
             </nav>
         </div>
@@ -56,7 +75,7 @@ $featuredItems = $stmt->fetchAll();
                     <div class="sm:text-center lg:text-left">
                         <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl serif">
                             <span class="block xl:inline">Discover history in the</span>
-                            <span class="block text-gray-600 xl:inline">Museum Collection</span>
+                            <span class="block text-gray-600 xl:inline"><?= SITE_TITLE ?></span>
                         </h1>
                         <p class="mt-3 text-base text-gray-500 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
                             Explore thousands of items, narratives, and media from engineering marvels to significant historical artifacts.
@@ -96,7 +115,8 @@ $featuredItems = $stmt->fetchAll();
                     <a href="<?= SITE_URL ?>/item/<?= $item['id'] ?>" class="group bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
                         <div class="relative h-64 bg-gray-100 flex items-center justify-center overflow-hidden">
                             <?php if (!empty($item['file_path'])): ?>
-                                <img src="<?= htmlspecialchars($item['file_path']) ?>" alt="<?= htmlspecialchars($item['title']) ?>" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500">
+                                <?php $featuredImgUrl = isset($storage) ? $storage->url('display/' . $item['file_path']) : SITE_URL . '/uploads/display/' . $item['file_path']; ?>
+                                <img src="<?= htmlspecialchars($featuredImgUrl) ?>" alt="<?= htmlspecialchars($item['title']) ?>" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500">
                             <?php else: ?>
                                 <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             <?php endif; ?>
@@ -106,9 +126,22 @@ $featuredItems = $stmt->fetchAll();
                         </div>
                         <div class="p-6 flex flex-col flex-grow">
                             <h3 class="text-xl font-bold serif text-gray-900 mb-2 group-hover:text-blue-800 transition-colors line-clamp-2"><?= htmlspecialchars($item['title']) ?></h3>
-                            <p class="text-sm text-gray-600 line-clamp-3 mb-4 flex-grow">
+                            <p class="text-sm text-gray-600 line-clamp-3 mb-3 flex-grow">
                                 <?= htmlspecialchars(strip_tags($item['physical_description'] ?? 'No description available.')) ?>
                             </p>
+                            <?php $cardTags = $featuredTags[$item['id']] ?? []; ?>
+                            <?php if ($cardTags): ?>
+                            <div class="flex flex-wrap gap-1 mt-auto">
+                                <?php foreach (array_slice($cardTags, 0, 4) as $ct): ?>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">
+                                        <span class="mr-0.5 text-gray-400">#</span><?= htmlspecialchars($ct['name']) ?>
+                                    </span>
+                                <?php endforeach; ?>
+                                <?php if (count($cardTags) > 4): ?>
+                                    <span class="text-xs text-gray-400">+<?= count($cardTags) - 4 ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </a>
                 <?php endforeach; ?>

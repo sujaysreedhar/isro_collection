@@ -53,6 +53,17 @@ $narrativeStmt = $pdo->prepare("
 $narrativeStmt->execute([':id' => $id]);
 $stories = $narrativeStmt->fetchAll();
 
+// 4b. Fetch Tags
+$tagStmt = $pdo->prepare("
+    SELECT t.id, t.name, t.slug
+    FROM tags t
+    INNER JOIN item_tag it ON t.id = it.tag_id
+    WHERE it.item_id = :id
+    ORDER BY t.name ASC
+");
+$tagStmt->execute([':id' => $id]);
+$itemTags = $tagStmt->fetchAll();
+
 // 4. Generate Citation
 $currentYear = date('Y');
 $citationUrl = SITE_URL . "/item/" . htmlspecialchars($item['id']);
@@ -64,10 +75,14 @@ $ogDescription = htmlspecialchars(substr(strip_tags($item['physical_description'
 $ogUrl         = SITE_URL . '/item/' . $id;
 $ogImage       = '';
 if ($primaryMedia) {
-    $displayPath = __DIR__ . '/uploads/display/' . $primaryMedia['file_path'];
-    $ogImage = file_exists($displayPath)
-        ? SITE_URL . '/uploads/display/'   . rawurlencode($primaryMedia['file_path'])
-        : SITE_URL . '/uploads/originals/' . rawurlencode($primaryMedia['file_path']);
+    if (isset($storage)) {
+        $ogImage = $storage->url('display/' . $primaryMedia['file_path']);
+    } else {
+        $displayPath = __DIR__ . '/uploads/display/' . $primaryMedia['file_path'];
+        $ogImage = file_exists($displayPath)
+            ? SITE_URL . '/uploads/display/'   . rawurlencode($primaryMedia['file_path'])
+            : SITE_URL . '/uploads/originals/' . rawurlencode($primaryMedia['file_path']);
+    }
 }
 $jsonLd = array_filter([
     '@context'    => 'https://schema.org',
@@ -139,7 +154,7 @@ $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
             <div class="flex items-center">
                 <a href="<?= SITE_URL ?>" class="text-2xl font-bold serif tracking-tight"><?= SITE_TITLE ?></a>
             </div>
-            <div class="flex-1 max-w-2xl ml-8">
+            <div class="flex-1 max-w-2xl ml-8 hidden md:block">
                 <form action="/search.php" method="GET" class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -150,6 +165,10 @@ $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
                     <input type="text" name="q" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 sm:text-sm transition duration-150 ease-in-out" placeholder="Search the collections... (e.g. Steam Engine)">
                 </form>
             </div>
+            <nav class="hidden lg:flex space-x-8 ml-8 flex-shrink-0">
+                <a href="<?= SITE_URL ?>/search.php" class="text-gray-500 hover:text-gray-900 font-medium text-sm">Explore</a>
+                <a href="<?= SITE_URL ?>/gallery.php" class="text-gray-500 hover:text-gray-900 font-medium text-sm">Gallery</a>
+            </nav>
         </div>
     </header>
 
@@ -188,10 +207,13 @@ $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
                             <!-- Primary Image Viewer -->
                             <?php if ($primaryMedia): ?>
                                 <?php
-                                    // Prefer WebP display variant, fall back to original file_path
-                                    $displaySrc = file_exists(__DIR__ . '/uploads/display/' . $primaryMedia['file_path'])
-                                        ? SITE_URL . '/uploads/display/' . rawurlencode($primaryMedia['file_path'])
-                                        : (SITE_URL . '/uploads/originals/' . rawurlencode($primaryMedia['file_path']));
+                                    if (isset($storage)) {
+                                        $displaySrc = $storage->url('display/' . $primaryMedia['file_path']);
+                                    } else {
+                                        $displaySrc = file_exists(__DIR__ . '/uploads/display/' . $primaryMedia['file_path'])
+                                            ? SITE_URL . '/uploads/display/' . rawurlencode($primaryMedia['file_path'])
+                                            : (SITE_URL . '/uploads/originals/' . rawurlencode($primaryMedia['file_path']));
+                                    }
                                 ?>
                                 <img src="<?= $displaySrc ?>" alt="<?= htmlspecialchars($item['title']) ?>" class="object-cover w-full h-full">
                             <?php else: ?>
@@ -212,6 +234,27 @@ $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
                         </span>
                         <?php endif; ?>
                     </div>
+                    <div class="bg-white border-b border-x border-gray-200 text-xs text-gray-500 p-3 rounded-b-lg flex flex-wrap gap-x-6 gap-y-2 mb-4">
+                        <?php if(!empty($primaryMedia['dimensions'])): ?>
+                            <div class="flex items-center gap-1.5"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg><span class="font-medium text-gray-700"><?= htmlspecialchars($primaryMedia['dimensions']) ?> px</span></div>
+                        <?php endif; ?>
+                        <?php if(!empty($primaryMedia['file_size'])): ?>
+                            <?php
+                                $bytes = $primaryMedia['file_size'];
+                                $units = ['B', 'KB', 'MB', 'GB'];
+                                $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+                                $pow = min($pow, count($units) - 1);
+                                $size = round($bytes / pow(1024, $pow), 1) . ' ' . $units[$pow];
+                            ?>
+                            <div class="flex items-center gap-1.5"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg><span class="font-medium text-gray-700"><?= $size ?></span></div>
+                        <?php endif; ?>
+                        <?php if(!empty($primaryMedia['mime_type']) && $primaryMedia['mime_type'] !== 'image/youtube'): ?>
+                            <div class="flex items-center gap-1.5"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="font-medium text-gray-700"><?= strtoupper(str_replace('image/', '', htmlspecialchars($primaryMedia['mime_type']))) ?></span></div>
+                        <?php endif; ?>
+                        <?php if(!empty($primaryMedia['upload_date'])): ?>
+                            <div class="flex items-center gap-1.5"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="font-medium text-gray-700">Added <?= date('M j, Y', strtotime($primaryMedia['upload_date'])) ?></span></div>
+                        <?php endif; ?>
+                    </div>
                     <?php endif; ?>
                 </div>
 
@@ -220,7 +263,18 @@ $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
                     <div class="mb-2">
                         <span class="text-sm font-semibold tracking-wider text-gray-500 uppercase">Reg: <?= htmlspecialchars($item['reg_number']) ?></span>
                     </div>
-                    <h1 class="text-4xl font-bold mb-6 leading-tight"><?= htmlspecialchars($item['title']) ?></h1>
+                    <h1 class="text-4xl font-bold mb-4 leading-tight"><?= htmlspecialchars($item['title']) ?></h1>
+
+                    <?php if ($itemTags): ?>
+                    <div class="flex flex-wrap gap-2 mb-6">
+                        <?php foreach ($itemTags as $tag): ?>
+                            <a href="<?= SITE_URL ?>/tag/<?= htmlspecialchars($tag['slug']) ?>"
+                               class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-800 hover:text-white transition-colors duration-200">
+                                <span class="mr-1 text-gray-400">#</span><?= htmlspecialchars($tag['name']) ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
                     
                     <div class="prose prose-gray mb-8 serif text-lg leading-relaxed text-gray-700">
                         <p>

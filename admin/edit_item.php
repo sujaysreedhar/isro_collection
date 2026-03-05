@@ -3,7 +3,7 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/layout.php';
 require_once __DIR__ . '/../MediaProcessor.php';
 
-$mp = new MediaProcessor($pdo);
+$mp = new MediaProcessor($pdo, $storage ?? null);
 $hasIsPrimary = false;
 try {
     $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
@@ -19,11 +19,13 @@ $item = [
 ];
 $mediaList       = [];
 $linkedNarratives = [];
+$linkedTags      = [];
 $error   = '';
 $success = '';
 
 $categories   = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
 $allNarratives = $pdo->query("SELECT id, title FROM narratives ORDER BY title ASC")->fetchAll();
+$allTags       = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
 
 if ($id > 0) {
     $stmt = $pdo->prepare("SELECT * FROM items WHERE id = :id");
@@ -37,6 +39,9 @@ if ($id > 0) {
         $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
         $nStmt->execute([':id' => $id]);
         $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
+        $tStmt = $pdo->prepare("SELECT tag_id FROM item_tag WHERE item_id = :id");
+        $tStmt->execute([':id' => $id]);
+        $linkedTags = $tStmt->fetchAll(PDO::FETCH_COLUMN);
     } else {
         $error = "Item not found.";
         $id = 0;
@@ -87,6 +92,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
         $nStmt->execute([':id' => $id]);
         $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
+        $tStmt = $pdo->prepare("SELECT tag_id FROM item_tag WHERE item_id = :id");
+        $tStmt->execute([':id' => $id]);
+        $linkedTags = $tStmt->fetchAll(PDO::FETCH_COLUMN);
     } else {
 
         $reg_number             = trim($_POST['reg_number'] ?? '');
@@ -182,6 +190,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach (array_filter($sel) as $nid) { $ls->execute([':i' => $id, ':n' => $nid]); }
         }
 
+        // — Tag pivot sync (auto-create new tags) —
+        $pdo->prepare("DELETE FROM item_tag WHERE item_id = :id")->execute([':id' => $id]);
+        $rawTags = (array)($_POST['tags'] ?? []);
+        foreach ($rawTags as $tagValue) {
+            $tagValue = trim($tagValue);
+            if ($tagValue === '') continue;
+            if (ctype_digit($tagValue)) {
+                // Existing tag by ID
+                $tagId = (int)$tagValue;
+            } else {
+                // New tag — create it
+                $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower($tagValue));
+                $slug = trim($slug, '-');
+                // Check if slug already exists
+                $existCheck = $pdo->prepare("SELECT id FROM tags WHERE slug = :s");
+                $existCheck->execute([':s' => $slug]);
+                $tagId = $existCheck->fetchColumn();
+                if (!$tagId) {
+                    $ins = $pdo->prepare("INSERT INTO tags (name, slug) VALUES (:n, :s)");
+                    $ins->execute([':n' => $tagValue, ':s' => $slug]);
+                    $tagId = (int)$pdo->lastInsertId();
+                }
+            }
+            $pdo->prepare("INSERT IGNORE INTO item_tag (item_id, tag_id) VALUES (:i, :t)")
+                ->execute([':i' => $id, ':t' => $tagId]);
+        }
+
             $pdo->commit();
 
         // Reload
@@ -194,6 +229,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
             $nStmt->execute([':id' => $id]);
             $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
+            $tStmt = $pdo->prepare("SELECT tag_id FROM item_tag WHERE item_id = :id");
+            $tStmt->execute([':id' => $id]);
+            $linkedTags = $tStmt->fetchAll(PDO::FETCH_COLUMN);
+            $allTags = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
 
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -304,6 +343,21 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                         <?php endforeach; ?>
                     </select>
                 </div>
+
+                <!-- TomSelect Tag Input -->
+                <div>
+                    <label class="label">
+                        Tags / Hashtags
+                        <span class="text-gray-400 font-normal">(type to create new or select existing)</span>
+                    </label>
+                    <select id="tag-select" name="tags[]" multiple placeholder="Add tags… e.g. steam, victorian" class="w-full">
+                        <?php foreach ($allTags as $t): ?>
+                            <option value="<?= $t['id'] ?>" <?= in_array($t['id'], $linkedTags) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($t['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
 
             <!-- ── Attach Media (tabbed) ────────────────────────── -->
@@ -391,14 +445,14 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                     <div class="h-36 bg-red-50 flex flex-col items-center justify-center gap-1">
                         <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                         <span class="text-xs text-red-500 font-medium">PDF Document</span>
-                        <a href="<?= MediaProcessor::url($m['file_path'], 'display', 'pdf') ?>" target="_blank"
+                        <a href="<?= MediaProcessor::url($m['file_path'], 'display', 'pdf', $storage ?? null) ?>" target="_blank"
                            class="text-xs text-blue-600 hover:underline">Open PDF</a>
                     </div>
                 <?php else: ?>
                     <!-- Image preview -->
                     <div class="h-36 bg-gray-100">
-                        <img src="<?= MediaProcessor::url($m['file_path'], 'thumbs', 'image') ?>"
-                             onerror="this.src='<?= MediaProcessor::url($m['file_path'], 'display', 'image') ?>'"
+                        <img src="<?= MediaProcessor::url($m['file_path'], 'thumbs', 'image', $storage ?? null) ?>"
+                             onerror="this.src='<?= MediaProcessor::url($m['file_path'], 'display', 'image', $storage ?? null) ?>'"
                              class="object-cover w-full h-full" alt="thumbnail">
                     </div>
                 <?php endif; ?>
@@ -453,6 +507,15 @@ new TomSelect('#narrative-select', {
     plugins: ['remove_button'],
     placeholder: 'Search for a story…',
     maxOptions: 200,
+});
+
+new TomSelect('#tag-select', {
+    plugins: ['remove_button'],
+    create: true,
+    placeholder: 'Add tags… e.g. steam, victorian',
+    maxOptions: 200,
+    persist: false,
+    createFilter: function(input) { return input.trim().length >= 2; },
 });
 
 // Media upload tab switcher
