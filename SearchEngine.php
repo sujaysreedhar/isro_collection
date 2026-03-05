@@ -255,17 +255,18 @@ class SearchEngine {
         if (!empty($searchTerm)) {
             $boolTerm = $this->buildBooleanSearchTerm($searchTerm);
             if ($boolTerm !== null) {
-                $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
-                $imgBind[':search'] = $boolTerm;
+                $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(? IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(? IN NATURAL LANGUAGE MODE) OR i.title LIKE ? OR i.physical_description LIKE ? OR i.production_date LIKE ? OR i.credit_line LIKE ?)";
+                $imgBind[] = $boolTerm;
+                $imgBind[] = $searchTerm;
             } else {
-                $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
+                $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(? IN NATURAL LANGUAGE MODE) OR i.title LIKE ? OR i.physical_description LIKE ? OR i.production_date LIKE ? OR i.credit_line LIKE ?)";
+                $imgBind[] = $searchTerm;
             }
-            $imgBind[':search_nl'] = $searchTerm;
             $likeTerm = '%' . $searchTerm . '%';
-            $imgBind[':sl1'] = $likeTerm;
-            $imgBind[':sl2'] = $likeTerm;
-            $imgBind[':sl3'] = $likeTerm;
-            $imgBind[':sl4'] = $likeTerm;
+            $imgBind[] = $likeTerm;
+            $imgBind[] = $likeTerm;
+            $imgBind[] = $likeTerm;
+            $imgBind[] = $likeTerm;
         }
 
         if (!empty($categoryIds)) {
@@ -279,7 +280,7 @@ class SearchEngine {
 
         $imgStmt = $this->db->prepare($imgSql);
         $pi = 1;
-        foreach ($imgBind as $k => $v) { $imgStmt->bindValue($k, $v); }
+        foreach ($imgBind as $v) { $imgStmt->bindValue($pi++, $v); }
         foreach ($categoryIds as $cid)  { $imgStmt->bindValue($pi++, $cid, PDO::PARAM_INT); }
         $imgStmt->execute();
         $hasImagesCount = $imgStmt->fetchColumn();
@@ -293,8 +294,10 @@ class SearchEngine {
         $tagFacetBind  = [];
 
         if (!empty($searchTerm)) {
-            $tagFacetWhere[] = "(i.title LIKE :tfl OR i.physical_description LIKE :tfl)";
-            $tagFacetBind[':tfl'] = '%' . $searchTerm . '%';
+            $tagFacetWhere[] = "(i.title LIKE ? OR i.physical_description LIKE ?)";
+            $likeTerm = '%' . $searchTerm . '%';
+            $tagFacetBind[] = $likeTerm;
+            $tagFacetBind[] = $likeTerm;
         }
         if (!empty($categoryIds)) {
             $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
@@ -307,7 +310,7 @@ class SearchEngine {
 
         $tagFacetStmt = $this->db->prepare($tagFacetSql);
         $tpi = 1;
-        foreach ($tagFacetBind as $k => $v) { $tagFacetStmt->bindValue($k, $v); }
+        foreach ($tagFacetBind as $v) { $tagFacetStmt->bindValue($tpi++, $v); }
         foreach ($categoryIds as $cid) { $tagFacetStmt->bindValue($tpi++, $cid, PDO::PARAM_INT); }
         $tagFacetStmt->execute();
         $tagFacets = $tagFacetStmt->fetchAll(PDO::FETCH_ASSOC);
