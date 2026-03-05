@@ -17,6 +17,29 @@ class SearchEngine {
      */
     private ?array $vocabulary = null;
 
+    /**
+     * Build a safe boolean-mode fulltext query from user input.
+     * Returns null when no searchable tokens are found.
+     */
+    private function buildBooleanSearchTerm(string $searchTerm): ?string {
+        $searchTerm = trim($searchTerm);
+        if ($searchTerm === '') {
+            return null;
+        }
+
+        if (strpos($searchTerm, '"') !== false) {
+            return $searchTerm;
+        }
+
+        preg_match_all('/[\p{L}\p{N}]+/u', $searchTerm, $matches);
+        $words = array_values(array_filter($matches[0] ?? [], fn($w) => $w !== ''));
+        if (empty($words)) {
+            return null;
+        }
+
+        return implode('* ', $words) . '*';
+    }
+
     private function getVocabulary(): array {
         if ($this->vocabulary !== null) {
             return $this->vocabulary;
@@ -198,14 +221,13 @@ class SearchEngine {
         }
 
         if (!empty($searchTerm)) {
-            $facetWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
-            // For boolean mode, add * to the end of each word if we don't have exact quotes
-            $boolTerm = $searchTerm;
-            if (strpos($boolTerm, '"') === false) {
-                $words = str_word_count($boolTerm, 1);
-                $boolTerm = implode('* ', $words) . (count($words) > 0 ? '*' : '');
+            $boolTerm = $this->buildBooleanSearchTerm($searchTerm);
+            if ($boolTerm !== null) {
+                $facetWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
+                $facetBind[':search'] = $boolTerm;
+            } else {
+                $facetWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
             }
-            $facetBind[':search'] = $boolTerm;
             $facetBind[':search_nl'] = $searchTerm;
             $likeTerm = '%' . $searchTerm . '%';
             $facetBind[':sl1'] = $likeTerm;
@@ -231,14 +253,13 @@ class SearchEngine {
         $imgBind  = [];
 
         if (!empty($searchTerm)) {
-            $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
-            // For boolean mode, add * to the end of each word if we don't have exact quotes
-            $boolTerm = $searchTerm;
-            if (strpos($boolTerm, '"') === false) {
-                $words = str_word_count($boolTerm, 1);
-                $boolTerm = implode('* ', $words) . (count($words) > 0 ? '*' : '');
+            $boolTerm = $this->buildBooleanSearchTerm($searchTerm);
+            if ($boolTerm !== null) {
+                $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
+                $imgBind[':search'] = $boolTerm;
+            } else {
+                $imgWhere[] = "(MATCH(i.title, i.physical_description) AGAINST(:search_nl IN NATURAL LANGUAGE MODE) OR i.title LIKE :sl1 OR i.physical_description LIKE :sl2 OR i.production_date LIKE :sl3 OR i.credit_line LIKE :sl4)";
             }
-            $imgBind[':search'] = $boolTerm;
             $imgBind[':search_nl'] = $searchTerm;
             $likeTerm = '%' . $searchTerm . '%';
             $imgBind[':sl1'] = $likeTerm;
@@ -331,16 +352,13 @@ class SearchEngine {
         }
 
         if (!empty($searchTerm)) {
-            $parts[]  = "(MATCH(i.title, i.physical_description) AGAINST(? IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(? IN NATURAL LANGUAGE MODE) OR i.title LIKE ? OR i.physical_description LIKE ? OR i.production_date LIKE ? OR i.credit_line LIKE ?)";
-            
-            // For boolean mode, add * to the end of each word if we don't have exact quotes
-            $boolTerm = $searchTerm;
-            if (strpos($boolTerm, '"') === false) {
-                $words = str_word_count($boolTerm, 1);
-                $boolTerm = implode('* ', $words) . (count($words) > 0 ? '*' : '');
+            $boolTerm = $this->buildBooleanSearchTerm($searchTerm);
+            if ($boolTerm !== null) {
+                $parts[]  = "(MATCH(i.title, i.physical_description) AGAINST(? IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(? IN NATURAL LANGUAGE MODE) OR i.title LIKE ? OR i.physical_description LIKE ? OR i.production_date LIKE ? OR i.credit_line LIKE ?)";
+                $values[] = $boolTerm;
+            } else {
+                $parts[]  = "(MATCH(i.title, i.physical_description) AGAINST(? IN NATURAL LANGUAGE MODE) OR i.title LIKE ? OR i.physical_description LIKE ? OR i.production_date LIKE ? OR i.credit_line LIKE ?)";
             }
-            
-            $values[] = $boolTerm;
             $values[] = $searchTerm;
             $values[] = '%' . $searchTerm . '%';
             $values[] = '%' . $searchTerm . '%';
