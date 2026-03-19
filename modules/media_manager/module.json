@@ -1,0 +1,7 @@
+{
+    "name": "Media Manager",
+    "description": "Audits collection media and generates missing thumbnails.",
+    "version": "1.1",
+    "author": "Antigravity",
+    "admin_menu_priority": 10
+}

@@ -16,6 +16,7 @@ function renderAdminHeader($title) {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f9fafb; }
     </style>
+    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_head'); } ?>
 </head>
 <body class="flex h-screen overflow-hidden">
 
@@ -32,9 +33,12 @@ function renderAdminHeader($title) {
             <div class="pt-4 pb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Content</div>
             <a href="<?= SITE_URL ?>/admin/narratives.php" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Stories & Narratives</a>
             <div class="pt-4 pb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">System</div>
+            <a href="<?= SITE_URL ?>/admin/modules.php" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Modules</a>
+            <a href="<?= SITE_URL ?>/admin/themes.php" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Themes</a>
             <a href="<?= SITE_URL ?>/admin/users.php" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Administrators</a>
             <a href="<?= SITE_URL ?>/admin/settings.php" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Storage Settings</a>
             <a href="<?= SITE_URL ?>/admin/storage_migration.php" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Storage Migration</a>
+            <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_menu'); } ?>
         </nav>
         <div class="p-4 border-t border-gray-800">
             <p class="text-xs text-gray-500 mb-2">Logged in as <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Admin') ?></p>
@@ -56,9 +60,12 @@ function renderAdminHeader($title) {
             <a href="<?= SITE_URL ?>/admin/items.php" class="block px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300">Manage Items</a>
             <a href="<?= SITE_URL ?>/admin/categories.php" class="block px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300">Categories</a>
             <a href="<?= SITE_URL ?>/admin/narratives.php" class="block px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300">Stories & Narratives</a>
+            <a href="<?= SITE_URL ?>/admin/modules.php" class="block px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300">Modules</a>
+            <a href="<?= SITE_URL ?>/admin/themes.php" class="block px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300">Themes</a>
             <a href="<?= SITE_URL ?>/admin/users.php" class="block px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300">Administrators</a>
             <a href="<?= SITE_URL ?>/admin/settings.php" class="block px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300">Storage Settings</a>
             <a href="<?= SITE_URL ?>/admin/storage_migration.php" class="block px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300">Storage Migration</a>
+            <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_menu_mobile'); } ?>
         </nav>
         <div class="p-4 border-t border-gray-800">
             <a href="<?= SITE_URL ?>/admin/logout.php" class="block w-full text-center px-4 py-2 text-sm text-gray-300 bg-gray-800 rounded hover:bg-gray-700 transition">Log Out</a>
@@ -103,6 +110,7 @@ function closeMobileNav() {
     document.getElementById('mobile-nav-overlay').classList.add('hidden');
 }
 </script>
+<?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_footer'); } ?>
 </body>
 </html>
 <?php

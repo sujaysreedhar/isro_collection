@@ -25,8 +25,12 @@ $options = [
     PDO::ATTR_EMULATE_PREPARES   => false,
 ];
 
+// ── Database Safety Extension ───────────────────────────────────────────────
+require_once __DIR__ . '/../includes/SafePDO.php';
+require_once __DIR__ . '/../includes/ModuleDB.php';
+
 try {
-     $pdo = new PDO($dsn, $user, $pass, $options);
+     $pdo = new SafePDO($dsn, $user, $pass, $options);
 } catch (\PDOException $e) {
      throw new \PDOException($e->getMessage(), (int)$e->getCode());
 }
@@ -76,4 +80,19 @@ if ($storageDriver === 's3'
     }
     $storage = new LocalStorage($uploadBase, SITE_URL . '/uploads');
 }
+
+// ── Hook Registry & Modules & Themes ─────────────────────────────────────────
+require_once __DIR__ . '/../includes/HookRegistry.php';
+require_once __DIR__ . '/../includes/ThemeManager.php';
+require_once __DIR__ . '/../includes/BaseModule.php';
+require_once __DIR__ . '/../includes/ModuleManager.php';
+
+require_once __DIR__ . '/../includes/frontend.php';
+
+$activeModulesJson = $appSettings['active_modules'] ?? '[]';
+$activeModulesSlugs = json_decode($activeModulesJson, true);
+if (!is_array($activeModulesSlugs)) $activeModulesSlugs = [];
+
+$moduleManager = new ModuleManager($pdo, __DIR__ . '/../modules', $activeModulesSlugs);
+$moduleManager->bootActiveModules();
 ?>

@@ -1,0 +1,7 @@
+{
+    "name": "User Galleries",
+    "description": "Allows visitors to curate and share their own personal galleries.",
+    "version": "1.0",
+    "author": "Antigravity",
+    "admin_menu_priority": 30
+}

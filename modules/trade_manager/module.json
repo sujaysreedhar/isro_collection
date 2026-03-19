@@ -1,0 +1,7 @@
+{
+    "name": "Trade Manager",
+    "description": "Allows users to request trades for items in the collection.",
+    "version": "1.1",
+    "author": "Antigravity",
+    "admin_menu_priority": 20
+}

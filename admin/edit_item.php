@@ -15,7 +15,7 @@ try {
 $id  = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $item = [
     'reg_number' => '', 'title' => '', 'physical_description' => '',
-    'historical_significance' => '', 'production_date' => '', 'credit_line' => '', 'category_id' => '',
+    'historical_significance' => '', 'production_date' => '', 'credit_line' => '', 'category_id' => '', 'allow_trade' => 1,
 ];
 $mediaList       = [];
 $linkedNarratives = [];
@@ -104,6 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $production_date        = trim($_POST['production_date'] ?? '');
         $credit_line            = trim($_POST['credit_line'] ?? '');
         $category_id            = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
+        $allow_trade            = isset($_POST['allow_trade']) ? 1 : 0;
 
         try {
             $pdo->beginTransaction();
@@ -111,21 +112,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id > 0) {
             $pdo->prepare("
                 UPDATE items SET reg_number=:reg, title=:title, physical_description=:desc,
-                historical_significance=:hist, production_date=:prod, credit_line=:cred, category_id=:cat
+                historical_significance=:hist, production_date=:prod, credit_line=:cred, category_id=:cat, allow_trade=:trade
                 WHERE id=:id
             ")->execute([
                 ':reg'=>$reg_number, ':title'=>$title, ':desc'=>$physical_description,
                 ':hist'=>$historical_significance, ':prod'=>$production_date, ':cred'=>$credit_line,
-                ':cat'=>$category_id, ':id'=>$id,
+                ':cat'=>$category_id, ':trade'=>$allow_trade, ':id'=>$id,
             ]);
             $success = "Item updated.";
         } else {
             $pdo->prepare("
-                INSERT INTO items (reg_number,title,physical_description,historical_significance,production_date,credit_line,category_id)
-                VALUES (:reg,:title,:desc,:hist,:prod,:cred,:cat)
+                INSERT INTO items (reg_number,title,physical_description,historical_significance,production_date,credit_line,category_id,allow_trade)
+                VALUES (:reg,:title,:desc,:hist,:prod,:cred,:cat,:trade)
             ")->execute([
                 ':reg'=>$reg_number, ':title'=>$title, ':desc'=>$physical_description,
-                ':hist'=>$historical_significance, ':prod'=>$production_date, ':cred'=>$credit_line, ':cat'=>$category_id,
+                ':hist'=>$historical_significance, ':prod'=>$production_date, ':cred'=>$credit_line, ':cat'=>$category_id, ':trade'=>$allow_trade,
             ]);
             $id = (int) $pdo->lastInsertId();
             $success = "Item created.";
@@ -357,6 +358,17 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                             </option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+                
+                <!-- Trade Manager Enable/Disable -->
+                <div class="mt-4 border-t border-gray-200 pt-5">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="allow_trade" value="1" class="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900" <?= ($item['allow_trade'] ?? 1) ? 'checked' : '' ?>>
+                        <div>
+                            <span class="block text-sm font-medium text-gray-900">Allow Trade Requests</span>
+                            <span class="block text-sm text-gray-500">If checked, visitors can submit trade requests for this specific item.</span>
+                        </div>
+                    </label>
                 </div>
             </div>
 
