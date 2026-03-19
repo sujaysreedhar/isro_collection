@@ -1,0 +1,7 @@
+{
+    "name": "Contact Us",
+    "description": "Adds a Contact Us page with a form and stores submissions. Admins can view and manage messages.",
+    "version": "1.0",
+    "author": "System",
+    "admin_menu_priority": 40
+}

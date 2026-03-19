@@ -8,9 +8,9 @@ if (file_exists($autoloadPath)) {
 }
 
 // Application settings
-define('SITE_URL', 'http://localhost/collection'); // Set to your base URL without trailing slash
-define('SITE_TITLE', 'Pictorial Cancellation Collection');
-define('HOME_PAGE_TITLE', 'Home - Pictorial  Cancellation Collection');
+// Application settings (defaults — can be overridden in Admin → Site Settings)
+define('SITE_URL_DEFAULT', 'http://localhost/collection');
+define('SITE_TITLE_DEFAULT', 'Pictorial Cancellation Collection');
 
 $host = 'localhost';
 $db   = 'eish'; // Change to your actual database name
@@ -57,6 +57,11 @@ function loadSettings(PDO $pdo): array {
 }
 
 $appSettings = loadSettings($pdo);
+
+// Define SITE_URL and SITE_TITLE — DB overrides the hardcoded defaults
+define('SITE_URL',  rtrim($appSettings['site_url']   ?? SITE_URL_DEFAULT, '/'));
+define('SITE_TITLE', $appSettings['site_title'] ?? SITE_TITLE_DEFAULT);
+
 $storageDriver = $appSettings['storage_driver'] ?? 'local';
 
 if ($storageDriver === 's3'

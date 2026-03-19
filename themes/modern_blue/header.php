@@ -8,6 +8,12 @@ global $pageTitle, $additionalHead, $currentMenu;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle ?? SITE_TITLE) ?></title>
+    <?php
+        $siteFavicon = $appSettings['site_favicon'] ?? '';
+        if ($siteFavicon && file_exists(__DIR__ . '/../uploads/branding/' . $siteFavicon)):
+    ?>
+        <link rel="icon" href="<?= SITE_URL ?>/uploads/branding/<?= rawurlencode($siteFavicon) ?>" type="image/<?= pathinfo($siteFavicon, PATHINFO_EXTENSION) === 'svg' ? 'svg+xml' : pathinfo($siteFavicon, PATHINFO_EXTENSION) ?>">
+    <?php endif; ?>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -48,10 +54,19 @@ global $pageTitle, $additionalHead, $currentMenu;
     <header class="glass-header sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-modern-500 to-modern-700 rounded-xl shadow-lg shadow-modern-500/30 flex items-center justify-center text-white font-bold text-xl">
-                    <?= substr(SITE_TITLE, 0, 1) ?>
-                </div>
-                <a href="<?= SITE_URL ?>" class="text-2xl font-extrabold tracking-tight text-slate-900"><?= SITE_TITLE ?></a>
+                <?php
+                    $siteLogo = $appSettings['site_logo'] ?? '';
+                    if ($siteLogo && file_exists(__DIR__ . '/../uploads/branding/' . $siteLogo)):
+                ?>
+                    <a href="<?= SITE_URL ?>" class="flex items-center">
+                        <img src="<?= SITE_URL ?>/uploads/branding/<?= rawurlencode($siteLogo) ?>" alt="<?= SITE_TITLE ?>" class="h-12 w-auto object-contain">
+                    </a>
+                <?php else: ?>
+                    <div class="w-10 h-10 bg-gradient-to-br from-modern-500 to-modern-700 rounded-xl shadow-lg shadow-modern-500/30 flex items-center justify-center text-white font-bold text-xl">
+                        <?= substr(SITE_TITLE, 0, 1) ?>
+                    </div>
+                    <a href="<?= SITE_URL ?>" class="text-2xl font-extrabold tracking-tight text-slate-900"><?= SITE_TITLE ?></a>
+                <?php endif; ?>
             </div>
             
             <div class="flex-1 max-w-xl mx-8 hidden md:block">

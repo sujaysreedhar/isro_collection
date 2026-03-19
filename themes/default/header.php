@@ -19,6 +19,13 @@ $searchParams = $searchParams ?? ['q' => ''];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle) ?></title>
 
+    <?php
+        $siteFavicon = $appSettings['site_favicon'] ?? '';
+        if ($siteFavicon && file_exists(__DIR__ . '/../uploads/branding/' . $siteFavicon)):
+    ?>
+        <link rel="icon" href="<?= SITE_URL ?>/uploads/branding/<?= rawurlencode($siteFavicon) ?>" type="image/<?= pathinfo($siteFavicon, PATHINFO_EXTENSION) === 'svg' ? 'svg+xml' : pathinfo($siteFavicon, PATHINFO_EXTENSION) ?>">
+    <?php endif; ?>
+
     <meta name="description" content="<?= htmlspecialchars($ogDescription) ?>">
     <link rel="canonical" href="<?= htmlspecialchars($ogUrl) ?>">
 
@@ -63,7 +70,16 @@ $searchParams = $searchParams ?? ['q' => ''];
         <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); } ?>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center flex-shrink-0">
-                <a href="<?= SITE_URL ?>" class="text-2xl font-bold serif tracking-tight"><?= SITE_TITLE ?></a>
+                <a href="<?= SITE_URL ?>" class="flex items-center gap-3">
+                    <?php
+                        $siteLogo = $appSettings['site_logo'] ?? '';
+                        if ($siteLogo && file_exists(__DIR__ . '/../uploads/branding/' . $siteLogo)):
+                    ?>
+                        <img src="<?= SITE_URL ?>/uploads/branding/<?= rawurlencode($siteLogo) ?>" alt="<?= SITE_TITLE ?>" class="h-10 w-auto object-contain">
+                    <?php else: ?>
+                        <span class="text-2xl font-bold serif tracking-tight"><?= SITE_TITLE ?></span>
+                    <?php endif; ?>
+                </a>
             </div>
             
             <?php if (!$hideHeaderSearch): ?>
