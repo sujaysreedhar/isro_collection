@@ -16,6 +16,7 @@ $id  = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $item = [
     'reg_number' => '', 'title' => '', 'physical_description' => '',
     'historical_significance' => '', 'production_date' => '', 'credit_line' => '', 'category_id' => '', 'allow_trade' => 1,
+    'material' => '', 'year_start' => '', 'year_end' => '',
 ];
 $mediaList       = [];
 $linkedNarratives = [];
@@ -105,6 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $credit_line            = trim($_POST['credit_line'] ?? '');
         $category_id            = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
         $allow_trade            = isset($_POST['allow_trade']) ? 1 : 0;
+        $material               = trim($_POST['material'] ?? '');
+        $year_start             = trim($_POST['year_start'] ?? '') === '' ? null : (int) $_POST['year_start'];
+        $year_end               = trim($_POST['year_end'] ?? '') === '' ? null : (int) $_POST['year_end'];
 
         try {
             $pdo->beginTransaction();
@@ -112,21 +116,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id > 0) {
             $pdo->prepare("
                 UPDATE items SET reg_number=:reg, title=:title, physical_description=:desc,
-                historical_significance=:hist, production_date=:prod, credit_line=:cred, category_id=:cat, allow_trade=:trade
+                historical_significance=:hist, production_date=:prod, credit_line=:cred, category_id=:cat, allow_trade=:trade,
+                material=:mat, year_start=:ys, year_end=:ye
                 WHERE id=:id
             ")->execute([
                 ':reg'=>$reg_number, ':title'=>$title, ':desc'=>$physical_description,
                 ':hist'=>$historical_significance, ':prod'=>$production_date, ':cred'=>$credit_line,
-                ':cat'=>$category_id, ':trade'=>$allow_trade, ':id'=>$id,
+                ':cat'=>$category_id, ':trade'=>$allow_trade, ':mat'=>$material, ':ys'=>$year_start, ':ye'=>$year_end, ':id'=>$id,
             ]);
             $success = "Item updated.";
         } else {
             $pdo->prepare("
-                INSERT INTO items (reg_number,title,physical_description,historical_significance,production_date,credit_line,category_id,allow_trade)
-                VALUES (:reg,:title,:desc,:hist,:prod,:cred,:cat,:trade)
+                INSERT INTO items (reg_number,title,physical_description,historical_significance,production_date,credit_line,category_id,allow_trade,material,year_start,year_end)
+                VALUES (:reg,:title,:desc,:hist,:prod,:cred,:cat,:trade,:mat,:ys,:ye)
             ")->execute([
                 ':reg'=>$reg_number, ':title'=>$title, ':desc'=>$physical_description,
                 ':hist'=>$historical_significance, ':prod'=>$production_date, ':cred'=>$credit_line, ':cat'=>$category_id, ':trade'=>$allow_trade,
+                ':mat'=>$material, ':ys'=>$year_start, ':ye'=>$year_end,
             ]);
             $id = (int) $pdo->lastInsertId();
             $success = "Item created.";
@@ -311,10 +317,24 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                     <label class="label">Title *</label>
                     <input type="text" name="title" value="<?= htmlspecialchars($item['title'] ?? '') ?>" required class="input">
                 </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div>
+                        <label class="label">Production Date (Text)</label>
+                        <input type="text" name="production_date" value="<?= htmlspecialchars($item['production_date'] ?? '') ?>" placeholder="e.g. Circa 1860" class="input">
+                    </div>
+                    <div>
+                        <label class="label">Start Year</label>
+                        <input type="number" name="year_start" value="<?= htmlspecialchars($item['year_start'] ?? '') ?>" placeholder="e.g. 1860" class="input">
+                    </div>
+                    <div>
+                        <label class="label">End Year</label>
+                        <input type="number" name="year_end" value="<?= htmlspecialchars($item['year_end'] ?? '') ?>" placeholder="e.g. 1865" class="input">
+                    </div>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                        <label class="label">Production Date</label>
-                        <input type="text" name="production_date" value="<?= htmlspecialchars($item['production_date'] ?? '') ?>" placeholder="e.g. Circa 1860" class="input">
+                        <label class="label">Material</label>
+                        <input type="text" name="material" value="<?= htmlspecialchars($item['material'] ?? '') ?>" placeholder="e.g. Paper, Ink" class="input">
                     </div>
                     <div>
                         <label class="label">Credit Line</label>

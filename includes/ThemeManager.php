@@ -21,13 +21,13 @@ class ThemeManager {
      */
     public static function getTemplatePath(string $templateName): string {
         $activeTheme = self::getActiveTheme();
-        $baseDir = realpath(__DIR__ . '/../themes') . DIRECTORY_SEPARATOR;
+        $resolved = realpath(__DIR__ . '/../themes');
         
-        if (!$baseDir) {
+        if (!$resolved) {
             // In case themes directory doesn't even exist yet
             $baseDir = __DIR__ . '/../themes/';
         } else {
-            $baseDir .= DIRECTORY_SEPARATOR;
+            $baseDir = $resolved . DIRECTORY_SEPARATOR;
         }
 
         // 1. Check active theme

@@ -1,0 +1,6 @@
+{
+    "name": "REST API & CSV Export",
+    "description": "Exposes collection data via a JSON REST API and provides a CSV export button in the admin panel.",
+    "version": "1.0.0",
+    "author": "System"
+}

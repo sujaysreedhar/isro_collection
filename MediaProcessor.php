@@ -304,6 +304,11 @@ class MediaProcessor {
             $this->preserveAlpha($img);
             imagecopyresampled($img, $src, 0, 0, 0, 0, $newW, $newH, $srcW, $srcH);
         }
+
+        if (class_exists('HookRegistry')) {
+            $img = HookRegistry::applyFilters('after_image_resize', $img, $folder);
+        }
+
         imagewebp($img, $path, 85);
         imagedestroy($img);
 

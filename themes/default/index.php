@@ -1,7 +1,7 @@
 <?php
 // themes/default/index.php
 
-$pageTitle = HOME_PAGE_TITLE;
+$pageTitle = SITE_TITLE;
 $currentMenu = 'home';
 $hideHeaderSearch = true; // Search is in the hero section
 

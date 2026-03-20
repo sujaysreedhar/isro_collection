@@ -1,0 +1,6 @@
+{
+    "name": "Interactive Timeline",
+    "description": "Plots collection items on a beautiful, interactive timeline based on their start year. Accessible at /timeline.php.",
+    "version": "1.0.0",
+    "author": "System"
+}
