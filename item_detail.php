@@ -26,7 +26,6 @@ if (!$item) {
 }
 
 // 2. Fetch Media for the item — split by type
-
 $hasIsPrimary = false;
 try {
     $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
@@ -41,7 +40,7 @@ $mediaItems   = $mediaStmt->fetchAll();
 $imageMedia   = array_values(array_filter($mediaItems, fn($m) => ($m['media_type'] ?? 'image') === 'image'));
 $pdfMedia     = array_values(array_filter($mediaItems, fn($m) => ($m['media_type'] ?? '') === 'pdf'));
 $youtubeMedia = array_values(array_filter($mediaItems, fn($m) => ($m['media_type'] ?? '') === 'youtube'));
-$primaryMedia = $imageMedia[0] ?? null;   // primary is always image-type
+$primaryMedia = $imageMedia[0] ?? null;
 
 // 3. Fetch Related Stories (Narratives)
 $narrativeStmt = $pdo->prepare("
@@ -98,5 +97,5 @@ $jsonLd = array_filter([
 ]);
 $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
 
-?>require_once ThemeManager::getTemplatePath('item_detail.php');
-</html>
+?>
+<?php require_once ThemeManager::getTemplatePath('item_detail.php'); ?>
