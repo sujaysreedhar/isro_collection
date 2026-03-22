@@ -178,9 +178,11 @@ class SearchEngine {
         $categoryFacets = $facetStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // ── 3. Material facet counts ─────────────────────────────────────
+        $matWhere = $baseParts['where'];
+        $matWhere[] = "i.material IS NOT NULL AND i.material != ''";
+        
         $matSql = "SELECT i.material as name, COUNT(DISTINCT i.id) as facet_count FROM items i " . $baseParts['join'];
-        if ($baseParts['where']) $matSql .= " WHERE " . implode(" AND ", $baseParts['where']);
-        $matSql .= " AND i.material IS NOT NULL AND i.material != '' ";
+        $matSql .= " WHERE " . implode(" AND ", $matWhere);
         $matSql .= " GROUP BY i.material HAVING facet_count > 0 ORDER BY facet_count DESC";
         
         $matStmt = $this->db->prepare($matSql);

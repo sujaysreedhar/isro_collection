@@ -124,10 +124,15 @@ echo renderAdminHeader('Manage Modules');
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                             <input type="hidden" name="module" value="<?= htmlspecialchars($mod['slug']) ?>">
                             <?php if ($mod['is_active']): ?>
-                                <input type="hidden" name="action" value="disable">
-                                <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-red-300 shadow-sm text-xs font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                                    Disable
-                                </button>
+                                <div class="flex items-center gap-2">
+                                    <a href="<?= SITE_URL ?>/admin/module_page.php?m=<?= htmlspecialchars($mod['slug']) ?>" class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Settings
+                                    </a>
+                                    <input type="hidden" name="action" value="disable">
+                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-red-300 shadow-sm text-xs font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                        Disable
+                                    </button>
+                                </div>
                             <?php else: ?>
                                 <input type="hidden" name="action" value="enable">
                                 <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">

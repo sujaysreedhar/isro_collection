@@ -19,6 +19,7 @@ $siteFavicon = $appSettings['site_favicon'] ?? '';
 $siteUrl     = $appSettings['site_url']   ?? SITE_URL;
 $siteTitle   = $appSettings['site_title'] ?? SITE_TITLE;
 $siteDesc    = $appSettings['site_description'] ?? '';
+$debugMode   = $appSettings['debug_mode'] ?? '0';
 
 // Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -60,15 +61,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newUrl   = rtrim(trim($_POST['site_url'] ?? ''), '/');
         $newTitle = trim($_POST['site_title'] ?? '');
         $newDesc  = trim($_POST['site_description'] ?? '');
-
         if (empty($newUrl) || empty($newTitle)) {
             $error = 'Site URL and Site Title are required.';
         } else {
+            $newDebug = isset($_POST['debug_mode']) ? '1' : '0';
             $upsert = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (:k, :v) ON DUPLICATE KEY UPDATE setting_value = :v2");
             $upsert->execute([':k' => 'site_url',         ':v' => $newUrl,   ':v2' => $newUrl]);
             $upsert->execute([':k' => 'site_title',        ':v' => $newTitle, ':v2' => $newTitle]);
             $upsert->execute([':k' => 'site_description',  ':v' => $newDesc,  ':v2' => $newDesc]);
-            $siteUrl = $newUrl; $siteTitle = $newTitle; $siteDesc = $newDesc;
+            $upsert->execute([':k' => 'debug_mode',        ':v' => $newDebug, ':v2' => $newDebug]);
+            $siteUrl = $newUrl; $siteTitle = $newTitle; $siteDesc = $newDesc; $debugMode = $newDebug;
             $success = 'Settings saved. Changes apply on the next page load.';
         }
     }
@@ -164,6 +166,20 @@ echo renderAdminHeader('Site Settings');
                           class="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none" placeholder="A digital archive of historical artifacts..."><?= htmlspecialchars($siteDesc) ?></textarea>
                 <p class="text-xs text-gray-400 mt-1.5">Used in meta descriptions and OpenGraph tags.</p>
             </div>
+            
+            <div class="pt-2">
+                <label class="flex items-center gap-3 cursor-pointer group">
+                    <div class="relative">
+                        <input type="checkbox" name="debug_mode" value="1" <?= ($debugMode === '1') ? 'checked' : '' ?> class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </div>
+                    <div>
+                        <span class="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">Enable Debug Mode</span>
+                        <p class="text-xs text-gray-500">When enabled, detailed PHP errors and warnings will be displayed on the frontend.</p>
+                    </div>
+                </label>
+            </div>
+
             <div class="flex justify-end pt-2">
                 <button type="submit" class="px-5 py-2.5 text-sm font-semibold rounded-lg text-white bg-gray-900 hover:bg-gray-800 transition-all shadow-sm hover:shadow-md active:scale-[0.98]">Save Settings</button>
             </div>

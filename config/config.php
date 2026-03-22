@@ -58,6 +58,17 @@ function loadSettings(PDO $pdo): array {
 
 $appSettings = loadSettings($pdo);
 
+// ── Debug Mode ──────────────────────────────────────────────────────────────
+if (($appSettings['debug_mode'] ?? '0') === '1') {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', 0);
+    ini_set('display_startup_errors', 0);
+    error_reporting(0);
+}
+
 // Define SITE_URL and SITE_TITLE — DB overrides the hardcoded defaults
 define('SITE_URL',  rtrim($appSettings['site_url']   ?? SITE_URL_DEFAULT, '/'));
 define('SITE_TITLE', $appSettings['site_title'] ?? SITE_TITLE_DEFAULT);
