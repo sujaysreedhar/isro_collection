@@ -40,6 +40,42 @@ echo renderAdminHeader("Dashboard");
     </div>
 </div>
 
+<!-- System Health Monitor -->
+<?php
+$phpVersion = PHP_VERSION;
+$gdEnabled = extension_loaded('gd');
+$uploadsWritable = is_writable(__DIR__ . '/../uploads');
+$dbHealthy = false;
+try {
+    $pdo->query("SELECT 1");
+    $dbHealthy = true;
+} catch (Exception $e) {}
+
+$storageType = $appSettings['storage_driver'] ?? 'local';
+$storageStatus = ($storageType === 's3') ? (($storage instanceof S3Storage) ? 'ok' : 'error') : ($uploadsWritable ? 'ok' : 'error');
+$storageLabel = ($storageType === 's3') ? 'S3 Storage' : 'Local Storage';
+$storageValue = ($storageType === 's3') ? ($appSettings['s3_bucket'] ?: 'Not Configured') : ($uploadsWritable ? 'Active' : 'Locked');
+
+$healthChecks = [
+    ['label' => 'PHP Version', 'value' => $phpVersion, 'status' => version_compare(PHP_VERSION, '7.4.0', '>=') ? 'ok' : 'warn'],
+    ['label' => 'GD Library', 'value' => $gdEnabled ? 'Enabled' : 'Missing', 'status' => $gdEnabled ? 'ok' : 'error'],
+    ['label' => 'Database', 'value' => $dbHealthy ? 'Connected' : 'Offline', 'status' => $dbHealthy ? 'ok' : 'error'],
+    ['label' => 'Uploads Folder', 'value' => $uploadsWritable ? 'Writable' : 'Locked', 'status' => $uploadsWritable ? 'ok' : 'error'],
+    ['label' => $storageLabel, 'value' => $storageValue, 'status' => $storageStatus],
+];
+?>
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
+    <?php foreach ($healthChecks as $check): ?>
+    <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center shadow-sm">
+        <div class="w-2.5 h-2.5 rounded-full mr-3 <?= $check['status'] === 'ok' ? 'bg-emerald-500' : ($check['status'] === 'warn' ? 'bg-amber-500' : 'bg-red-500 shadow-sm shadow-red-500/50') ?>"></div>
+        <div class="min-w-0">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate"><?= $check['label'] ?></p>
+            <p class="text-sm font-bold text-slate-800 truncate" title="<?= htmlspecialchars($check['value']) ?>"><?= $check['value'] ?></p>
+        </div>
+    </div>
+    <?php endforeach; ?>
+</div>
+
 <!-- KPI Cards -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
     <div class="bg-white rounded-2xl shadow-sm shadow-slate-200/50 border border-slate-200 p-6 relative overflow-hidden group hover:shadow-md transition-shadow">

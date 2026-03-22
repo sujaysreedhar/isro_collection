@@ -30,6 +30,11 @@ if (file_exists($modFile)) {
     if (preg_match('/Module Name:\s*(.*)/i', $content, $m)) $name = trim($m[1]);
 }
 
+// Allow modules to handle logic (like POST redirects) before any headers are sent
+if (class_exists('HookRegistry')) {
+    HookRegistry::doAction("admin_init_{$moduleSlug}");
+}
+
 echo renderAdminHeader($name . ' Settings');
 ?>
 

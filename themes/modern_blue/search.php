@@ -187,6 +187,8 @@ require_once ThemeManager::getHeader();
                 </div>
                 <?php endif; ?>
 
+                <?php if (class_exists('HookRegistry')) HookRegistry::doAction('search_results_before_items', $results, $params); ?>
+
                 <?php if (empty($results)): ?>
                     <div class="text-center py-24 bg-white rounded-3xl border border-slate-200 border-dashed">
                         <svg class="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">

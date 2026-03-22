@@ -104,7 +104,8 @@ class WatermarkerModule extends BaseModule {
     private function getSetting($key, $default = '') {
         $stmt = $this->pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
         $stmt->execute([$key]);
-        return $stmt->fetchColumn() ?: $default;
+        $val = $stmt->fetchColumn();
+        return ($val !== false) ? $val : $default;
     }
 
     private function setSetting($key, $value) {

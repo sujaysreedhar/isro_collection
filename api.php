@@ -2,11 +2,45 @@
 // api.php - Public REST API endpoint
 require_once __DIR__ . '/config/config.php';
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
 header('Content-Type: application/json; charset=utf-8');
 
-// Simple CORS
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET');
+// API Authentication Check
+function getRequestApiKey() {
+    $key = $_SERVER['HTTP_X_API_KEY'] ?? null;
+    if (!$key && isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        if (preg_match('/Bearer\s(\S+)/', $_SERVER['HTTP_AUTHORIZATION'], $matches)) {
+            $key = $matches[1];
+        }
+    }
+    return $key ?: ($_GET['api_key'] ?? null);
+}
+
+$apiKey = getRequestApiKey();
+$isAuthorized = false;
+
+// 1. Check for API key
+if ($apiKey) {
+    $authStmt = $pdo->prepare("SELECT 1 FROM api_keys WHERE key_value = ? AND is_active = 1");
+    $authStmt->execute([$apiKey]);
+    if ($authStmt->fetch()) {
+        $isAuthorized = true;
+    }
+}
+
+// 2. Fallback: Check if user is logged in as Admin (allowing internal AJAX calls)
+if (!$isAuthorized && isset($_SESSION['admin_id'])) {
+    $isAuthorized = true;
+}
+
+if (!$isAuthorized) {
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Unauthorized: Invalid or missing API key.'], JSON_PRETTY_PRINT);
+    exit;
+}
 
 $action = $_GET['action'] ?? 'items';
 $page = max(1, (int)($_GET['page'] ?? 1));
@@ -24,7 +58,8 @@ $response = [
 try {
     if ($action === 'items') {
         // Build base query for items
-        $where = ["is_visible = 1"];
+        $showHidden = isset($_SESSION['admin_id']) && ($_GET['include_hidden'] ?? '0') === '1';
+        $where = [$showHidden ? "1=1" : "is_visible = 1"];
         $params = [];
 
         // Filters
@@ -36,10 +71,11 @@ try {
             $where[] = "? BETWEEN year_start AND year_end";
             $params[] = (int)$_GET['year'];
         }
-        if (!empty($_GET['search'])) {
+        if (!empty($_GET['search']) || !empty($_GET['q'])) {
+            $searchTerm = $_GET['search'] ?? $_GET['q'];
             $where[] = "MATCH(title, physical_description, historical_context) AGAINST(? IN BOOLEAN MODE)";
             // Basic boolean mode mapping (very simplified)
-            $params[] = '*' . trim($_GET['search']) . '*'; 
+            $params[] = '*' . trim($searchTerm) . '*'; 
         }
 
         $whereClause = implode(' AND ', $where);

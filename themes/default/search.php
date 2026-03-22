@@ -220,6 +220,8 @@ require_once ThemeManager::getHeader();
             </div>
             <?php endif; ?>
 
+            <?php if (class_exists('HookRegistry')) HookRegistry::doAction('search_results_before_items', $results, $params); ?>
+
             <?php if ($results): ?>
                 <?php
                     // Batch-fetch tags for all result items

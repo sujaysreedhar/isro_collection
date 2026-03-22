@@ -1,0 +1,6 @@
+{
+    "name": "Curated Collections",
+    "description": "Allows administrators to create themed groups of items (e.g., 'Apollo 11 Mission', 'Ancient Coins') that appear in search results and have a dedicated gallery view.",
+    "version": "1.0.0",
+    "author": "System"
+}
