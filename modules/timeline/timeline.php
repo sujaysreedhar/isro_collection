@@ -1,6 +1,6 @@
 <?php
 // timeline.php (Root level Controller)
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../../config/config.php';
 
 // Fetch all items that have a valid year_start, ordered chronologically
 // Also fetch their primary image for the timeline thumbnail

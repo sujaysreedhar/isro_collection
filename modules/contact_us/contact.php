@@ -1,6 +1,6 @@
 <?php
 // contact.php — Public contact form (controller)
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../../config/config.php';
 
 $success = '';
 $error   = '';

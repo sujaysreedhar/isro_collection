@@ -2,8 +2,8 @@
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/layout.php';
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../LocalStorage.php';
-require_once __DIR__ . '/../S3Storage.php';
+require_once __DIR__ . '/../includes/LocalStorage.php';
+require_once __DIR__ . '/../includes/S3Storage.php';
 
 $error = '';
 $success = '';

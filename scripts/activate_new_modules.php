@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/modules/item_comments/module.php';
 
 if (item_comments_activate()) {

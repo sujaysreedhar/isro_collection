@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/modules/api_export/module.php';
 
 if (api_export_activate()) {

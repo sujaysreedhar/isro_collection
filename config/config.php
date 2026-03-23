@@ -36,8 +36,8 @@ try {
 }
 
 // ── Storage Backend ─────────────────────────────────────────────────────────
-require_once __DIR__ . '/../LocalStorage.php';
-require_once __DIR__ . '/../S3Storage.php';
+require_once __DIR__ . '/../includes/LocalStorage.php';
+require_once __DIR__ . '/../includes/S3Storage.php';
 
 /**
  * Load all settings into an associative array.

@@ -1,6 +1,6 @@
 <?php
 // collection.php - Show a single curated collection
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/includes/ThemeManager.php';
 
 $slug = $_GET['slug'] ?? '';

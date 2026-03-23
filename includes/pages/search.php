@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/config/config.php';
-require_once __DIR__ . '/SearchEngine.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../SearchEngine.php';
 
 $searchEngine = new SearchEngine($pdo);
 

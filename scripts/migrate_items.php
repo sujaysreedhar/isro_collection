@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../config/config.php';
 
 try {
     $pdo->exec("ALTER TABLE items ADD COLUMN material VARCHAR(255) DEFAULT NULL;");

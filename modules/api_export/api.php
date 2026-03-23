@@ -1,6 +1,6 @@
 <?php
 // api.php - Public REST API endpoint
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../../config/config.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();

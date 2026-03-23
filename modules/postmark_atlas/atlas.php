@@ -1,6 +1,6 @@
 <?php
 // atlas.php
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../../config/config.php';
 
 // Ensure the module is active by querying the schema/settings
 $activeModulesJson = $appSettings['active_modules'] ?? '[]';

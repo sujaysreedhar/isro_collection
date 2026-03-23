@@ -10,22 +10,35 @@ RewriteBase /collection/
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 
+# ─── Module Frontend Pages ───────────────────────────────────────────────────
+RewriteRule ^timeline\.php$ modules/timeline/timeline.php [L,QSA]
+RewriteRule ^gallery\.php$ modules/user_galleries/gallery.php [L,QSA]
+RewriteRule ^atlas\.php$ modules/postmark_atlas/atlas.php [L,QSA]
+RewriteRule ^contact\.php$ modules/contact_us/contact.php [L,QSA]
+RewriteRule ^collections\.php$ modules/curated_collections/collections.php [L,QSA]
+RewriteRule ^collection\.php$ modules/curated_collections/collection.php [L,QSA]
+RewriteRule ^api\.php$ modules/api_export/api.php [L,QSA]
+
+# ─── Core Pages Direct File Access ───────────────────────────────────────────
+RewriteRule ^search\.php$ includes/pages/search.php [L,QSA]
+RewriteRule ^item_detail\.php$ includes/pages/item_detail.php [L,QSA]
+
 # ─── Clean URL: Item Detail ───────────────────────────────────────────────────
 # Matches: /collection/item/42
 # Matches: /collection/item/42/steam-engine-ballarat  (with optional slug)
-RewriteRule ^item/([0-9]+)(/[a-zA-Z0-9_-]+)?/?$ item_detail.php?id=$1 [L,QSA]
+RewriteRule ^item/([0-9]+)(/[a-zA-Z0-9_-]+)?/?$ includes/pages/item_detail.php?id=$1 [L,QSA]
 
 # ─── Clean URL: Category Browse ───────────────────────────────────────────────
 # Matches: /collection/category/social-history
-RewriteRule ^category/([a-zA-Z0-9_-]+)/?$ search.php?category=$1 [L,QSA]
+RewriteRule ^category/([a-zA-Z0-9_-]+)/?$ includes/pages/search.php?category=$1 [L,QSA]
 
 # ─── Clean URL: Search ────────────────────────────────────────────────────────
 # Matches: /collection/search  (query string passed through via QSA)
-RewriteRule ^search/?$ search.php [L,QSA]
+RewriteRule ^search/?$ includes/pages/search.php [L,QSA]
 
 # ─── Clean URL: Tag Browse ────────────────────────────────────────────────────
 # Matches: /collection/tag/steam-engine
-RewriteRule ^tag/([a-zA-Z0-9_-]+)/?$ search.php?tag=$1 [L,QSA]
+RewriteRule ^tag/([a-zA-Z0-9_-]+)/?$ includes/pages/search.php?tag=$1 [L,QSA]
 
 # ─── Clean URL: Story / Narrative ────────────────────────────────────────────
 # Matches: /collection/story/5
