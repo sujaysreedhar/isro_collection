@@ -231,6 +231,8 @@ require_once ThemeManager::getHeader();
             </div>
         </div>
 
+        <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_after_content', $item); } ?>
+
         <!-- Related Stories -->
         <?php if (!empty($relatedStories)): ?>
         <div class="mt-16 sm:mt-24">
