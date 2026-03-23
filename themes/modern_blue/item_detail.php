@@ -44,9 +44,9 @@ require_once ThemeManager::getHeader();
             
             <!-- Media Section (Left side on desktop) -->
             <div class="w-full lg:w-3/5 bg-slate-50 border-r border-slate-200 flex flex-col">
-                <div class="relative w-full aspect-square md:aspect-video lg:aspect-square flex items-center justify-center p-6 bg-slate-100 group">
+                <div class="relative w-full flex items-center justify-center p-6 bg-slate-100 group">
                     <?php if (empty($allMedia)): ?>
-                        <div class="text-slate-400 flex flex-col items-center">
+                        <div class="text-slate-400 flex flex-col items-center py-24">
                             <svg class="h-20 w-20 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             <span class="text-lg font-medium">No Media Available</span>
                         </div>
@@ -58,14 +58,14 @@ require_once ThemeManager::getHeader();
                                 $mediaSrc = '';
                                 if ($first['media_type'] === 'image' || $first['media_type'] === 'document') {
                                     $mediaSrc = isset($storage) ? $storage->url('display/' . $first['file_path']) : SITE_URL . '/uploads/display/' . $first['file_path'];
-                                    echo '<img id="main-media" src="'.htmlspecialchars($mediaSrc).'" alt="Item Media" class="w-full h-full object-contain cursor-zoom-in" onclick="openFullscreen()">';
+                                    echo '<img id="main-media" src="'.htmlspecialchars($mediaSrc).'" alt="Item Media" class="w-full h-auto cursor-zoom-in" onclick="openFullscreen()">';
                                 } elseif ($first['media_type'] === 'youtube') {
                                     preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i', $first['youtube_url'] ?? '', $matches);
                                     $ytId = $matches[1] ?? '';
-                                    echo '<iframe id="main-media" src="https://www.youtube.com/embed/'.htmlspecialchars($ytId).'" class="w-full h-full border-0" allowfullscreen></iframe>';
+                                    echo '<div class="w-full relative" style="padding-top:56.25%"><iframe id="main-media" src="https://www.youtube.com/embed/'.htmlspecialchars($ytId).'" class="absolute inset-0 w-full h-full border-0" allowfullscreen></iframe></div>';
                                 } elseif ($first['media_type'] === 'video') {
                                     $mediaSrc = isset($storage) ? $storage->url('originals/' . $first['file_path']) : SITE_URL . '/uploads/originals/' . $first['file_path'];
-                                    echo '<video id="main-media" src="'.htmlspecialchars($mediaSrc).'" controls class="w-full h-full object-contain"></video>';
+                                    echo '<video id="main-media" src="'.htmlspecialchars($mediaSrc).'" controls class="w-full h-auto bg-black"></video>';
                                 }
                             ?>
                         </div>
@@ -289,11 +289,11 @@ require_once ThemeManager::getHeader();
         
         setTimeout(() => {
             if (type === 'image' || type === 'document') {
-                container.innerHTML = `<img id="main-media" src="${src}" class="w-full h-full object-contain cursor-zoom-in" onclick="openFullscreen()">`;
+                container.innerHTML = `<img id="main-media" src="${src}" class="w-full h-auto cursor-zoom-in" onclick="openFullscreen()">`;
             } else if (type === 'youtube') {
-                container.innerHTML = `<iframe id="main-media" src="${src}" class="w-full h-full border-0" allowfullscreen></iframe>`;
+                container.innerHTML = `<div class="w-full relative" style="padding-top:56.25%"><iframe id="main-media" src="${src}" class="absolute inset-0 w-full h-full border-0" allowfullscreen></iframe></div>`;
             } else if (type === 'video') {
-                container.innerHTML = `<video id="main-media" src="${src}" controls class="w-full h-full object-contain bg-black"></video>`;
+                container.innerHTML = `<video id="main-media" src="${src}" controls class="w-full h-auto bg-black"></video>`;
             }
             // Fade in
             container.style.opacity = '1';

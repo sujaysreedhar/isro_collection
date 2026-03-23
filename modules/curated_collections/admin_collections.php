@@ -29,7 +29,7 @@ if ($action === 'edit' || $action === 'add'):
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2 space-y-8">
             <div class="bg-white p-6 rounded-xl border border-gray-200">
-                <form method="POST" class="space-y-4">
+                <form method="POST" enctype="multipart/form-data" class="space-y-4">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                     <input type="hidden" name="save_collection" value="1">
                     
@@ -47,6 +47,16 @@ if ($action === 'edit' || $action === 'add'):
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                         <textarea name="description" rows="5" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all"><?= htmlspecialchars($collection['description']) ?></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
+                        <?php if (!empty($collection['cover_image'])): ?>
+                            <div class="mb-3">
+                                <img src="<?= SITE_URL ?>/uploads/display/<?= htmlspecialchars($collection['cover_image']) ?>" alt="Cover" class="h-32 object-cover rounded-lg border border-gray-200 shadow-sm">
+                            </div>
+                        <?php endif; ?>
+                        <input type="file" name="cover_image" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all cursor-pointer">
+                        <p class="text-[10px] text-gray-500 mt-1">Leave empty to keep the current image.</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <input type="checkbox" name="is_public" id="is_public" value="1" <?= $collection['is_public'] ? 'checked' : '' ?> class="rounded border-gray-300">

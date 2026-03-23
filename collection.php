@@ -45,10 +45,18 @@ require_once ThemeManager::getHeader();
 <div class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12">
     <!-- Header -->
     <div class="mb-12 border-b border-gray-200 pb-8">
-        <a href="<?= SITE_URL ?>/collections.php" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 mb-4 font-medium group">
+        <a href="<?= SITE_URL ?>/collections.php" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 mb-6 font-medium group w-max">
             <svg class="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             Back to All Collections
         </a>
+        
+        <?php if (!empty($collection['cover_image'])): ?>
+            <?php $coverUrl = isset($storage) ? $storage->url('display/' . $collection['cover_image']) : SITE_URL . '/uploads/display/' . $collection['cover_image']; ?>
+            <div class="w-full h-64 md:h-80 lg:h-96 rounded-2xl overflow-hidden mb-8 shadow-sm border border-gray-200">
+                <img src="<?= htmlspecialchars($coverUrl) ?>" alt="<?= htmlspecialchars($collection['title']) ?>" class="w-full h-full object-cover">
+            </div>
+        <?php endif; ?>
+
         <h1 class="text-4xl font-extrabold text-gray-900 serif mb-4"><?= htmlspecialchars($collection['title']) ?></h1>
         <div class="prose prose-blue max-w-4xl text-gray-600">
             <?= nl2br(htmlspecialchars($collection['description'])) ?>

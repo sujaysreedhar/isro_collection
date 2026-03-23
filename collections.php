@@ -40,12 +40,17 @@ require_once ThemeManager::getHeader();
             <a href="<?= SITE_URL ?>/collection.php?slug=<?= urlencode($col['slug']) ?>" 
                class="group block bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all duration-300 transform hover:-translate-y-1 flex flex-col h-full">
                 
-                <div class="h-48 bg-gray-100 flex items-center justify-center p-6 relative overflow-hidden">
-                    <div class="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <svg class="h-16 w-16 text-gray-300 group-hover:text-blue-500 group-hover:scale-110 transition-all duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                    </svg>
-                    <div class="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-gray-600 shadow-sm border border-gray-100">
+                <div class="h-48 bg-gray-100 flex items-center justify-center relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity z-10"></div>
+                    <?php if (!empty($col['cover_image'])): ?>
+                        <?php $coverUrl = isset($storage) ? $storage->url('display/' . $col['cover_image']) : SITE_URL . '/uploads/display/' . $col['cover_image']; ?>
+                        <img src="<?= htmlspecialchars($coverUrl) ?>" alt="<?= htmlspecialchars($col['title']) ?>" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700">
+                    <?php else: ?>
+                        <svg class="h-16 w-16 text-gray-300 group-hover:text-blue-500 group-hover:scale-110 transition-all duration-500 z-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                    <?php endif; ?>
+                    <div class="absolute bottom-4 right-4 z-20 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-gray-600 shadow-sm border border-gray-100">
                         <?= $col['item_count'] ?> items
                     </div>
                 </div>

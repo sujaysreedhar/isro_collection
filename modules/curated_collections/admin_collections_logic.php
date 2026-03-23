@@ -93,17 +93,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) die('Invalid CSRF token.');
 
     if (isset($_POST['save_collection'])) {
+        global $storage;
         $title = trim($_POST['title']);
         $slug = trim($_POST['slug']);
         $description = trim($_POST['description']);
         $is_public = isset($_POST['is_public']) ? 1 : 0;
 
+        $cover_image = null;
+        if (isset($_FILES['cover_image']) && $_FILES['cover_image']['error'] === UPLOAD_ERR_OK) {
+            $file = $_FILES['cover_image'];
+            $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file['tmp_name']);
+            
+            if (in_array($mime, $allowed) && $file['size'] <= 5 * 1024 * 1024) {
+                $ext = match($mime) {
+                    'image/jpeg' => 'jpg',
+                    'image/png'  => 'png',
+                    'image/gif'  => 'gif',
+                    'image/webp' => 'webp',
+                    default      => 'jpg'
+                };
+                $baseName = 'col_' . substr(md5(uniqid('', true)), 0, 10) . '.' . $ext;
+                
+                if (isset($storage) && $storage) {
+                    $storage->put('display/' . $baseName, $file['tmp_name'], $mime);
+                } else {
+                    $destDir = __DIR__ . '/../../uploads/display';
+                    if (!is_dir($destDir)) @mkdir($destDir, 0755, true);
+                    move_uploaded_file($file['tmp_name'], $destDir . '/' . $baseName);
+                }
+                $cover_image = $baseName;
+            }
+        }
+
         if ($colId > 0) {
-            $stmt = $this->pdo->prepare("UPDATE collections SET title = ?, slug = ?, description = ?, is_public = ? WHERE id = ?");
-            $stmt->execute([$title, $slug, $description, $is_public, $colId]);
+            if ($cover_image) {
+                $stmt = $this->pdo->prepare("UPDATE collections SET title = ?, slug = ?, description = ?, is_public = ?, cover_image = ? WHERE id = ?");
+                $stmt->execute([$title, $slug, $description, $is_public, $cover_image, $colId]);
+            } else {
+                $stmt = $this->pdo->prepare("UPDATE collections SET title = ?, slug = ?, description = ?, is_public = ? WHERE id = ?");
+                $stmt->execute([$title, $slug, $description, $is_public, $colId]);
+            }
         } else {
-            $stmt = $this->pdo->prepare("INSERT INTO collections (title, slug, description, is_public) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$title, $slug, $description, $is_public]);
+            $stmt = $this->pdo->prepare("INSERT INTO collections (title, slug, description, is_public, cover_image) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$title, $slug, $description, $is_public, $cover_image]);
             $colId = $this->pdo->lastInsertId();
         }
         header("Location: " . SITE_URL . "/admin/module_page.php?m=curated_collections&action=edit&id=" . $colId . "&msg=saved");
