@@ -179,14 +179,6 @@ $csrfToken = $_SESSION['csrf_token'] ?? '';
                                        class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all outline-none">
                                 <div id="search-results" class="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl hidden max-h-64 overflow-y-auto"></div>
                             </div>
-                            <div class="w-40">
-                                <select id="item-role" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-sm">
-                                    <option value="Subject">Subject</option>
-                                    <option value="Author">Author</option>
-                                    <option value="Recipient">Recipient</option>
-                                    <option value="Mentioned">Mentioned</option>
-                                </select>
-                            </div>
                         </div>
 
                         <div class="space-y-3" id="linked-items-list">
@@ -197,7 +189,7 @@ $csrfToken = $_SESSION['csrf_token'] ?? '';
                                     <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 group">
                                         <div class="flex flex-col">
                                             <span class="font-bold text-slate-900"><?= htmlspecialchars($li['title']) ?></span>
-                                            <span class="text-xs text-slate-500"><?= htmlspecialchars($li['reg_number']) ?> &bull; <span class="font-bold text-indigo-600"><?= htmlspecialchars($li['role']) ?></span></span>
+                                            <span class="text-xs text-slate-500"><?= htmlspecialchars($li['reg_number']) ?></span>
                                         </div>
                                         <button type="button" onclick="unlinkItem(<?= $li['id'] ?>)" class="text-red-400 hover:text-red-600 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -212,6 +204,29 @@ $csrfToken = $_SESSION['csrf_token'] ?? '';
 
             <!-- Sidebar Widgets -->
             <div class="lg:col-span-1 space-y-8">
+                <!-- Public URL Widget -->
+                <?php if ($personId > 0 && !empty($person['slug'])): ?>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                    <h3 class="text-sm font-bold text-slate-900 border-b border-slate-50 pb-3">Public Profile URL</h3>
+                    <?php $publicUrl = SITE_URL . '/person/' . urlencode($person['slug']); ?>
+                    <div class="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg group">
+                        <input type="text" readonly value="<?= htmlspecialchars($publicUrl) ?>" id="public-url-input" class="bg-transparent text-[10px] text-indigo-600 font-mono w-full outline-none">
+                        <button type="button" onclick="copyPublicUrl(this)" class="p-1 px-2 bg-white border border-slate-200 text-slate-500 text-[10px] font-bold rounded-md hover:bg-slate-100 transition shadow-sm whitespace-nowrap">Copy</button>
+                        <a href="<?= $publicUrl ?>" target="_blank" class="p-1 px-2 bg-white border border-slate-200 text-slate-500 text-[10px] font-bold rounded-md hover:bg-slate-100 transition shadow-sm whitespace-nowrap">Open</a>
+                    </div>
+                </div>
+                <script>
+                    function copyPublicUrl(btn) {
+                        const input = document.getElementById('public-url-input');
+                        input.select();
+                        document.execCommand('copy');
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = 'Copied!';
+                        setTimeout(() => btn.innerHTML = originalText, 2000);
+                    }
+                </script>
+                <?php endif; ?>
+
                 <!-- Save Widget -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
                     <div class="flex items-center justify-between">
@@ -360,17 +375,18 @@ $csrfToken = $_SESSION['csrf_token'] ?? '';
             }
 
             function linkItem(itemId) {
-                const role = document.getElementById('item-role').value;
                 const fd = new FormData();
                 fd.append('item_id', itemId);
-                fd.append('role', role);
                 fd.append('csrf_token', '<?= $csrfToken ?>');
                 
                 fetch(`?m=people&action=link_item_ajax&id=<?= $personId ?>`, { method: 'POST', body: fd })
                     .then(r => r.json())
                     .then(res => {
-                        if (res.success) window.location.reload();
-                        else alert('Error linking item: ' + (res.error || 'Unknown error'));
+                        if (res.success) {
+                            searchResults.classList.add('hidden');
+                            searchInput.value = '';
+                            loadLinkedItems();
+                        } else alert('Error linking item: ' + (res.error || 'Unknown error'));
                     });
             }
 
@@ -383,8 +399,37 @@ $csrfToken = $_SESSION['csrf_token'] ?? '';
                 fetch(`?m=people&action=unlink_item_ajax&id=<?= $personId ?>`, { method: 'POST', body: fd })
                     .then(r => r.json())
                     .then(res => {
-                        if (res.success) window.location.reload();
+                        if (res.success) loadLinkedItems();
                     });
+            }
+
+            function loadLinkedItems() {
+                const list = document.getElementById('linked-items-list');
+                fetch(`?m=people&action=get_linked_items_ajax&id=<?= $personId ?>`)
+                    .then(r => r.json())
+                    .then(json => {
+                        if (json.data && json.data.length > 0) {
+                            list.innerHTML = json.data.map(li => `
+                                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 group">
+                                    <div class="flex flex-col">
+                                        <span class="font-bold text-slate-900">${escapeHtml(li.title)}</span>
+                                        <span class="text-xs text-slate-500">${escapeHtml(li.reg_number)}</span>
+                                    </div>
+                                    <button type="button" onclick="unlinkItem(${li.id})" class="text-red-400 hover:text-red-600 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                </div>
+                            `).join('');
+                        } else {
+                            list.innerHTML = `<p class="text-center text-slate-400 py-6 italic text-sm border-2 border-dashed border-slate-100 rounded-2xl">No items linked to this person yet.</p>`;
+                        }
+                    });
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
             }
         </script>
     <?php endif; ?>

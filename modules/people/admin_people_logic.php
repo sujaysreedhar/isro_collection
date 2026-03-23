@@ -45,13 +45,27 @@ if ($action === 'link_item_ajax') {
         exit;
     }
     $itemId = (int)$_POST['item_id'];
-    $role = trim($_POST['role'] ?? 'Subject');
+    $role = 'Associated'; 
     
     $stmt = $this->pdo->prepare("INSERT IGNORE INTO item_people (person_id, item_id, role) VALUES (?, ?, ?)");
     $stmt->execute([$personId, $itemId, $role]);
     
     header('Content-Type: application/json');
     echo json_encode(['success' => true]);
+    exit;
+}
+
+if ($action === 'webhook_get_linked_items_ajax' || $action === 'get_linked_items_ajax') {
+    if ($personId <= 0) {
+        header('Content-Type: application/json', true, 400);
+        echo json_encode(['error' => 'Invalid Person ID']);
+        exit;
+    }
+    $stmt = $this->pdo->prepare("SELECT i.id, i.title, i.reg_number, ip.role FROM items i JOIN item_people ip ON i.id = ip.item_id WHERE ip.person_id = ? ORDER BY i.id DESC");
+    $stmt->execute([$personId]);
+    $items = $stmt->fetchAll();
+    header('Content-Type: application/json');
+    echo json_encode(['data' => $items]);
     exit;
 }
 
