@@ -1,0 +1,8 @@
+{
+    "name": "People & Biographies",
+    "slug": "people",
+    "description": "Create Wikipedia-style profiles for people related to the collection.",
+    "version": "1.0.0",
+    "author": "Antigravity",
+    "enabled": false
+}

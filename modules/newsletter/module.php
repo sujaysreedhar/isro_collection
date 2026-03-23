@@ -29,8 +29,8 @@ HookRegistry::addAction('frontend_footer', function() {
                     <h3 class="text-lg font-bold font-serif mb-1">Stay Updated</h3>
                     <p class="text-sm text-gray-400">Subscribe to our newsletter for the latest additions and archive news.</p>
                 </div>
-                <form action="/modules/newsletter/subscribe.php" method="POST" class="flex w-full md:w-auto min-w-0">
-                    <input type="hidden" name="csrf_token" value="{$csrf}">
+                <form action="<?= SITE_URL ?>/modules/newsletter/subscribe.php" method="POST" class="flex w-full md:w-auto min-w-0">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
                     
                     <!-- Honeypot -->
                     <div style="display:none;"><input type="text" name="hp_name"></div>
@@ -44,7 +44,7 @@ HookRegistry::addAction('frontend_footer', function() {
     </div>
     <script>
         // Simple AJAX intercept for the newsletter form
-        document.querySelector('form[action="/modules/newsletter/subscribe.php"]').addEventListener('submit', function(e) {
+        document.querySelector('form[action="<?= SITE_URL ?>/modules/newsletter/subscribe.php"]').addEventListener('submit', function(e) {
             e.preventDefault();
             const form = this;
             const msgObj = document.getElementById('newsletter-msg');

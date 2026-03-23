@@ -97,7 +97,7 @@ $items = $itemStmt->fetchAll();
         <?php else: ?>
             <div class="masonry-grid">
                 <?php foreach ($items as $item): ?>
-                    <a href="<?= SITE_URL ?>/item_detail.php?id=<?= $item['id'] ?>" class="masonry-item group block relative bg-white rounded-lg overflow-hidden border border-gray-200 hover:shadow-xl transition-all duration-300">
+                    <a href="<?= SITE_URL ?>/item/<?= $item['id'] ?>" class="masonry-item group block relative bg-white rounded-lg overflow-hidden border border-gray-200 hover:shadow-xl transition-all duration-300">
                         <?php if ($item['main_image']): ?>
                             <?php 
                                 $imgSrc = isset($storage) 

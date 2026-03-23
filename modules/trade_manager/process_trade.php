@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$itemId, $name, $email, $message]);
             
             // Redirect back with success
-            header("Location: " . SITE_URL . "/item_detail.php?id=$itemId&trade_success=1#trade-request");
+            header("Location: " . SITE_URL . "/item/$itemId/?trade_success=1#trade-request");
             exit;
         } catch (Exception $e) {
             die("Error processing trade request: " . $e->getMessage());

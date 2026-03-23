@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/config.php';
-require_once __DIR__ . '/MediaProcessor.php';
+require_once __DIR__ . '/../../includes/MediaProcessor.php';
 
 // Fetch all visible images and youtube videos
 $stmt = $pdo->prepare("

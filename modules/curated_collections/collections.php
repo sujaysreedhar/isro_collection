@@ -1,7 +1,7 @@
 <?php
 // collections.php - List all public curated collections
 require_once __DIR__ . '/../../config/config.php';
-require_once __DIR__ . '/includes/ThemeManager.php';
+require_once __DIR__ . '/../../includes/ThemeManager.php';
 
 $pageTitle = 'Curated Collections - ' . SITE_TITLE;
 $currentMenu = 'collections';

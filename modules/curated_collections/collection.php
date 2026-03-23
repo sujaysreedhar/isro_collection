@@ -1,7 +1,7 @@
 <?php
 // collection.php - Show a single curated collection
 require_once __DIR__ . '/../../config/config.php';
-require_once __DIR__ . '/includes/ThemeManager.php';
+require_once __DIR__ . '/../../includes/ThemeManager.php';
 
 $slug = $_GET['slug'] ?? '';
 if (!in_array('curated_collections', $activeModulesSlugs)) {
@@ -30,7 +30,8 @@ $currentMenu = 'collections';
 
 // Fetch items in this collection
 $stmt = $pdo->prepare("
-    SELECT i.* 
+    SELECT i.*, 
+        (SELECT file_path FROM media WHERE item_id = i.id AND media_type = 'image' ORDER BY id ASC LIMIT 1) as preview_file_path
     FROM items i 
     JOIN collection_items ci ON i.id = ci.item_id 
     WHERE ci.collection_id = ? 
@@ -78,7 +79,7 @@ require_once ThemeManager::getHeader();
                         if (isset($storage)) {
                             $previewUrl = $storage->url('display/' . $previewPath);
                         } else {
-                            $displayPath = realpath(__DIR__ . '/uploads/display/' . $previewPath);
+                            $displayPath = realpath(__DIR__ . '/../../uploads/display/' . $previewPath);
                             $previewUrl = $displayPath && file_exists($displayPath)
                                 ? SITE_URL . '/uploads/display/' . rawurlencode($previewPath)
                                 : SITE_URL . '/uploads/originals/' . rawurlencode($previewPath);
