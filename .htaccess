@@ -18,6 +18,8 @@ RewriteRule ^contact\.php$ modules/contact_us/contact.php [L,QSA]
 RewriteRule ^collections\.php$ modules/curated_collections/collections.php [L,QSA]
 RewriteRule ^collection\.php$ modules/curated_collections/collection.php [L,QSA]
 RewriteRule ^api\.php$ modules/api_export/api.php [L,QSA]
+RewriteRule ^people\.php$ modules/people/people.php [L,QSA]
+RewriteRule ^person\.php$ modules/people/person.php [L,QSA]
 
 # ─── Core Pages Direct File Access ───────────────────────────────────────────
 RewriteRule ^search\.php$ includes/pages/search.php [L,QSA]
@@ -43,6 +45,12 @@ RewriteRule ^tag/([a-zA-Z0-9_-]+)/?$ includes/pages/search.php?tag=$1 [L,QSA]
 # ─── Clean URL: Story / Narrative ────────────────────────────────────────────
 # Matches: /collection/story/5
 RewriteRule ^story/([0-9]+)/?$ story.php?id=$1 [L,QSA]
+
+# ─── Clean URL: People & Biographies ──────────────────────────────────────────
+# Matches: /collection/people
+# Matches: /collection/person/mahfuz-rahman
+RewriteRule ^people/?$ modules/people/people.php [L,QSA]
+RewriteRule ^person/([a-zA-Z0-9_-]+)/?$ modules/people/person.php?slug=$1 [L,QSA]
 
 # ─── Security: block sensitive files ─────────────────────────────────────────
 <FilesMatch "\.(sql|env|json|lock)$">
