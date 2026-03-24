@@ -16,7 +16,22 @@ class ModuleManager {
     /**
      * Scan the modules directory for available modules and their metadata.
      */
-    public function discoverModules(): array {
+    public function discoverModules(bool $forceRefresh = false): array {
+        global $appSettings;
+        $enableCache = ($appSettings['enable_cache'] ?? '1') === '1';
+        $cacheFile = __DIR__ . '/cache/modules_metadata.json';
+
+        if (!$forceRefresh && $enableCache && file_exists($cacheFile)) {
+            $cached = json_decode(file_get_contents($cacheFile), true);
+            if (is_array($cached)) {
+                // Update active status as it might have changed in appSettings
+                foreach ($cached as $slug => &$meta) {
+                    $meta['is_active'] = in_array($slug, $this->activeModulesSlugs);
+                }
+                return $cached;
+            }
+        }
+
         $available = [];
         if (!is_dir($this->modulesDir)) return [];
 
@@ -54,7 +69,15 @@ class ModuleManager {
             $available[$slug] = $metadata;
         }
 
+        file_put_contents($cacheFile, json_encode($available));
         return $available;
+    }
+
+    public function clearCache(): void {
+        $cacheFile = __DIR__ . '/cache/modules_metadata.json';
+        if (file_exists($cacheFile)) {
+            unlink($cacheFile);
+        }
     }
 
     /**

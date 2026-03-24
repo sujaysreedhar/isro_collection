@@ -25,8 +25,7 @@ class SearchEngine {
         return implode('* ', $words) . '*';
     }
 
-    private function getVocabulary(): array {
-        if ($this->vocabulary !== null) return $this->vocabulary;
+    public function rebuildVocabularyCache(): void {
         $vocab = [];
         $stmt = $this->db->query("SELECT name FROM categories");
         while ($row = $stmt->fetchColumn()) foreach (str_word_count(strtolower($row), 1) as $w) if (strlen($w) > 2) $vocab[$w] = true;
@@ -37,7 +36,25 @@ class SearchEngine {
         $stmt = $this->db->query("SELECT name FROM tags");
         while ($row = $stmt->fetchColumn()) foreach (str_word_count(strtolower($row), 1) as $w) if (strlen($w) > 2) $vocab[$w] = true;
         
-        $this->vocabulary = array_keys($vocab);
+        $vocabulary = array_keys($vocab);
+        $cacheFile = __DIR__ . '/cache/vocabulary.json';
+        file_put_contents($cacheFile, json_encode($vocabulary));
+        $this->vocabulary = $vocabulary;
+    }
+
+    private function getVocabulary(): array {
+        global $appSettings;
+        if ($this->vocabulary !== null) return $this->vocabulary;
+        
+        $enableCache = ($appSettings['enable_cache'] ?? '1') === '1';
+        $cacheFile = __DIR__ . '/cache/vocabulary.json';
+
+        if ($enableCache && file_exists($cacheFile)) {
+            $this->vocabulary = json_decode(file_get_contents($cacheFile), true);
+            if (is_array($this->vocabulary)) return $this->vocabulary;
+        }
+
+        $this->rebuildVocabularyCache();
         return $this->vocabulary;
     }
 

@@ -14,7 +14,7 @@ $itemsNoImage   = (int)$pdo->query("SELECT COUNT(*) FROM items i WHERE NOT EXIST
 $itemsHidden    = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE is_visible = 0")->fetchColumn();
 
 // Orphaned files check via MediaProcessor
-require_once __DIR__ . '/../includes/MediaProcessor.php';
+
 $mp = new MediaProcessor($pdo, $storage ?? null);
 $orphanedFiles = $mp->orphanedFiles();
 

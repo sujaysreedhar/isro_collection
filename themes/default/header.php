@@ -52,11 +52,7 @@ $searchParams = $searchParams ?? ['q' => ''];
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f9fafb; display: flex; flex-direction: column; min-height: 100vh; }
-        h1, h2, h3, h4, .serif { font-family: 'Playfair Display', serif; color: #111827; }
-    </style>
+    <?php echo AssetManager::renderStyles(['themes/default/style.css']); ?>
     
     <!-- User injected head -->
     <?php if (isset($additionalHead)) echo $additionalHead; ?>

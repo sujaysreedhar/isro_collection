@@ -41,10 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // INSERT
                 $stmt = $pdo->prepare("INSERT INTO categories (name) VALUES (:name)");
                 $stmt->execute([':name' => $name]);
-                $id = $pdo->lastInsertId();
-                $success = "Category created successfully.";
-            }
-            $category['name'] = $name;
+            $id = $pdo->lastInsertId();
+            $success = "Category created successfully.";
+        }
+        if (class_exists('HookRegistry')) {
+            HookRegistry::doAction('category_saved', $id);
+        }
+        $category['name'] = $name;
         } catch (\PDOException $e) {
             if ($e->getCode() == 23000) {
                 // Unique constraint violation

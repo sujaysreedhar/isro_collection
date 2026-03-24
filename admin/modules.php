@@ -43,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($instance) {
                     $instance->activate();
                 }
+                $moduleManager->clearCache();
                 $success = "Module '$moduleSlug' enabled.";
             }
         } elseif ($action === 'disable') {
@@ -54,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 unset($activeModules[$key]);
                 saveActiveModules($pdo, $activeModules);
+                $moduleManager->clearCache();
                 $success = "Module '$moduleSlug' disabled.";
             }
         }

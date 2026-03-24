@@ -26,8 +26,7 @@ $options = [
 ];
 
 // ── Database Safety Extension ───────────────────────────────────────────────
-require_once __DIR__ . '/../includes/SafePDO.php';
-require_once __DIR__ . '/../includes/ModuleDB.php';
+require_once __DIR__ . '/../includes/Autoloader.php';
 
 try {
      $pdo = new SafePDO($dsn, $user, $pass, $options);
@@ -98,11 +97,8 @@ if ($storageDriver === 's3'
 }
 
 // ── Hook Registry & Modules & Themes ─────────────────────────────────────────
-require_once __DIR__ . '/../includes/HookRegistry.php';
-require_once __DIR__ . '/../includes/ThemeManager.php';
-require_once __DIR__ . '/../includes/BaseModule.php';
-require_once __DIR__ . '/../includes/ModuleManager.php';
-
+// Autoloader handles the following:
+// HookRegistry, ThemeManager, BaseModule, ModuleManager, frontend.php
 require_once __DIR__ . '/../includes/frontend.php';
 
 $activeModulesJson = $appSettings['active_modules'] ?? '[]';
@@ -111,4 +107,17 @@ if (!is_array($activeModulesSlugs)) $activeModulesSlugs = [];
 
 $moduleManager = new ModuleManager($pdo, __DIR__ . '/../modules', $activeModulesSlugs);
 $moduleManager->bootActiveModules();
+
+// ── Search Vocabulary Caching ───────────────────────────────────────────────
+if (class_exists('HookRegistry')) {
+    HookRegistry::addAction('item_saved', function() use ($pdo) {
+        (new SearchEngine($pdo))->rebuildVocabularyCache();
+    });
+    HookRegistry::addAction('category_saved', function() use ($pdo) {
+        (new SearchEngine($pdo))->rebuildVocabularyCache();
+    });
+    HookRegistry::addAction('category_deleted', function() use ($pdo) {
+        (new SearchEngine($pdo))->rebuildVocabularyCache();
+    });
+}
 ?>

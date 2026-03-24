@@ -92,7 +92,9 @@ class PeopleModule extends BaseModule {
                 }
                 echo '<div class="ml-4">';
                 echo '<h4 class="font-bold text-slate-900 group-hover:text-blue-600 transition">' . htmlspecialchars($person['name']) . '</h4>';
-                echo '<p class="text-xs text-slate-500 italic">' . htmlspecialchars($person['role']) . '</p>';
+                if ($person['short_description']) {
+                    echo '<p class="text-[10px] text-slate-400 italic truncate max-w-[150px]">' . htmlspecialchars($person['short_description']) . '</p>';
+                }
                 echo '</div>';
                 echo '</a>';
             }

@@ -1,0 +1,7 @@
+{
+    "name": "SEO Meta",
+    "description": "Adds SEO title and description tags to items and categories.",
+    "version": "1.0",
+    "author": "Antigravity",
+    "admin_menu_priority": 90
+}

@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/layout.php';
-require_once __DIR__ . '/../MediaProcessor.php';
+
 
 $mp = new MediaProcessor($pdo, $storage ?? null);
 $hasIsPrimary = false;
@@ -225,6 +225,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
             $pdo->commit();
+
+            if (class_exists('HookRegistry')) {
+                HookRegistry::doAction('item_saved', $id);
+            }
 
         // Reload
             $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ?");

@@ -13,6 +13,9 @@ if (isset($_POST['delete_id'])) {
         $delStmt = $pdo->prepare("DELETE FROM categories WHERE id = :id");
         $delStmt->execute([':id' => $deleteId]);
         header("Location: " . SITE_URL . "/admin/categories.php?msg=deleted");
+        if (class_exists('HookRegistry')) {
+            HookRegistry::doAction('category_deleted', $deleteId);
+        }
         exit;
     } catch (\PDOException $e) {
         $error = "Cannot delete this category. It may be linked to existing items.";
