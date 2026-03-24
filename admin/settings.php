@@ -106,9 +106,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 echo renderAdminHeader('Storage Settings');
 ?>
 
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Storage Settings</h1>
-    <p class="text-sm text-gray-500 mt-1">Configure where uploaded media files are stored.</p>
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Storage Settings</h1>
+        <p class="text-sm text-gray-500 mt-1">Configure where uploaded media files are stored.</p>
+    </div>
+    <a href="storage_migration.php" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all shadow-sm">
+        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4-4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+        Storage Migration Tool
+    </a>
 </div>
 
 <?php if ($error): ?>

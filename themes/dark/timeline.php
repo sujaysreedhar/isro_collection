@@ -1,3 +1,4 @@
+<?php require_once ThemeManager::getHeader(); ?>
 <div class="bg-slate-950 min-h-screen flex flex-col font-sans text-slate-100">
     <!-- Header/Filter Bar -->
     <div class="bg-slate-900/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 px-4 py-4 shadow-2xl">

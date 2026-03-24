@@ -31,6 +31,29 @@ function renderAdminHeader($title) {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .sidebar-scroller::-webkit-scrollbar-thumb { background: #334155; }
+
+        /* TomSelect Premium Tags */
+        .ts-control { border-radius: 0.5rem !important; padding: 0.5rem 0.75rem !important; border-color: #E2E8F0 !important; box-shadow: none !important; transition: all 0.2s; }
+        .focus .ts-control { border-color: #111827 !important; ring: 2px #111827; }
+        .ts-wrapper.multi .ts-control > div {
+            background: #F1F5F9 !important;
+            color: #475569 !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 6px !important;
+            padding: 3px 10px !important;
+            margin: 3px 6px 3px 0 !important;
+            font-weight: 600 !important;
+            font-size: 0.75rem !important;
+            display: inline-flex;
+            align-items: center;
+        }
+        .ts-wrapper.multi .ts-control > div.active { background: #1E293B !important; color: #fff !important; }
+        .ts-wrapper.multi .ts-control > div .remove { border-left: 1px solid #CBD5E1 !important; margin-left: 8px !important; padding-left: 6px !important; opacity: 0.7; }
+        .ts-wrapper.multi .ts-control > div .remove:hover { opacity: 1; background: rgba(0,0,0,0.05); }
+        .ts-dropdown { border-radius: 0.75rem !important; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important; border: 1px solid #E2E8F0 !important; margin-top: 8px !important; padding: 4px !important; }
+        .ts-dropdown .option { border-radius: 0.5rem !important; padding: 8px 12px !important; margin: 2px 0 !important; font-size: 0.875rem !important; }
+        .ts-dropdown .active { background-color: #F8FAFC !important; color: #0F172A !important; }
+        .ts-dropdown .create { padding: 8px 12px !important; color: #2563EB !important; font-weight: 500 !important; }
     </style>
     <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_head'); } ?>
 </head>

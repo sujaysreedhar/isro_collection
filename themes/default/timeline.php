@@ -1,3 +1,4 @@
+<?php require_once ThemeManager::getHeader(); ?>
 <div class="bg-white min-h-screen flex flex-col font-serif text-slate-900">
     <!-- Header/Filter Bar -->
     <div class="bg-white border-b border-slate-100 sticky top-0 z-50 px-4 py-6">
@@ -114,59 +115,10 @@
     </div>
 </div>
 
-<style>
-    .vertical-text {
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
-    }
-    .hide-scrollbar::-webkit-scrollbar { display: none; }
-    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    #timeline-viewport {
-        scroll-behavior: smooth;
-        cursor: grab;
-    }
-    #timeline-viewport:active {
-        cursor: grabbing;
-    }
-</style>
 
-<script>
-    const viewport = document.getElementById('timeline-viewport');
-    
-    function scrollToItem(idx) {
-        const cards = viewport.querySelectorAll('.group');
-        if (cards[idx]) {
-            cards[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
-    }
-
-    // Scroll drag functionality
-    let isDown = false;
-    let startX;
-    let scrollLeft;
-
-    viewport.addEventListener('mousedown', (e) => {
-        isDown = true;
-        startX = e.pageX - viewport.offsetLeft;
-        scrollLeft = viewport.scrollLeft;
-    });
-    viewport.addEventListener('mouseleave', () => isDown = false);
-    viewport.addEventListener('mouseup', () => isDown = false);
-    viewport.addEventListener('mousemove', (e) => {
-        if(!isDown) return;
-        e.preventDefault();
-        const x = e.pageX - viewport.offsetLeft;
-        const walk = (x - startX) * 2;
-        viewport.scrollLeft = scrollLeft - walk;
-    });
-
-    viewport.addEventListener('scroll', () => {
-        const totalScroll = viewport.scrollWidth - viewport.clientWidth;
-        const currentScroll = viewport.scrollLeft;
-        const percent = totalScroll > 0 ? (currentScroll / totalScroll) * 100 : 0;
-        document.getElementById('nav-indicator').style.width = percent + '%';
-    });
-</script>
+<?php 
+echo AssetManager::renderStyles(['themes/default/timeline.css']); 
+echo AssetManager::renderScripts(['themes/default/timeline.js']);
+?>
 
 <?php require_once ThemeManager::getFooter(); ?>

@@ -189,5 +189,3 @@ require_once ThemeManager::getHeader();
 </script>
 
 <?php require_once ThemeManager::getFooter(); ?>
-
-<?php require_once ThemeManager::getFooter(); ?>

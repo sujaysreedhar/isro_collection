@@ -1,28 +1,32 @@
-/* themes/dark/timeline.js */
 const viewport = document.getElementById('timeline-viewport');
 
 function scrollToItem(idx) {
-    if (!viewport) return;
     const cards = viewport.querySelectorAll('.group');
     if (cards[idx]) {
         cards[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
 }
 
-if (viewport) {
-    // Scroll drag functionality
-    let isDown = false;
-    let startX;
-    let scrollLeft;
+// Scroll drag functionality
+let isDown = false;
+let startX;
+let scrollLeft;
 
+if (viewport) {
     viewport.addEventListener('mousedown', (e) => {
         isDown = true;
-        viewport.classList.add('active');
+        viewport.classList.add('cursor-grabbing');
         startX = e.pageX - viewport.offsetLeft;
         scrollLeft = viewport.scrollLeft;
     });
-    viewport.addEventListener('mouseleave', () => { isDown = false; });
-    viewport.addEventListener('mouseup', () => { isDown = false; });
+    viewport.addEventListener('mouseleave', () => {
+        isDown = false;
+        viewport.classList.remove('cursor-grabbing');
+    });
+    viewport.addEventListener('mouseup', () => {
+        isDown = false;
+        viewport.classList.remove('cursor-grabbing');
+    });
     viewport.addEventListener('mousemove', (e) => {
         if(!isDown) return;
         e.preventDefault();
@@ -31,12 +35,13 @@ if (viewport) {
         viewport.scrollLeft = scrollLeft - walk;
     });
 
-    // Update navigator indicator
     viewport.addEventListener('scroll', () => {
         const totalScroll = viewport.scrollWidth - viewport.clientWidth;
         const currentScroll = viewport.scrollLeft;
         const percent = totalScroll > 0 ? (currentScroll / totalScroll) * 100 : 0;
-        const indicator = document.getElementById('nav-indicator');
-        if (indicator) indicator.style.width = percent + '%';
+        const navIndicator = document.getElementById('nav-indicator');
+        if (navIndicator) {
+            navIndicator.style.width = percent + '%';
+        }
     });
 }

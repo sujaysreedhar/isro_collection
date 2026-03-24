@@ -197,31 +197,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach (array_filter($sel) as $nid) { $ls->execute([':i' => $id, ':n' => $nid]); }
         }
 
-        // — Tag pivot sync (auto-create new tags) —
+        // — Tag pivot sync (auto-create new tags with hashtag support) —
         $pdo->prepare("DELETE FROM item_tag WHERE item_id = :id")->execute([':id' => $id]);
         $rawTags = (array)($_POST['tags'] ?? []);
         foreach ($rawTags as $tagValue) {
             $tagValue = trim($tagValue);
             if ($tagValue === '') continue;
-            if (ctype_digit($tagValue)) {
-                // Existing tag by ID
-                $tagId = (int)$tagValue;
-            } else {
-                // New tag — create it
+
+            // Normalize: Remove leading hashtags if typed
+            $tagValue = ltrim($tagValue, '#');
+
+            $tagId = null;
+            if (is_numeric($tagValue)) {
+                // Check if this number is an actual existing tag ID
+                $checkId = $pdo->prepare("SELECT id FROM tags WHERE id = ?");
+                $checkId->execute([(int)$tagValue]);
+                $tagId = $checkId->fetchColumn();
+            }
+
+            if (!$tagId) {
+                // Not a known ID, so it's a tag name (new or existing)
                 $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower($tagValue));
                 $slug = trim($slug, '-');
-                // Check if slug already exists
+                
+                if ($slug === '') continue;
+
                 $existCheck = $pdo->prepare("SELECT id FROM tags WHERE slug = :s");
                 $existCheck->execute([':s' => $slug]);
                 $tagId = $existCheck->fetchColumn();
+
                 if (!$tagId) {
+                    // Create new tag with nice capitalization
+                    $name = ucwords(strtolower($tagValue));
                     $ins = $pdo->prepare("INSERT INTO tags (name, slug) VALUES (:n, :s)");
-                    $ins->execute([':n' => $tagValue, ':s' => $slug]);
+                    $ins->execute([':n' => $name, ':s' => $slug]);
                     $tagId = (int)$pdo->lastInsertId();
                 }
             }
-            $pdo->prepare("INSERT IGNORE INTO item_tag (item_id, tag_id) VALUES (:i, :t)")
-                ->execute([':i' => $id, ':t' => $tagId]);
+
+            if ($tagId) {
+                $pdo->prepare("INSERT IGNORE INTO item_tag (item_id, tag_id) VALUES (:i, :t)")
+                    ->execute([':i' => $id, ':t' => $tagId]);
+            }
         }
 
             $pdo->commit();
@@ -546,12 +563,20 @@ new TomSelect('#narrative-select', {
 });
 
 new TomSelect('#tag-select', {
-    plugins: ['remove_button'],
+    plugins: ['remove_button', 'dropdown_input', 'restore_on_backspace'],
     create: true,
-    placeholder: 'Add tags… e.g. steam, victorian',
-    maxOptions: 200,
     persist: false,
+    placeholder: 'Add tags… e.g. #steam, victorian',
+    maxOptions: 200,
     createFilter: function(input) { return input.trim().length >= 2; },
+    render: {
+        option_create: function(data, escape) {
+            return '<div class="create">Add <strong>' + escape(data.input) + '</strong>…</div>';
+        },
+        no_results: function(data, escape) {
+            return '<div class="no-results px-3 py-2 text-xs text-gray-500">No existing tags match "' + escape(data.input) + '"</div>';
+        }
+    }
 });
 
 // Media upload tab switcher
