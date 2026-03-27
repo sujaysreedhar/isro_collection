@@ -7,7 +7,7 @@ global $pdo;
 $error = '';
 $success = '';
 
-// Handle Actions (Add, Delete, Toggle)
+// Handle Actions (Add, Delete, Toggle, Bulk)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
         http_response_code(403);
@@ -46,8 +46,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $val = (int)$_POST['is_acquired'] === 1 ? 1 : 0;
             $stmt = $pdo->prepare("UPDATE postmark_locations SET is_acquired = ? WHERE id = ?");
             if ($stmt->execute([$val, $id])) {
-                 // Set a light success message or just pass, since it might be AJAX/redirect loops
                  $success = "Acquisition status updated.";
+            }
+        } elseif ($action === 'bulk_acquire') {
+            $ids = $_POST['selected_ids'] ?? [];
+            if (!empty($ids)) {
+                $ids = array_map('intval', $ids);
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $pdo->prepare("UPDATE postmark_locations SET is_acquired = 1 WHERE id IN ($placeholders)");
+                if ($stmt->execute($ids)) {
+                    $count = $stmt->rowCount();
+                    $success = "{$count} location(s) marked as acquired.";
+                } else {
+                    $error = "Failed to update locations.";
+                }
+            } else {
+                $error = "No locations selected.";
+            }
+        } elseif ($action === 'bulk_unacquire') {
+            $ids = $_POST['selected_ids'] ?? [];
+            if (!empty($ids)) {
+                $ids = array_map('intval', $ids);
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $pdo->prepare("UPDATE postmark_locations SET is_acquired = 0 WHERE id IN ($placeholders)");
+                if ($stmt->execute($ids)) {
+                    $count = $stmt->rowCount();
+                    $success = "{$count} location(s) marked as not acquired.";
+                } else {
+                    $error = "Failed to update locations.";
+                }
+            } else {
+                $error = "No locations selected.";
+            }
+        } elseif ($action === 'bulk_delete') {
+            $ids = $_POST['selected_ids'] ?? [];
+            if (!empty($ids)) {
+                $ids = array_map('intval', $ids);
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $pdo->prepare("DELETE FROM postmark_locations WHERE id IN ($placeholders)");
+                if ($stmt->execute($ids)) {
+                    $count = $stmt->rowCount();
+                    $success = "{$count} location(s) deleted.";
+                } else {
+                    $error = "Failed to delete locations.";
+                }
+            } else {
+                $error = "No locations selected.";
             }
         }
     }
@@ -79,12 +123,16 @@ $locations = $stmt->fetchAll();
 // Get unique states for dropdown
 $stateStmt = $pdo->query("SELECT DISTINCT state FROM postmark_locations WHERE state IS NOT NULL AND state != '' ORDER BY state ASC");
 $states = $stateStmt->fetchAll(PDO::FETCH_COLUMN);
+
+// Get counts
+$totalCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations")->fetchColumn();
+$acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_acquired = 1")->fetchColumn();
 ?>
 
 <div class="flex justify-between items-center mb-6">
     <div>
         <h2 class="text-xl font-bold text-gray-900">Locations Tracker</h2>
-        <p class="text-sm text-gray-500">Manage your post office acquisition targets.</p>
+        <p class="text-sm text-gray-500">Manage your post office acquisition targets. <strong><?= number_format($acquiredCount) ?></strong> / <strong><?= number_format($totalCount) ?></strong> acquired.</p>
     </div>
     <div>
         <button onclick="document.getElementById('add-location-modal').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700">
@@ -130,11 +178,39 @@ $states = $stateStmt->fetchAll(PDO::FETCH_COLUMN);
     </form>
 </div>
 
+<!-- Bulk Actions Bar -->
+<div id="bulk-bar" class="hidden mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex flex-wrap items-center gap-3 shadow-sm">
+    <span class="text-sm font-semibold text-yellow-800"><span id="selected-count">0</span> selected</span>
+    <div class="flex gap-2 ml-auto">
+        <button type="button" onclick="submitBulkAction('bulk_acquire')" class="inline-flex items-center px-3 py-1.5 text-xs font-bold rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Mark Acquired
+        </button>
+        <button type="button" onclick="submitBulkAction('bulk_unacquire')" class="inline-flex items-center px-3 py-1.5 text-xs font-bold rounded-md bg-gray-500 text-white hover:bg-gray-600 transition-colors">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            Unmark Acquired
+        </button>
+        <button type="button" onclick="if(confirm('Delete all selected locations? This cannot be undone.')){submitBulkAction('bulk_delete')}" class="inline-flex items-center px-3 py-1.5 text-xs font-bold rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            Delete Selected
+        </button>
+    </div>
+</div>
+
+<!-- Hidden bulk form -->
+<form id="bulk-form" method="POST" class="hidden">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+    <input type="hidden" name="action" id="bulk-action-input" value="">
+</form>
+
 <!-- Data Table -->
 <div class="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
+                <th class="px-4 py-3 text-left">
+                    <input type="checkbox" id="select-all" class="rounded border-gray-300 text-yellow-600 focus:ring-yellow-500 cursor-pointer" onchange="toggleSelectAll(this)">
+                </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PIN Code</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Post Office</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District / City</th>
@@ -145,10 +221,13 @@ $states = $stateStmt->fetchAll(PDO::FETCH_COLUMN);
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
             <?php if (empty($locations)): ?>
-            <tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No locations added yet.</td></tr>
+            <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No locations added yet.</td></tr>
             <?php else: ?>
                 <?php foreach ($locations as $loc): ?>
                 <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-4">
+                        <input type="checkbox" class="row-checkbox rounded border-gray-300 text-yellow-600 focus:ring-yellow-500 cursor-pointer" value="<?= $loc['id'] ?>" onchange="updateBulkBar()">
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= htmlspecialchars($loc['pin_code']) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= htmlspecialchars($loc['post_office']) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= htmlspecialchars($loc['district']) ?></td>
@@ -181,6 +260,9 @@ $states = $stateStmt->fetchAll(PDO::FETCH_COLUMN);
             <?php endif; ?>
         </tbody>
     </table>
+    <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
+        Showing <strong><?= number_format(count($locations)) ?></strong> location(s)
+    </div>
 </div>
 
 <!-- Add Modal -->
@@ -231,3 +313,51 @@ $states = $stateStmt->fetchAll(PDO::FETCH_COLUMN);
         </form>
     </div>
 </div>
+
+<script>
+function toggleSelectAll(master) {
+    document.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.checked = master.checked;
+    });
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    const bar = document.getElementById('bulk-bar');
+    const count = document.getElementById('selected-count');
+    
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = checked.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+    
+    // Update select-all state
+    const all = document.querySelectorAll('.row-checkbox');
+    const selectAll = document.getElementById('select-all');
+    selectAll.checked = all.length > 0 && checked.length === all.length;
+    selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+}
+
+function submitBulkAction(action) {
+    const form = document.getElementById('bulk-form');
+    const actionInput = document.getElementById('bulk-action-input');
+    actionInput.value = action;
+    
+    // Remove old hidden inputs
+    form.querySelectorAll('input[name="selected_ids[]"]').forEach(el => el.remove());
+    
+    // Add selected IDs
+    document.querySelectorAll('.row-checkbox:checked').forEach(cb => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_ids[]';
+        input.value = cb.value;
+        form.appendChild(input);
+    });
+    
+    form.submit();
+}
+</script>
