@@ -10,12 +10,22 @@ $totalResults = count($results);
 
 require_once ThemeManager::getHeader();
 ?>
-    <div class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 flex flex-col md:flex-row gap-8">
+    <div class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 flex flex-col md:flex-row gap-8 relative">
+
+        <!-- Mobile Facet Backdrop -->
+        <div id="mobile-facet-overlay" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 hidden md:hidden transition-opacity cursor-pointer"></div>
 
         <!-- Sidebar: Facets -->
-        <aside class="w-full md:w-64 flex-shrink-0">
-            <div class="sticky top-24">
-                <h3 class="text-sm font-bold uppercase tracking-wider text-gray-900 mb-4">Refine Search</h3>
+        <aside id="facet-sidebar" class="fixed inset-y-0 left-0 w-[85%] max-w-sm bg-white shadow-2xl z-50 transform -translate-x-full transition-transform duration-300 md:relative md:translate-x-0 md:bg-transparent md:w-64 md:shadow-none md:z-0 flex-shrink-0 flex flex-col h-full md:h-auto">
+            <div class="flex md:hidden items-center justify-between p-4 border-b border-gray-200 shrink-0">
+                <h2 class="text-lg font-bold text-gray-900">Filters</h2>
+                <button type="button" id="close-facet-btn" class="p-2 -mr-2 text-gray-500 hover:text-gray-900 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-4 md:p-0 overflow-y-auto flex-grow md:overflow-visible">
+                <div class="sticky top-24">
+                    <h3 class="hidden md:block text-sm font-bold uppercase tracking-wider text-gray-900 mb-4">Refine Search</h3>
 
                 <!-- Active Filters chips -->
                 <?php $hasActiveFilters = $q || $selectedCategories || $selectedMaterials || !empty($params['tag']) || $params['year_start'] || $params['year_end'] || $params['has_images']; ?>
@@ -190,20 +200,30 @@ require_once ThemeManager::getHeader();
                 </div>
                 <?php endif; ?>
 
+                </div>
             </div>
         </aside>
 
         <!-- Main Results -->
         <main class="flex-1 min-w-0">
-            <div class="mb-6 flex justify-between items-end border-b border-gray-200 pb-4">
-                <h1 class="text-3xl font-bold serif flex items-center gap-3">
-                    <?php if ($q): ?>
-                        <span>Results for "<?= htmlspecialchars($searchMeta['corrected_query'] ?? $q) ?>"</span>
-                    <?php else: ?>
-                        All Items
-                    <?php endif; ?>
-                </h1>
-                <span class="text-gray-500 text-sm"><?= $totalResults ?> result(s)</span>
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-end justify-between border-b border-gray-200 pb-4 gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold serif flex items-center gap-3">
+                        <?php if ($q): ?>
+                            <span>Results for "<?= htmlspecialchars($searchMeta['corrected_query'] ?? $q) ?>"</span>
+                        <?php else: ?>
+                            All Items
+                        <?php endif; ?>
+                    </h1>
+                    <span class="text-gray-500 text-sm mt-1 block sm:hidden"><?= $totalResults ?> result(s)</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="hidden sm:inline text-gray-500 text-sm"><?= $totalResults ?> result(s)</span>
+                    <button type="button" id="open-facet-btn" class="md:hidden w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors">
+                        <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                        Filters
+                    </button>
+                </div>
             </div>
 
             <?php if (!empty($searchMeta['was_corrected']) && $searchMeta['was_corrected']): ?>
@@ -308,4 +328,28 @@ require_once ThemeManager::getHeader();
         </main>
     </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('mobile-facet-overlay');
+    const sidebar = document.getElementById('facet-sidebar');
+    const openBtn = document.getElementById('open-facet-btn');
+    const closeBtn = document.getElementById('close-facet-btn');
+
+    function openSidebar() {
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    function closeSidebar() {
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    if(openBtn) openBtn.addEventListener('click', openSidebar);
+    if(closeBtn) closeBtn.addEventListener('click', closeSidebar);
+    if(overlay) overlay.addEventListener('click', closeSidebar);
+});
+</script>
 <?php require_once ThemeManager::getFooter(); ?>

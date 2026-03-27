@@ -53,6 +53,103 @@ $searchParams = $searchParams ?? ['q' => ''];
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <?php echo AssetManager::renderStyles(['themes/default/style.css']); ?>
+
+    <!-- Autocomplete JS -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('input[data-autocomplete="true"]').forEach(input => {
+            let timeout = null;
+            let currentFocus = -1;
+            const container = input.parentElement;
+            container.classList.add('relative');
+            
+            const dropdown = document.createElement('div');
+            dropdown.className = 'absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-2xl hidden max-h-96 overflow-y-auto left-0 top-full';
+            container.appendChild(dropdown);
+            
+            input.addEventListener('input', function(e) {
+                clearTimeout(timeout);
+                const val = this.value.trim();
+                if (!val || val.length < 2) {
+                    dropdown.classList.add('hidden');
+                    return;
+                }
+                
+                timeout = setTimeout(() => {
+                    fetch('<?= SITE_URL ?>/ajax_search.php?q=' + encodeURIComponent(val))
+                        .then(res => res.json())
+                        .then(data => {
+                            dropdown.innerHTML = '';
+                            currentFocus = -1;
+                            if (data.length === 0) {
+                                dropdown.innerHTML = '<div class="p-4 text-sm text-gray-500 text-center">No matching items found.</div>';
+                            } else {
+                                data.forEach(item => {
+                                    const a = document.createElement('a');
+                                    a.href = item.url;
+                                    a.className = 'flex items-center gap-3 p-3 hover:bg-gray-50 border-b border-gray-100 transition-colors last:border-0 autocomp-item';
+                                    
+                                    let imgHtml = item.image_url 
+                                        ? `<img src="${item.image_url}" class="w-12 h-12 object-cover rounded bg-gray-100 flex-shrink-0">`
+                                        : `<div class="w-12 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-400"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
+                                        
+                                    a.innerHTML = `
+                                        ${imgHtml}
+                                        <div class="min-w-0 flex-1">
+                                            <div class="text-xs font-bold text-gray-500 mb-0.5">${item.reg_number}</div>
+                                            <div class="text-sm font-semibold text-gray-900 truncate">${item.title}</div>
+                                        </div>
+                                    `;
+                                    
+                                    dropdown.appendChild(a);
+                                });
+                            }
+                            dropdown.classList.remove('hidden');
+                        })
+                        .catch(err => console.error(err));
+                }, 300);
+            });
+            
+            // Close when click outside
+            document.addEventListener('click', function(e) {
+                if (e.target !== input && !dropdown.contains(e.target)) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+            
+            // Simple keyboard nav
+            input.addEventListener('keydown', function(e) {
+                const items = dropdown.querySelectorAll('.autocomp-item');
+                if (!items.length || dropdown.classList.contains('hidden')) return;
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    currentFocus++;
+                    if (currentFocus >= items.length) currentFocus = 0;
+                    addActive(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    currentFocus--;
+                    if (currentFocus < 0) currentFocus = items.length - 1;
+                    addActive(items);
+                } else if (e.key === 'Enter') {
+                    if (currentFocus > -1) {
+                        e.preventDefault();
+                        items[currentFocus].click();
+                    }
+                }
+            });
+            
+            function addActive(x) {
+                x.forEach(item => item.classList.remove('bg-gray-100'));
+                if (currentFocus > -1) {
+                    x[currentFocus].classList.add('bg-gray-100');
+                    x[currentFocus].scrollIntoView({ block: 'nearest' });
+                }
+            }
+        });
+    });
+    </script>
     
     <!-- User injected head -->
     <?php if (isset($additionalHead)) echo $additionalHead; ?>
@@ -100,7 +197,7 @@ $searchParams = $searchParams ?? ['q' => ''];
                     <?php if (!empty($searchParams['tag'])): ?>
                         <input type="hidden" name="tag" value="<?= htmlspecialchars($searchParams['tag']) ?>">
                     <?php endif; ?>
-                    <input type="text" name="q" value="<?= htmlspecialchars($searchParams['q'] ?? '') ?>" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 sm:text-sm transition duration-150 ease-in-out" placeholder="Search the collections... (e.g. Steam Engine)">
+                    <input type="text" name="q" data-autocomplete="true" autocomplete="off" value="<?= htmlspecialchars($searchParams['q'] ?? '') ?>" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-gray-900 focus:border-gray-900 sm:text-sm transition duration-150 ease-in-out" placeholder="Search the collections... (e.g. Steam Engine)">
                 </form>
             </div>
             <?php endif; ?>

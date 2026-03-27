@@ -78,13 +78,26 @@ uasort($availableModules, function($a, $b) {
     return strcasecmp($a['name'], $b['name']);
 });
 
+$filter = $_GET['filter'] ?? 'all';
+$filteredModules = $availableModules;
+if ($filter === 'active') {
+    $filteredModules = array_filter($availableModules, fn($m) => $m['is_active']);
+} elseif ($filter === 'inactive') {
+    $filteredModules = array_filter($availableModules, fn($m) => !$m['is_active']);
+}
+
 echo renderAdminHeader('Manage Modules');
 ?>
 
-<div class="mb-6 flex justify-between items-end">
+<div class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
     <div>
         <h1 class="text-2xl font-bold text-gray-900">Manage Modules</h1>
         <p class="text-sm text-gray-500 mt-1">Enable or disable extensible features of the application.</p>
+    </div>
+    <div class="flex bg-gray-100 p-1 rounded-lg">
+        <a href="?filter=all" class="px-4 py-1.5 text-sm font-medium rounded-md <?= $filter === 'all' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900' ?>">All</a>
+        <a href="?filter=active" class="px-4 py-1.5 text-sm font-medium rounded-md <?= $filter === 'active' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900' ?>">Active</a>
+        <a href="?filter=inactive" class="px-4 py-1.5 text-sm font-medium rounded-md <?= $filter === 'inactive' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900' ?>">Inactive</a>
     </div>
 </div>
 
@@ -109,10 +122,10 @@ echo renderAdminHeader('Manage Modules');
             </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-            <?php if (empty($availableModules)): ?>
-            <tr><td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">No modules found in the modules/ directory.</td></tr>
+            <?php if (empty($filteredModules)): ?>
+            <tr><td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">No modules found matching the criteria.</td></tr>
             <?php else: ?>
-                <?php foreach ($availableModules as $mod): ?>
+                <?php foreach ($filteredModules as $mod): ?>
                 <tr>
                     <td class="px-6 py-4">
                         <div class="text-sm font-bold text-gray-900"><?= htmlspecialchars($mod['name']) ?></div>
