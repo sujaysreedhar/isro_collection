@@ -23,8 +23,8 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
             </div>
             <div class="flex gap-4 text-xs font-semibold bg-white/5 backdrop-blur-xl p-3 rounded-xl border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.2)]">
                 <div class="flex items-center gap-2">
-                    <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png" class="h-6" alt="Blue Marker">
-                    <span class="text-slate-200">Acquired</span>
+                    <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png" class="h-6" alt="Green Marker">
+                    <span class="text-slate-200">Collected</span>
                 </div>
                 <div class="flex items-center gap-2 pl-3 border-l border-white/10">
                     <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png" class="h-6" alt="Grey Marker">
@@ -51,8 +51,8 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
             maxZoom: 19
         }).addTo(map);
 
-        var blueIcon = new L.Icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+        var greenIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
             iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
         });
@@ -71,7 +71,7 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
                 var markerTitle = loc.post_office + ' - ' + loc.district;
                 
                 var statusHtml = isAcquired ? 
-                    '<span style="background: rgba(139,92,246,0.2); color: #c4b5fd; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; display: inline-block; margin-top: 4px; border: 1px solid rgba(139,92,246,0.3);">In Collection</span>' : 
+                    '<span style="background: rgba(34,197,94,0.2); color: #86efac; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; display: inline-block; margin-top: 4px; border: 1px solid rgba(34,197,94,0.3);">✓ Collected</span>' : 
                     '<span style="background: rgba(255,255,255,0.05); color: #94a3b8; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; display: inline-block; margin-top: 4px; border: 1px solid rgba(255,255,255,0.1);">Seeking</span>';
 
                 var popupHtml = '<div style="font-family: \'Plus Jakarta Sans\', sans-serif; padding: 4px;">' +
@@ -80,7 +80,7 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
                                 statusHtml +
                                 '</div>';
 
-                var iconToUse = isAcquired ? blueIcon : greyIcon;
+                var iconToUse = isAcquired ? greenIcon : greyIcon;
                 
                 L.marker([parseFloat(loc.latitude), parseFloat(loc.longitude)], {icon: iconToUse})
                  .bindPopup(popupHtml, {className: 'glass-popup'})
