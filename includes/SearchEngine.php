@@ -193,7 +193,7 @@ class SearchEngine {
         $sql .= " ORDER BY i.id DESC"; // Default sort
         
         if (isset($params['limit'])) {
-            $sql .= " LIMIT :limit OFFSET :offset";
+            $sql .= " LIMIT ? OFFSET ?";
         }
 
         $stmt = $this->db->prepare($sql);
@@ -203,10 +203,10 @@ class SearchEngine {
             $stmt->bindValue($k + 1, $v);
         }
         
-        // Bind limit/offset if present
+        // Bind limit/offset if present as positional parameters
         if (isset($params['limit'])) {
-            $stmt->bindValue(':limit', (int)$params['limit'], PDO::PARAM_INT);
-            $stmt->bindValue(':offset', (int)($params['offset'] ?? 0), PDO::PARAM_INT);
+            $stmt->bindValue(count($baseParts['bindings']) + 1, (int)$params['limit'], PDO::PARAM_INT);
+            $stmt->bindValue(count($baseParts['bindings']) + 2, (int)($params['offset'] ?? 0), PDO::PARAM_INT);
         }
 
         $stmt->execute();
