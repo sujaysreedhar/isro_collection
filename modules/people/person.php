@@ -3,6 +3,8 @@
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../includes/ThemeManager.php';
 
+global $pdo, $activeModulesSlugs;
+
 $slug = $_GET['slug'] ?? '';
 if (!in_array('people', $activeModulesSlugs)) {
     header("HTTP/1.0 404 Not Found");

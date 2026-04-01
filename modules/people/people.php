@@ -3,6 +3,8 @@
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../includes/ThemeManager.php';
 
+global $pdo, $activeModulesSlugs;
+
 $pageTitle = 'People & Biographies - ' . SITE_TITLE;
 $currentMenu = 'people';
 
@@ -30,7 +32,7 @@ require_once ThemeManager::getHeader();
     <?php if ($people): ?>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             <?php foreach ($people as $p): ?>
-                <a href="<?= SITE_URL ?>/person.php?slug=<?= urlencode($p['slug']) ?>" 
+                <a href="<?= SITE_URL ?>/person/<?= urlencode($p['slug']) ?>" 
                    class="group block bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
                     
                     <div class="aspect-[4/5] bg-slate-50 relative overflow-hidden">

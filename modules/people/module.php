@@ -31,6 +31,55 @@ class PeopleModule extends BaseModule {
         
         // Inject biography into item detail page
         HookRegistry::addAction('item_after_content', [$this, 'injectPeopleInfo']);
+
+        // Routing
+        HookRegistry::addFilter('route_request', function($handled, $uri) {
+            if ($uri === 'people' || $uri === 'people.php') {
+                require __DIR__ . '/people.php';
+                return true;
+            }
+            if (preg_match('#^person/([a-zA-Z0-9_-]+)/?$#', $uri, $matches)) {
+                $_GET['slug'] = $matches[1];
+                require __DIR__ . '/person.php';
+                return true;
+            }
+            // Handle legacy person.php?slug=... if it hits the index.php router
+            if ($uri === 'person.php' && isset($_GET['slug'])) {
+                require __DIR__ . '/person.php';
+                return true;
+            }
+            return $handled;
+        }, 10, 2);
+
+        // Search Integration
+        HookRegistry::addFilter('search_results', function($results, $params) {
+            $q = trim($params['q'] ?? '');
+            if (!$q) return $results;
+
+            global $pdo;
+            $searchTerm = '%' . $q . '%';
+            $stmt = $pdo->prepare("
+                SELECT * FROM people 
+                WHERE is_public = 1 AND (name LIKE ? OR short_description LIKE ? OR biography LIKE ?)
+            ");
+            $stmt->execute([$searchTerm, $searchTerm, $searchTerm]);
+            $people = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($people as $person) {
+                $results[] = [
+                    'id' => 'person_' . $person['id'],
+                    '_module_url' => SITE_URL . '/person/' . $person['slug'],
+                    '_module_type' => 'Biography',
+                    '_module_tags' => [],
+                    '_module_image_url' => $person['profile_image'] ? SITE_URL . '/uploads/display/' . $person['profile_image'] : '',
+                    'title' => $person['name'],
+                    'production_date' => $person['birth_date'] ? $person['birth_date'] . ' - ' . ($person['death_date'] ?: 'Present') : '',
+                    'reg_number' => 'Biography',
+                    'material' => $person['short_description']
+                ];
+            }
+            return $results;
+        }, 10, 2);
     }
 
     public function activate() {
@@ -81,7 +130,7 @@ class PeopleModule extends BaseModule {
             echo '<h3 class="text-xl font-bold text-slate-900 mb-6 font-serif">Related People & Biographies</h3>';
             echo '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">';
             foreach ($people as $person) {
-                $url = SITE_URL . '/person.php?slug=' . urlencode($person['slug']);
+                $url = SITE_URL . '/person/' . urlencode($person['slug']);
                 $img = $person['profile_image'] ? SITE_URL . '/uploads/display/' . $person['profile_image'] : '';
                 
                 echo '<a href="' . $url . '" class="flex items-center p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-md transition group">';
