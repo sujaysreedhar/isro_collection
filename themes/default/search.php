@@ -317,6 +317,13 @@ require_once ThemeManager::getHeader();
                         </a>
                     <?php endforeach; ?>
                 </div>
+
+                <!-- Pagination -->
+                <?php 
+                    $currentPage = $page; 
+                    require ThemeManager::getTemplatePath('partials/pagination.php'); 
+                ?>
+
             <?php else: ?>
                 <div class="text-center py-20 bg-white border border-gray-200 rounded-lg">
                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

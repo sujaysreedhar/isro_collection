@@ -171,7 +171,15 @@ class SearchEngine {
 
         $baseParts = $this->buildWhere($params);
 
-        // ── 1. Items query ───────────────────────────────────────────────
+        // ── 1. Count total matching items (before limit) ────────────────
+        $countSql = "SELECT COUNT(DISTINCT i.id) FROM items i " . $baseParts['join'];
+        if ($baseParts['where']) $countSql .= " WHERE " . implode(" AND ", $baseParts['where']);
+        
+        $countStmt = $this->db->prepare($countSql);
+        $countStmt->execute($baseParts['bindings']);
+        $totalResults = (int)$countStmt->fetchColumn();
+
+        // ── 2. Items query with pagination ───────────────────────────────
         $sql = "SELECT DISTINCT i.*, pm.file_path AS preview_file_path FROM items i ";
         $sql .= "LEFT JOIN ("
              .  "SELECT m.item_id, m.file_path FROM media m INNER JOIN ("
@@ -181,11 +189,30 @@ class SearchEngine {
         $sql .= $baseParts['join'];
         if ($baseParts['where']) $sql .= " WHERE " . implode(" AND ", $baseParts['where']);
         
+        // Add sorting and limiting
+        $sql .= " ORDER BY i.id DESC"; // Default sort
+        
+        if (isset($params['limit'])) {
+            $sql .= " LIMIT :limit OFFSET :offset";
+        }
+
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($baseParts['bindings']);
+        
+        // Bind original bindings
+        foreach ($baseParts['bindings'] as $k => $v) {
+            $stmt->bindValue($k + 1, $v);
+        }
+        
+        // Bind limit/offset if present
+        if (isset($params['limit'])) {
+            $stmt->bindValue(':limit', (int)$params['limit'], PDO::PARAM_INT);
+            $stmt->bindValue(':offset', (int)($params['offset'] ?? 0), PDO::PARAM_INT);
+        }
+
+        $stmt->execute();
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // ── 2. Category facet counts ─────────────────────────────────────
+        // ── 3. Category facet counts ─────────────────────────────────────
         $facetSql = "SELECT c.id, c.name, COUNT(DISTINCT i.id) as facet_count FROM categories c LEFT JOIN items i ON c.id = i.category_id " . $baseParts['join'];
         if ($baseParts['where']) $facetSql .= " WHERE " . implode(" AND ", $baseParts['where']);
         $facetSql .= " GROUP BY c.id, c.name HAVING facet_count > 0 ORDER BY c.name ASC";
@@ -228,6 +255,7 @@ class SearchEngine {
 
         return [
             'results' => $items,
+            'total_results' => $totalResults,
             'search_meta' => $searchMeta,
             'facets'  => [
                 'categories' => $categoryFacets,

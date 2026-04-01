@@ -6,14 +6,27 @@ global $pdo;
 $pageTitle = 'Blog - ' . SITE_TITLE;
 $currentMenu = 'blog';
 
-// Fetch published posts
+// Pagination
+$perPage = 9;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page - 1) * $perPage;
+
+// Count total published posts
+$countStmt = $pdo->query("SELECT COUNT(*) FROM blog_posts WHERE status = 'published'");
+$totalResults = (int)$countStmt->fetchColumn();
+$totalPages = ceil($totalResults / $perPage);
+
+// Fetch paginated public posts
 $stmt = $pdo->prepare("
     SELECT bp.*, a.username as author_name 
     FROM blog_posts bp 
     LEFT JOIN admins a ON bp.author_id = a.id 
     WHERE bp.status = 'published' 
     ORDER BY bp.published_at DESC
+    LIMIT :limit OFFSET :offset
 ");
+$stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -189,6 +202,12 @@ require_once ThemeManager::getHeader();
                     </article>
                 <?php endforeach; ?>
             </div>
+
+            <!-- Pagination -->
+            <?php 
+                $currentPage = $page; 
+                require ThemeManager::getTemplatePath('partials/pagination.php'); 
+            ?>
         <?php endif; ?>
     </div>
 </main>

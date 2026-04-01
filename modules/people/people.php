@@ -16,8 +16,21 @@ if (!in_array('people', $activeModulesSlugs)) {
     exit;
 }
 
-// Fetch all public people
-$stmt = $pdo->query("SELECT * FROM people WHERE is_public = 1 ORDER BY name ASC");
+// Pagination
+$perPage = 16;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page - 1) * $perPage;
+
+// Count total public people
+$countStmt = $pdo->query("SELECT COUNT(*) FROM people WHERE is_public = 1");
+$totalResults = (int)$countStmt->fetchColumn();
+$totalPages = ceil($totalResults / $perPage);
+
+// Fetch paginated public people
+$stmt = $pdo->prepare("SELECT * FROM people WHERE is_public = 1 ORDER BY name ASC LIMIT :limit OFFSET :offset");
+$stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
 $people = $stmt->fetchAll();
 
 require_once ThemeManager::getHeader();
@@ -60,6 +73,12 @@ require_once ThemeManager::getHeader();
                 </a>
             <?php endforeach; ?>
         </div>
+
+        <!-- Pagination -->
+        <?php 
+            $currentPage = $page; 
+            require ThemeManager::getTemplatePath('partials/pagination.php'); 
+        ?>
     <?php else: ?>
         <div class="text-center py-24 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
             <svg class="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>

@@ -14,15 +14,29 @@ if (!in_array('curated_collections', $activeModulesSlugs)) {
     exit;
 }
 
-// Fetch all public collections
-$stmt = $pdo->query("
+// Pagination
+$perPage = 12;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page - 1) * $perPage;
+
+// Count total public collections
+$countStmt = $pdo->query("SELECT COUNT(*) FROM collections WHERE is_public = 1");
+$totalResults = (int)$countStmt->fetchColumn();
+$totalPages = ceil($totalResults / $perPage);
+
+// Fetch paginated public collections
+$stmt = $pdo->prepare("
     SELECT c.*, COUNT(ci.item_id) as item_count 
     FROM collections c 
     LEFT JOIN collection_items ci ON c.id = ci.collection_id 
     WHERE c.is_public = 1 
     GROUP BY c.id 
     ORDER BY c.created_at DESC
+    LIMIT :limit OFFSET :offset
 ");
+$stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
 $collections = $stmt->fetchAll();
 
 require_once ThemeManager::getHeader();
@@ -67,6 +81,13 @@ require_once ThemeManager::getHeader();
             </a>
         <?php endforeach; ?>
     </div>
+
+    <!-- Pagination -->
+    <?php 
+        $currentPage = $page; 
+        require ThemeManager::getTemplatePath('partials/pagination.php'); 
+    ?>
+
     <?php else: ?>
     <div class="text-center py-24 bg-white rounded-3xl border border-gray-200 border-dashed">
         <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>

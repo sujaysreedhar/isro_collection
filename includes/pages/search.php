@@ -17,8 +17,18 @@ $params = [
     'year_end'     => (isset($_GET['year_end']) && is_numeric($_GET['year_end'])) ? (int)$_GET['year_end'] : null,
 ];
 
+// Pagination
+$perPage = 20;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page - 1) * $perPage;
+
+$params['limit'] = $perPage;
+$params['offset'] = $offset;
+
 $searchData = $searchEngine->search($params);
 $results    = $searchData['results'];
+$totalResults = $searchData['total_results'] ?? count($results);
+$totalPages = ceil($totalResults / $perPage);
 $facets     = $searchData['facets'];
 $searchMeta = $searchData['search_meta'] ?? null;
 

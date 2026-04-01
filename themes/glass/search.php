@@ -229,6 +229,11 @@ require_once ThemeManager::getHeader();
                             </a>
                         <?php endforeach; ?>
                     </div>
+
+                    <?php 
+                        $currentPage = $page; 
+                        require ThemeManager::getTemplatePath('partials/pagination.php'); 
+                    ?>
                 <?php endif; ?>
             </main>
         </div>
