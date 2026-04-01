@@ -222,6 +222,10 @@ class SearchEngine {
         $tagFacetStmt->execute($baseParts['bindings']);
         $tagFacets = $tagFacetStmt->fetchAll(PDO::FETCH_ASSOC);
 
+        if (class_exists('HookRegistry')) {
+            $items = HookRegistry::applyFilters('search_results', $items, $params);
+        }
+
         return [
             'results' => $items,
             'search_meta' => $searchMeta,

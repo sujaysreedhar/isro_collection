@@ -1,6 +1,7 @@
 <?php
 // Include database connection
 require_once __DIR__ . '/../../config/config.php';
+global $pdo;
 
 // Get and validate the Item ID from the URL (rewritten by .htaccess)
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;

@@ -259,6 +259,10 @@ require_once ThemeManager::getHeader();
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <?php foreach ($results as $item): ?>
                         <?php
+                            $isModule = !empty($item['_module_url']);
+                            $itemUrl = $isModule ? $item['_module_url'] : SITE_URL . '/item/' . $item['id'];
+                            $itemType = $item['_module_type'] ?? 'Item';
+                            
                             $previewPath = trim((string)($item['preview_file_path'] ?? ''));
                             $previewUrl = '';
                             if ($previewPath !== '') {
@@ -270,36 +274,38 @@ require_once ThemeManager::getHeader();
                                         ? SITE_URL . '/uploads/display/' . rawurlencode($previewPath)
                                         : SITE_URL . '/uploads/originals/' . rawurlencode($previewPath);
                                 }
+                            } elseif (!empty($item['_module_image_url'])) {
+                                $previewUrl = $item['_module_image_url'];
                             }
                         ?>
-                        <a href="<?= SITE_URL ?>/item/<?= $item['id'] ?>"
+                        <a href="<?= htmlspecialchars($itemUrl) ?>"
                            class="group block border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition bg-white flex flex-col">
                             <div class="h-48 bg-gray-100 flex items-center justify-center p-4">
                                 <?php if ($previewUrl): ?>
-                                    <img src="<?= htmlspecialchars($previewUrl) ?>" alt="<?= htmlspecialchars($item['title']) ?>" class="object-cover w-full h-full">
+                                    <img src="<?= htmlspecialchars($previewUrl) ?>" alt="<?= htmlspecialchars($item['title'] ?? '') ?>" class="object-cover w-full h-full">
                                 <?php else: ?>
                                     <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                 <?php endif; ?>
                             </div>
                             <div class="p-4 flex flex-col flex-grow">
                                 <div class="flex justify-between items-start mb-1">
-                                    <div class="text-xs font-bold text-gray-500"><?= htmlspecialchars($item['reg_number']) ?></div>
+                                    <div class="text-xs font-bold text-gray-500"><?= htmlspecialchars($item['reg_number'] ?? $itemType) ?></div>
                                     <?php if (!empty($item['material'])): ?>
                                         <div class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200"><?= htmlspecialchars($item['material']) ?></div>
                                     <?php endif; ?>
                                 </div>
-                                <h3 class="font-bold serif text-lg text-gray-900 group-hover:text-blue-800 transition line-clamp-2"><?= htmlspecialchars($item['title']) ?></h3>
+                                <h3 class="font-bold serif text-lg text-gray-900 group-hover:text-blue-800 transition line-clamp-2"><?= htmlspecialchars($item['title'] ?? '') ?></h3>
                                 
                                 <div class="text-xs text-gray-500 mt-2">
                                     <?= htmlspecialchars($item['production_date'] ?? 'n.d.') ?>
                                 </div>
 
-                                <?php $rTags = $resultTags[$item['id']] ?? []; ?>
+                                <?php $rTags = $isModule ? ($item['_module_tags'] ?? []) : ($resultTags[$item['id']] ?? []); ?>
                                 <?php if ($rTags): ?>
                                 <div class="flex flex-wrap gap-1 mt-3">
                                     <?php foreach (array_slice($rTags, 0, 3) as $rt): ?>
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 border border-gray-200">
-                                            <span class="mr-0.5 text-gray-400">#</span><?= htmlspecialchars($rt['name']) ?>
+                                            <span class="mr-0.5 text-gray-400">#</span><?= htmlspecialchars(is_array($rt) ? $rt['name'] : $rt) ?>
                                         </span>
                                     <?php endforeach; ?>
                                     <?php if (count($rTags) > 3): ?>

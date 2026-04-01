@@ -6,11 +6,7 @@ RewriteEngine On
 # Set the base path for this subdirectory install
 RewriteBase /collection/
 
-# ─── Allow direct access to real files and directories ────────────────────────
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-
-# ─── Module Frontend Pages ───────────────────────────────────────────────────
+# ─── Legacy Module Frontend Pages ────────────────────────────────────────────
 RewriteRule ^timeline\.php$ modules/timeline/timeline.php [L,QSA]
 RewriteRule ^gallery\.php$ modules/user_galleries/gallery.php [L,QSA]
 RewriteRule ^atlas\.php$ modules/postmark_atlas/atlas.php [L,QSA]
@@ -19,38 +15,13 @@ RewriteRule ^collections\.php$ modules/curated_collections/collections.php [L,QS
 RewriteRule ^collection\.php$ modules/curated_collections/collection.php [L,QSA]
 RewriteRule ^api\.php$ modules/api_export/api.php [L,QSA]
 RewriteRule ^people\.php$ modules/people/people.php [L,QSA]
-RewriteRule ^person\.php$ modules/people/person.php [L,QSA]
-
-# ─── Core Pages Direct File Access ───────────────────────────────────────────
-RewriteRule ^search\.php$ includes/pages/search.php [L,QSA]
-RewriteRule ^item_detail\.php$ includes/pages/item_detail.php [L,QSA]
-
-# ─── Clean URL: Item Detail ───────────────────────────────────────────────────
-# Matches: /collection/item/42
-# Matches: /collection/item/42/steam-engine-ballarat  (with optional slug)
-RewriteRule ^item/([0-9]+)(/[a-zA-Z0-9_-]+)?/?$ includes/pages/item_detail.php?id=$1 [L,QSA]
-
-# ─── Clean URL: Category Browse ───────────────────────────────────────────────
-# Matches: /collection/category/social-history
-RewriteRule ^category/([a-zA-Z0-9_-]+)/?$ includes/pages/search.php?category=$1 [L,QSA]
-
-# ─── Clean URL: Search ────────────────────────────────────────────────────────
-# Matches: /collection/search  (query string passed through via QSA)
-RewriteRule ^search/?$ includes/pages/search.php [L,QSA]
-
-# ─── Clean URL: Tag Browse ────────────────────────────────────────────────────
-# Matches: /collection/tag/steam-engine
-RewriteRule ^tag/([a-zA-Z0-9_-]+)/?$ includes/pages/search.php?tag=$1 [L,QSA]
-
-# ─── Clean URL: Story / Narrative ────────────────────────────────────────────
-# Matches: /collection/story/5
-RewriteRule ^story/([0-9]+)/?$ story.php?id=$1 [L,QSA]
-
-# ─── Clean URL: People & Biographies ──────────────────────────────────────────
-# Matches: /collection/people
-# Matches: /collection/person/mahfuz-rahman
-RewriteRule ^people/?$ modules/people/people.php [L,QSA]
 RewriteRule ^person/([a-zA-Z0-9_-]+)/?$ modules/people/person.php?slug=$1 [L,QSA]
+
+# ─── Front Controller ───────────────────────────────────────────
+# Allow direct access to real files and directories
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [L,QSA]
 
 # ─── Security: block sensitive files ─────────────────────────────────────────
 <FilesMatch "\.(sql|env|json|lock)$">

@@ -1,0 +1,7 @@
+{
+    "name": "Blog",
+    "description": "A robust, lightweight blog module for the Collection Portal.",
+    "version": "1.0",
+    "author": "Antigravity",
+    "admin_menu_priority": 30
+}
