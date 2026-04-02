@@ -50,8 +50,8 @@ $searchParams = $searchParams ?? ['q' => ''];
     <?php if ($jsonLdJson): ?>
         <!-- Schema.org JSON-LD -->
         <script type="application/ld+json">
-    <?= $jsonLdJson ?>
-        </script>
+        <?= $jsonLdJson ?>
+            </script>
     <?php endif; ?>
 
     <!-- Tailwind CSS -->
@@ -175,7 +175,7 @@ $searchParams = $searchParams ?? ['q' => ''];
             <div class="flex items-center flex-shrink-0">
                 <a href="<?= SITE_URL ?>" class="flex items-center gap-3">
                     <?php
-                    $siteLogo = $appSettings['site_logo'] ?? '';
+                    $siteLogo = $GLOBALS['appSettings']['site_logo'] ?? '';//$appSettings['site_logo'] ?? '';
                     if ($siteLogo && file_exists(dirname(__DIR__, 2) . '/uploads/branding/' . $siteLogo)):
                         ?>
                         <img src="<?= SITE_URL ?>/uploads/branding/<?= rawurlencode($siteLogo) ?>" alt="<?= SITE_TITLE ?>"
