@@ -109,4 +109,7 @@ require_once ThemeManager::getHeader();
         <?php endif; ?>
     </main>
 
+    <!-- Modular Sections Injected via Hook -->
+    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
+
 <?php require_once ThemeManager::getFooter(); ?>

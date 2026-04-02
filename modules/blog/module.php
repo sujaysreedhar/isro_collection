@@ -77,6 +77,46 @@ class BlogModule extends BaseModule {
         HookRegistry::addAction('admin_page_blog', function() {
             require_once __DIR__ . '/admin_posts.php';
         });
+
+        // Home page modular section
+        HookRegistry::addAction('home_page_sections', [$this, 'renderHomeSection']);
+    }
+
+    public function renderHomeSection() {
+        $stmt = $this->pdo->query("SELECT * FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 3");
+        $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$posts) return;
+
+        echo '<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-gray-100 dark:border-gray-800">';
+        echo '<div class="flex items-center justify-between mb-8">';
+        echo '<h2 class="text-3xl font-bold text-gray-900 dark:text-white serif">Latest Stories</h2>';
+        echo '<a href="' . SITE_URL . '/blog" class="text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center">Read All <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></a>';
+        echo '</div>';
+        echo '<div class="grid grid-cols-1 md:grid-cols-3 gap-8">';
+        
+        foreach ($posts as $post) {
+            $url = SITE_URL . '/blog/' . urlencode($post['slug']);
+            echo '<a href="' . $url . '" class="group block bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl dark:hover:border-gray-600 transition-all flex flex-col h-full">';
+            echo '<div class="relative h-48 bg-gray-100 dark:bg-gray-900 overflow-hidden">';
+            
+            if (!empty($post['featured_image'])) {
+                $imgUrl = SITE_URL . '/uploads/' . htmlspecialchars($post['featured_image']);
+                echo '<img src="' . $imgUrl . '" alt="' . htmlspecialchars($post['title']) . '" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">';
+            } else {
+                echo '<div class="absolute inset-0 flex items-center justify-center"><svg class="w-10 h-10 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1l2.293-2.293A1 1 0 0121 5.414v13.172a1 1 0 01-1.707.707L17 17v1a2 2 0 01-2 2z"></path></svg></div>';
+            }
+            
+            echo '</div>';
+            echo '<div class="p-6 flex flex-col flex-grow">';
+            $pubDate = !empty($post['published_at']) ? date('M j, Y', strtotime($post['published_at'])) : date('M j, Y', strtotime($post['created_at']));
+            echo '<div class="text-xs font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-2 block">' . $pubDate . '</div>';
+            echo '<h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 leading-snug line-clamp-2">' . htmlspecialchars($post['title']) . '</h3>';
+            echo '<p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3">' . htmlspecialchars(strip_tags($post['excerpt'] ?? '')) . '</p>';
+            echo '</div></a>';
+        }
+        
+        echo '</div></div>';
     }
 
     public function activate() {

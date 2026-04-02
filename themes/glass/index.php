@@ -161,7 +161,7 @@ require_once ThemeManager::getHeader();
         <?php endif; ?>
     </div>
     
-    <!-- Hooks for modules -->
-    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_home'); } ?>
+    <!-- Hooks for modules (home_page_sections) -->
+    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
 
 <?php require_once ThemeManager::getFooter(); ?>

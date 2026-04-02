@@ -80,6 +80,46 @@ class PeopleModule extends BaseModule {
             }
             return $results;
         }, 10, 2);
+
+        // Home page modular section
+        HookRegistry::addAction('home_page_sections', [$this, 'renderHomeSection']);
+    }
+
+    public function renderHomeSection() {
+        $stmt = $this->pdo->query("SELECT * FROM people WHERE is_public = 1 ORDER BY id DESC LIMIT 4");
+        $people = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$people) return;
+
+        echo '<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-gray-100 dark:border-gray-800">';
+        echo '<div class="flex items-center justify-between mb-8">';
+        echo '<h2 class="text-3xl font-bold text-gray-900 dark:text-white serif">Featured People</h2>';
+        echo '<a href="' . SITE_URL . '/people.php" class="text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center">View All <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></a>';
+        echo '</div>';
+        echo '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">';
+        
+        foreach ($people as $person) {
+            $url = SITE_URL . '/person/' . urlencode($person['slug']);
+            $img = $person['profile_image'] ? SITE_URL . '/uploads/display/' . htmlspecialchars($person['profile_image']) : '';
+            
+            echo '<a href="' . $url . '" class="group flex flex-col items-center p-6 bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 hover:shadow-xl dark:hover:border-gray-600 transition-all text-center">';
+            
+            if ($img) {
+                echo '<img src="' . $img . '" alt="' . htmlspecialchars($person['name']) . '" class="w-24 h-24 rounded-full object-cover mb-4 border-4 border-gray-50 dark:border-gray-700 shadow-md group-hover:scale-105 transition-transform">';
+            } else {
+                echo '<div class="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 dark:text-gray-500 mb-4 border-4 border-gray-50 dark:border-gray-800"><svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg></div>';
+            }
+            
+            echo '<h3 class="text-lg font-bold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400">' . htmlspecialchars($person['name']) . '</h3>';
+            
+            if (!empty($person['short_description'])) {
+                echo '<p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">' . htmlspecialchars($person['short_description']) . '</p>';
+            }
+            
+            echo '</a>';
+        }
+        
+        echo '</div></div>';
     }
 
     public function activate() {
