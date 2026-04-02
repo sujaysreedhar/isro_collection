@@ -99,9 +99,8 @@ require_once ThemeManager::getHeader();
                 <p class="mt-1 text-sm text-gray-500">Get started by importing data into your MySQL database.</p>
             </div>
         <?php endif; ?>
+        <!-- Modular Sections Injected via Hook -->
+        <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
     </main>
-
-    <!-- Modular Sections Injected via Hook -->
-    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
 
 <?php require_once ThemeManager::getFooter(); ?>

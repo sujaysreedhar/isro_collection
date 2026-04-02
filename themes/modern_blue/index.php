@@ -159,9 +159,8 @@ require_once ThemeManager::getHeader();
                 </a>
             </div>
         <?php endif; ?>
+        <!-- Hooks for modules (home_page_sections) -->
+        <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
     </div>
-    
-    <!-- Hooks for modules (home_page_sections) -->
-    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
 
 <?php require_once ThemeManager::getFooter(); ?>

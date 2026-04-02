@@ -55,8 +55,8 @@ global $pageTitle, $additionalHead, $currentMenu;
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <?php
-                    $siteLogo = $appSettings['site_logo'] ?? '';
-                    if ($siteLogo && file_exists(__DIR__ . '/../uploads/branding/' . $siteLogo)):
+ $siteLogo = $GLOBALS['appSettings']['site_logo'] ?? '';//$appSettings['site_logo'] ?? '';
+                    if ($siteLogo && file_exists(dirname(__DIR__, 2) . '/uploads/branding/' . $siteLogo)):
                 ?>
                     <a href="<?= SITE_URL ?>" class="flex items-center">
                         <img src="<?= SITE_URL ?>/uploads/branding/<?= rawurlencode($siteLogo) ?>" alt="<?= SITE_TITLE ?>" class="h-12 w-auto object-contain">

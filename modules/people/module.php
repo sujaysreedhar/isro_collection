@@ -91,30 +91,40 @@ class PeopleModule extends BaseModule {
 
         if (!$people) return;
 
-        echo '<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-gray-100 dark:border-gray-800">';
-        echo '<div class="flex items-center justify-between mb-8">';
-        echo '<h2 class="text-3xl font-bold text-gray-900 dark:text-white serif">Featured People</h2>';
-        echo '<a href="' . SITE_URL . '/people.php" class="text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center">View All <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></a>';
+        echo '<div class="py-16 border-t border-gray-100 dark:border-gray-800">';
+        echo '<div class="flex items-center justify-between mb-10">';
+        echo '<div>';
+        echo '<h2 class="text-3xl font-extrabold text-gray-900 dark:text-white serif">Featured People</h2>';
+        echo '<p class="mt-2 text-gray-500 dark:text-gray-400 text-sm">Biographies of the individuals who shaped this history.</p>';
         echo '</div>';
-        echo '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">';
+        echo '<a href="' . SITE_URL . '/people.php" class="inline-flex items-center text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">View All <svg class="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg></a>';
+        echo '</div>';
+        echo '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">';
         
         foreach ($people as $person) {
             $url = SITE_URL . '/person/' . urlencode($person['slug']);
             $img = $person['profile_image'] ? SITE_URL . '/uploads/display/' . htmlspecialchars($person['profile_image']) : '';
             
-            echo '<a href="' . $url . '" class="group flex flex-col items-center p-6 bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 hover:shadow-xl dark:hover:border-gray-600 transition-all text-center">';
+            echo '<a href="' . $url . '" class="group flex flex-col items-center p-8 bg-white dark:bg-gray-800/50 rounded-3xl border border-gray-200 dark:border-gray-700/50 hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-300 dark:hover:border-blue-500/50 transition-all duration-300 text-center transform hover:-translate-y-1">';
             
             if ($img) {
-                echo '<img src="' . $img . '" alt="' . htmlspecialchars($person['name']) . '" class="w-24 h-24 rounded-full object-cover mb-4 border-4 border-gray-50 dark:border-gray-700 shadow-md group-hover:scale-105 transition-transform">';
+                echo '<div class="relative mb-6">';
+                echo '<img src="' . $img . '" alt="' . htmlspecialchars($person['name']) . '" class="w-28 h-28 rounded-full object-cover border-[6px] border-gray-50 dark:border-gray-800 shadow-md group-hover:scale-105 transition-transform duration-500">';
+                echo '<div class="absolute inset-0 rounded-full border border-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>';
+                echo '</div>';
             } else {
-                echo '<div class="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 dark:text-gray-500 mb-4 border-4 border-gray-50 dark:border-gray-800"><svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg></div>';
+                echo '<div class="w-28 h-28 rounded-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-600 mb-6 border-[6px] border-gray-50 dark:border-gray-800 shadow-inner group-hover:scale-105 transition-transform duration-500"><svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg></div>';
             }
             
-            echo '<h3 class="text-lg font-bold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400">' . htmlspecialchars($person['name']) . '</h3>';
+            echo '<h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight">' . htmlspecialchars($person['name']) . '</h3>';
             
             if (!empty($person['short_description'])) {
-                echo '<p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">' . htmlspecialchars($person['short_description']) . '</p>';
+                echo '<p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">' . htmlspecialchars($person['short_description']) . '</p>';
             }
+            
+            echo '<div class="mt-6 flex items-center justify-center text-xs font-bold text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 tracking-widest uppercase">';
+            echo 'Biography <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>';
+            echo '</div>';
             
             echo '</a>';
         }
