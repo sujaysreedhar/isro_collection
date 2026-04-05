@@ -304,6 +304,114 @@ switch ($action) {
         echo json_encode(['success' => true]);
         break;
 
+    // ── Orphaned Media Scanner ───────────────────────────────────────────────
+    case 'scan_orphans':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
+        if (!verifyCsrfToken($csrfToken)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token.']);
+            exit;
+        }
+        
+        $validFiles = [];
+        
+        // 1. Media table (originals, display, thumbnails, pdfs)
+        $stmt = $pdo->query("SELECT file_path FROM media");
+        while ($row = $stmt->fetch()) {
+            $path = ltrim(str_replace('\\', '/', $row['file_path']), '/');
+            $validFiles['originals/' . $path] = true;
+            $validFiles['display/' . $path] = true;
+            $validFiles['thumbnails/' . $path] = true;
+            $validFiles['pdfs/' . $path] = true;
+        }
+
+        // 2. Panoramics
+        try {
+            $stmt = $pdo->query("SELECT file_path FROM item_panoramics");
+            while ($row = $stmt->fetch()) {
+                $path = ltrim(str_replace('\\', '/', $row['file_path']), '/');
+                $validFiles['panoramics/' . $path] = true;
+            }
+        } catch (\Exception $e) {}
+
+        $uploadsDir = realpath(__DIR__ . '/../uploads');
+        $orphans = [];
+
+        if ($uploadsDir && is_dir($uploadsDir)) {
+            $dirIterator = new RecursiveDirectoryIterator($uploadsDir, RecursiveDirectoryIterator::SKIP_DOTS);
+            $iterator = new RecursiveIteratorIterator($dirIterator);
+
+            foreach ($iterator as $file) {
+                if (!$file->isFile()) continue;
+                $filename = $file->getFilename();
+                
+                // Ignore system files
+                if ($filename === 'index.html' || $filename === 'index.php' || strpos($filename, '.') === 0) {
+                    continue;
+                }
+
+                $absPath = $file->getRealPath();
+                $relPath = str_replace('\\', '/', substr($absPath, strlen($uploadsDir) + 1));
+                
+                // Ignore the branding folder completely
+                if (strpos($relPath, 'branding/') === 0) {
+                    continue;
+                }
+                
+                if (!isset($validFiles[$relPath])) {
+                    $bytes = $file->getSize();
+                    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+                    $pow = min($pow, count($units) - 1);
+                    $formattedSize = round($bytes / pow(1024, $pow), 2) . ' ' . $units[$pow];
+
+                    $orphans[] = [
+                        'path' => $relPath,
+                        'size' => $bytes,
+                        'size_formatted' => $formattedSize
+                    ];
+                }
+            }
+        }
+
+        echo json_encode(['success' => true, 'orphans' => $orphans]);
+        break;
+
+    // ── Orphaned Media Deletion ──────────────────────────────────────────────
+    case 'delete_orphans':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
+        if (!verifyCsrfToken($csrfToken)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token.']);
+            exit;
+        }
+
+        $paths = $_POST['paths'] ?? [];
+        if (!is_array($paths) || empty($paths)) {
+            echo json_encode(['success' => false, 'message' => 'No files selected']);
+            exit;
+        }
+
+        $uploadsBase = realpath(__DIR__ . '/../uploads');
+        $deleted = 0;
+
+        foreach ($paths as $p) {
+            // Prevent directory traversal
+            if (strpos($p, '..') !== false) continue;
+            
+            $target = realpath($uploadsBase . DIRECTORY_SEPARATOR . $p);
+            
+            // Strictly assure the resolved path is within uploads directory
+            if ($target && strpos($target, $uploadsBase) === 0 && is_file($target)) {
+                if (@unlink($target)) {
+                    $deleted++;
+                }
+            }
+        }
+
+        echo json_encode(['success' => true, 'deleted' => $deleted, 'message' => "$deleted file(s) deleted."]);
+        break;
+
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action.']);

@@ -49,9 +49,8 @@ require_once ThemeManager::getHeader();
                     <?php if (!empty($selectedMaterials)): ?>
                         <?php foreach($selectedMaterials as $m): ?><input type="hidden" name="materials[]" value="<?= htmlspecialchars($m) ?>"><?php endforeach; ?>
                     <?php endif; ?>
-                    <?php if (!empty($params['tag'])): ?>
-                        <input type="hidden" name="tag" value="<?= htmlspecialchars($params['tag']) ?>">
-                    <?php endif; ?>
+                    <?php if (!empty($params['tag'])): ?><input type="hidden" name="tags[]" value="<?= htmlspecialchars($params['tag']) ?>"><?php endif; ?>
+                    <?php foreach(($params['tags'] ?? []) as $t): ?><input type="hidden" name="tags[]" value="<?= htmlspecialchars($t) ?>"><?php endforeach; ?>
                     <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" class="block w-full pl-10 pr-20 py-3 border border-slate-300 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-modern-500/20 focus:border-modern-500 sm:text-sm shadow-sm transition-all" placeholder="New search...">
                     <button type="submit" class="absolute inset-y-1 right-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-lg border border-slate-200 transition-colors">Go</button>
                 </form>
@@ -73,7 +72,8 @@ require_once ThemeManager::getHeader();
                         <form action="<?= SITE_URL ?>/search.php" method="GET" class="flex items-center gap-2">
                             <!-- Hidden inputs to preserve existing non-date filters -->
                             <?php if ($q): ?><input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>"><?php endif; ?>
-                            <?php if (!empty($params['tag'])): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($params['tag']) ?>"><?php endif; ?>
+                            <?php if (!empty($params['tag'])): ?><input type="hidden" name="tags[]" value="<?= htmlspecialchars($params['tag']) ?>"><?php endif; ?>
+                            <?php foreach(($params['tags'] ?? []) as $t): ?><input type="hidden" name="tags[]" value="<?= htmlspecialchars($t) ?>"><?php endforeach; ?>
                             <?php foreach($selectedCategories as $cid): ?><input type="hidden" name="category_ids[]" value="<?= htmlspecialchars($cid) ?>"><?php endforeach; ?>
                             <?php foreach($selectedMaterials as $m): ?><input type="hidden" name="materials[]" value="<?= htmlspecialchars($m) ?>"><?php endforeach; ?>
                             
@@ -139,9 +139,13 @@ require_once ThemeManager::getHeader();
                     <div class="border-t border-slate-100 pt-6">
                         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">By Tag</h3>
                         <div class="flex flex-wrap gap-2">
-                            <?php foreach ($facets['tags'] as $tag): ?>
-                            <?php $isActive = ($params['tag'] === $tag['slug']); ?>
-                            <a href="<?= buildFilterUrl($params, 'tag', $tag['slug']) ?>" 
+                            <?php 
+                            $activeTagsForFacet = $params['tags'] ?? [];
+                            if (!empty($params['tag'])) $activeTagsForFacet[] = $params['tag'];
+                            foreach ($facets['tags'] as $tag): 
+                                $isActive = in_array($tag['slug'], $activeTagsForFacet);
+                            ?>
+                            <a href="<?= buildFilterUrl($params, 'tags', $tag['slug']) ?>" 
                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
                                       <?= $isActive ? 'bg-modern-500 text-white border-modern-500 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-modern-300 hover:bg-slate-50' ?>">
                                 <?= htmlspecialchars($tag['name']) ?> <span class="<?= $isActive ? 'text-white/80' : 'text-slate-400' ?> ml-1.5">(<?= $tag['facet_count'] ?>)</span>
@@ -157,7 +161,7 @@ require_once ThemeManager::getHeader();
             <main class="flex-1 min-w-0">
                 
                 <!-- Active Filters Chips -->
-                <?php $hasAnyFilters = $selectedCategories || $selectedMaterials || !empty($params['tag']) || $params['year_start'] || $params['year_end']; ?>
+                <?php $hasAnyFilters = $selectedCategories || $selectedMaterials || !empty($params['tag']) || !empty($params['tags']) || $params['year_start'] || $params['year_end']; ?>
                 <?php if ($hasAnyFilters): ?>
                 <div class="flex flex-wrap items-center gap-2 mb-6 p-3 bg-modern-50 rounded-xl border border-modern-100">
                     <span class="text-xs font-bold text-modern-600 uppercase tracking-widest mx-2">Active Filters:</span>
@@ -178,9 +182,12 @@ require_once ThemeManager::getHeader();
                         echo '<a href="'.buildFilterUrl($params, 'materials', $mat).'" class="inline-flex items-center py-1 px-3 rounded-md text-sm font-medium bg-white text-slate-700 border border-modern-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors shadow-sm gap-2">Material: '.htmlspecialchars($mat).' <span class="text-slate-400">&times;</span></a>';
                     }
                     // Tags
-                    if (!empty($params['tag'])) {
-                        $name = $tagNameMap[$params['tag']] ?? 'Tag';
-                        echo '<a href="'.buildFilterUrl($params, 'tag', $params['tag']).'" class="inline-flex items-center py-1 px-3 rounded-md text-sm font-medium bg-white text-slate-700 border border-modern-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors shadow-sm gap-2"><span class="text-slate-400">#</span>'.htmlspecialchars($name).' <span class="text-slate-400">&times;</span></a>';
+                    $activeTags = $params['tags'] ?? [];
+                    if (!empty($params['tag'])) $activeTags[] = $params['tag'];
+                    $activeTags = array_unique($activeTags);
+                    foreach ($activeTags as $aTag) {
+                        $name = $tagNameMap[$aTag] ?? $aTag;
+                        echo '<a href="'.buildFilterUrl($params, 'tags', $aTag).'" class="inline-flex items-center py-1 px-3 rounded-md text-sm font-medium bg-white text-slate-700 border border-modern-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors shadow-sm gap-2"><span class="text-slate-400">#</span>'.htmlspecialchars($name).' <span class="text-slate-400">&times;</span></a>';
                     }
                     ?>
                     <a href="<?= SITE_URL ?>/search.php" class="text-xs text-modern-500 hover:text-modern-700 hover:underline ml-auto mr-2 font-medium">Clear All</a>

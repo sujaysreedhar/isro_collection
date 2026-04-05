@@ -130,6 +130,17 @@ echo renderAdminHeader('Storage Settings');
 </div>
 <?php endif; ?>
 
+<!-- Tabs Navigation -->
+<div class="mb-6 border-b border-gray-200">
+    <nav class="-mb-px flex gap-6" aria-label="Tabs">
+        <button type="button" onclick="switchTab('config')" id="nav-btn-config" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-gray-900 text-gray-900">Configuration</button>
+        <?php if ($settings['storage_driver'] !== 's3'): ?>
+        <button type="button" onclick="switchTab('orphans')" id="nav-btn-orphans" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Orphaned Media Cleanup</button>
+        <?php endif; ?>
+    </nav>
+</div>
+
+<div id="tab-config" class="tab-content">
 <form method="POST" class="space-y-6" id="settings-form">
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
     <input type="hidden" name="action" value="save" id="form-action">
@@ -269,6 +280,64 @@ echo renderAdminHeader('Storage Settings');
         </button>
     </div>
 </form>
+</div>
+
+<?php if ($settings['storage_driver'] !== 's3'): ?>
+<div id="tab-orphans" class="tab-content hidden space-y-6">
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <div>
+                <h3 class="font-semibold text-gray-800">Orphaned Media Cleanup</h3>
+                <p class="text-sm text-gray-500 mt-1">Scan the local <code>uploads/</code> directory for physical files not linked to any database records.</p>
+            </div>
+            <button type="button" id="scan-orphans-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition flex items-center shadow-sm">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                Scan Now
+            </button>
+        </div>
+        <div class="p-6">
+            <div id="scan-loading" class="hidden text-center py-10">
+                <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-gray-500 text-sm font-medium">Scanning filesystem and mapping database records...</p>
+            </div>
+            
+            <div id="scan-results" class="hidden">
+                <div class="flex justify-between items-center mb-4 pb-4 border-b border-gray-100">
+                    <h4 class="font-bold text-gray-800"><span id="orphan-count">0</span> orphaned file(s) found</h4>
+                    <button type="button" id="delete-selected-btn" class="px-3 py-1.5 bg-red-100 text-red-700 text-sm font-medium rounded hover:bg-red-200 transition disabled:opacity-50 disabled:cursor-not-allowed">Delete Selected</button>
+                </div>
+                <!-- Data Table -->
+                <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left w-10">
+                                    <input type="checkbox" id="select-all-orphans" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                </th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider text-xs">File Path</th>
+                                <th class="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider text-xs">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orphan-list" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="scan-empty" class="hidden text-center py-10">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-4">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <p class="text-gray-600 font-medium">No orphaned files found.</p>
+                <p class="text-gray-400 text-sm mt-1">Your uploads directory is clean.</p>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Reusable input styles -->
 <style>
@@ -300,6 +369,123 @@ function toggleS3Fields() {
 function testS3Connection() {
     document.getElementById('form-action').value = 'test_s3';
     document.getElementById('settings-form').submit();
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-gray-900', 'text-gray-900');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+    
+    document.getElementById('tab-' + tabId).classList.remove('hidden');
+    const activeBtn = document.getElementById('nav-btn-' + tabId);
+    activeBtn.classList.remove('border-transparent', 'text-gray-500');
+    activeBtn.classList.add('border-gray-900', 'text-gray-900');
+}
+
+// Scanner logic
+const scanBtn = document.getElementById('scan-orphans-btn');
+if (scanBtn) {
+    scanBtn.addEventListener('click', async () => {
+        document.getElementById('scan-empty').classList.add('hidden');
+        document.getElementById('scan-results').classList.add('hidden');
+        document.getElementById('scan-loading').classList.remove('hidden');
+        scanBtn.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'scan_orphans');
+            formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+
+            const res = await fetch('ajax.php', { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            document.getElementById('scan-loading').classList.add('hidden');
+            scanBtn.disabled = false;
+
+            if (data.success) {
+                if (data.orphans.length === 0) {
+                    document.getElementById('scan-empty').classList.remove('hidden');
+                } else {
+                    document.getElementById('orphan-count').innerText = data.orphans.length;
+                    const tbody = document.getElementById('orphan-list');
+                    tbody.innerHTML = '';
+                    
+                    data.orphans.forEach(file => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'hover:bg-gray-50';
+                        tr.innerHTML = `
+                            <td class="px-4 py-3">
+                                <input type="checkbox" class="orphan-cb rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${file.path}">
+                            </td>
+                            <td class="px-4 py-3 text-gray-800 font-mono text-xs break-all">${file.path}</td>
+                            <td class="px-4 py-3 text-right text-gray-500 text-xs">${file.size_formatted}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    
+                    document.getElementById('scan-results').classList.remove('hidden');
+                    updateDeleteBtn();
+                }
+            } else {
+                alert('Scan failed: ' + (data.message || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Error connecting to server.');
+            document.getElementById('scan-loading').classList.add('hidden');
+            scanBtn.disabled = false;
+        }
+    });
+
+    // Checkbox logic
+    document.getElementById('select-all-orphans').addEventListener('change', (e) => {
+        document.querySelectorAll('.orphan-cb').forEach(cb => cb.checked = e.target.checked);
+        updateDeleteBtn();
+    });
+
+    document.getElementById('orphan-list').addEventListener('change', (e) => {
+        if(e.target.classList.contains('orphan-cb')) updateDeleteBtn();
+    });
+
+    function updateDeleteBtn() {
+        const checked = document.querySelectorAll('.orphan-cb:checked').length;
+        const btn = document.getElementById('delete-selected-btn');
+        btn.disabled = checked === 0;
+        btn.innerText = `Delete Selected (${checked})`;
+    }
+
+    document.getElementById('delete-selected-btn').addEventListener('click', async () => {
+        const checked = Array.from(document.querySelectorAll('.orphan-cb:checked')).map(cb => cb.value);
+        if (!checked.length) return;
+        
+        if (!confirm(`Are you sure you want to permanently delete ${checked.length} file(s)? This cannot be undone.`)) return;
+
+        const btn = document.getElementById('delete-selected-btn');
+        btn.disabled = true;
+        btn.innerText = 'Deleting...';
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'delete_orphans');
+            formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+            checked.forEach(path => formData.append('paths[]', path));
+
+            const res = await fetch('ajax.php', { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            if (data.success) {
+                // Re-scan
+                scanBtn.click();
+            } else {
+                alert('Deletion failed: ' + (data.message || 'Unknown error'));
+                updateDeleteBtn();
+            }
+        } catch (e) {
+            alert('Error connecting to server.');
+            updateDeleteBtn();
+        }
+    });
 }
 </script>
 
