@@ -353,8 +353,8 @@ switch ($action) {
                 $absPath = $file->getRealPath();
                 $relPath = str_replace('\\', '/', substr($absPath, strlen($uploadsDir) + 1));
                 
-                // Ignore the branding folder completely
-                if (strpos($relPath, 'branding/') === 0) {
+                // Ignore branding and categories folders completely
+                if (strpos($relPath, 'branding/') === 0 || strpos($relPath, 'categories/') === 0) {
                     continue;
                 }
                 
