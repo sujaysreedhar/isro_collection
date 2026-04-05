@@ -120,8 +120,6 @@ require_once ThemeManager::getHeader();
                                 <?php endif; ?>
                             </button>
                         <?php endforeach; ?>
-
-                        <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_gallery_thumbnails', $item); } ?>
                     </div>
                 </div>
                 <?php endif; ?>

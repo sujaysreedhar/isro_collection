@@ -118,8 +118,6 @@ require_once ThemeManager::getHeader();
                                 </div>
                             <?php endif; ?>
                             
-                            <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_card_badge', $item); } ?>
-                            
                             <!-- Category Badge -->
                             <?php if (!empty($item['category_name'])): ?>
                                 <div class="absolute top-4 left-4">
@@ -161,30 +159,6 @@ require_once ThemeManager::getHeader();
                 </a>
             </div>
         <?php endif; ?>
-
-        <?php /* ═══════════ BROWSE BY CATEGORY ═══════════ */ ?>
-        <?php if (!empty($homeCategories)): ?>
-        <div class="mt-24">
-            <div class="flex items-center justify-between mb-10 pb-6 border-b border-white/10">
-                <h2 class="text-3xl font-extrabold text-white drop-shadow-sm">Browse by Category</h2>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 xl:gap-8">
-                <?php foreach ($homeCategories as $cat): ?>
-                <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int)$cat['id'] ?>" class="group block h-full">
-                    <div class="relative aspect-video rounded-3xl overflow-hidden border border-white/20 bg-white/5 hover:border-glass-400 hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-all duration-500 hover:-translate-y-2">
-                        <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($cat['image_path']) ?>" 
-                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="<?= htmlspecialchars($cat['name']) ?>">
-                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
-                        <div class="absolute inset-0 p-5 flex flex-col justify-end text-center">
-                            <h4 class="text-white font-bold text-base serif drop-shadow-lg group-hover:text-glass-300 transition-colors"><?= htmlspecialchars($cat['name']) ?></h4>
-                        </div>
-                    </div>
-                </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <!-- Hooks for modules (home_page_sections) -->
         <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
     </div>

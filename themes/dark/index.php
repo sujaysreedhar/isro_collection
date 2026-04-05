@@ -69,7 +69,6 @@ require_once ThemeManager::getHeader();
                             <div class="absolute bottom-0 left-0 bg-gray-900/90 backdrop-blur px-3 py-1 text-xs font-bold text-gray-300 tracking-wider">
                                 <?= htmlspecialchars($item['reg_number']) ?>
                             </div>
-                            <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_card_badge', $item); } ?>
                         </div>
                         <div class="p-6 flex flex-col flex-grow">
                             <h3 class="text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors line-clamp-2"><?= htmlspecialchars($item['title']) ?></h3>
@@ -100,30 +99,6 @@ require_once ThemeManager::getHeader();
                 <p class="mt-1 text-sm text-gray-500">Get started by importing data into your MySQL database.</p>
             </div>
         <?php endif; ?>
-
-        <?php /* ═══════════ BROWSE BY CATEGORY ═══════════ */ ?>
-        <?php if (!empty($homeCategories)): ?>
-        <div class="mt-20">
-            <div class="flex items-center justify-between mb-8 border-b border-gray-800 pb-4">
-                <h2 class="text-3xl font-bold text-white">Browse by Category</h2>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <?php foreach ($homeCategories as $cat): ?>
-                <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int)$cat['id'] ?>" class="group block">
-                    <div class="relative aspect-video rounded-xl overflow-hidden border border-gray-700 bg-gray-800 hover:border-purple-500 hover:shadow-xl transition-all duration-300">
-                        <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($cat['image_path']) ?>" 
-                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="<?= htmlspecialchars($cat['name']) ?>">
-                        <div class="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/20 to-transparent"></div>
-                        <div class="absolute inset-0 p-4 flex flex-col justify-end text-center sm:text-left">
-                            <h4 class="text-white font-bold text-sm sm:text-base"><?= htmlspecialchars($cat['name']) ?></h4>
-                        </div>
-                    </div>
-                </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <!-- Modular Sections Injected via Hook -->
         <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
     </main>
