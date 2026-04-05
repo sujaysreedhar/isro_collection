@@ -91,6 +91,22 @@ require_once ThemeManager::getHeader();
                         <?php endif; ?>
                     </div>
                     <?php endif; ?>
+                    
+                    <!-- Secondary Gallery / Hooks -->
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <?php if (count($imageMedia) > 1): ?>
+                            <?php foreach ($imageMedia as $img): ?>
+                                <?php 
+                                    $tUrl = isset($storage) ? $storage->url('thumbnails/' . $img['file_path']) : SITE_URL . '/uploads/thumbnails/' . $img['file_path'];
+                                ?>
+                                <div class="w-16 h-12 rounded border border-gray-200 overflow-hidden bg-gray-50 opacity-80 hover:opacity-100 transition-opacity">
+                                    <img src="<?= $tUrl ?>" class="w-full h-full object-cover" alt="Thumb">
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        
+                        <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_gallery_thumbnails', $item); } ?>
+                    </div>
                 </div>
 
                 <!-- Right Column: Item Information -->

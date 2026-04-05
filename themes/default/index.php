@@ -75,6 +75,7 @@ require_once ThemeManager::getHeader();
                             <div class="absolute bottom-0 left-0 bg-white/90 backdrop-blur px-3 py-1 text-xs font-bold text-gray-700 tracking-wider">
                                 <?= htmlspecialchars($item['reg_number']) ?>
                             </div>
+                            <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_card_badge', $item); } ?>
                         </div>
                         <div class="p-6 flex flex-col flex-grow">
                             <h3 class="text-xl font-bold serif text-gray-900 mb-2 group-hover:text-blue-800 transition-colors line-clamp-2"><?= htmlspecialchars($item['title']) ?></h3>
@@ -107,6 +108,31 @@ require_once ThemeManager::getHeader();
                 <p class="mt-1 text-sm text-gray-500">Get started by importing data into your MySQL database.</p>
             </div>
         <?php endif; ?>
+
+        <?php /* ═══════════ BROWSE BY CATEGORY ═══════════ */ ?>
+        <?php if (!empty($homeCategories)): ?>
+        <div class="mt-20">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-3xl font-bold serif">Browse by Category</h2>
+                <div class="h-px flex-1 bg-gray-200 ml-8 opacity-50"></div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <?php foreach ($homeCategories as $cat): ?>
+                <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int)$cat['id'] ?>" class="group block">
+                    <div class="relative aspect-video rounded-xl overflow-hidden border border-gray-200 bg-gray-50 hover:shadow-lg transition-all duration-300">
+                        <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($cat['image_path']) ?>" 
+                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="<?= htmlspecialchars($cat['name']) ?>">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
+                        <div class="absolute inset-0 p-4 flex flex-col justify-end">
+                            <h4 class="text-white font-bold text-sm serif"><?= htmlspecialchars($cat['name']) ?></h4>
+                        </div>
+                    </div>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- Modular Sections Injected via Hook -->
         <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('home_page_sections'); } ?>
     </main>

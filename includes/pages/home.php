@@ -38,5 +38,9 @@ if ($featuredItems) {
         $featuredTags[$row['item_id']][] = $row;
     }
 }
+
+// Fetch Categories for discovery section (global for all themes)
+$stmtCats = $pdo->query("SELECT id, name, image_path FROM categories WHERE image_path IS NOT NULL AND image_path != '' ORDER BY id ASC LIMIT 8");
+$homeCategories = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <?php require_once ThemeManager::getTemplatePath('index.php'); ?>
