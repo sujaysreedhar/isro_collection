@@ -400,7 +400,14 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                         <label class="label">Registration Number *</label>
-                        <input type="text" name="reg_number" value="<?= htmlspecialchars($item['reg_number'] ?? '') ?>" required class="input">
+                        <input type="text" name="reg_number" list="reg_number_hints" value="<?= htmlspecialchars($item['reg_number'] ?? '') ?>" required class="input" autocomplete="off">
+                        <datalist id="reg_number_hints">
+                            <?php foreach ($allItems as $ri): ?>
+                                <?php if (!empty($ri['reg_number'])): ?>
+                                    <option value="<?= htmlspecialchars($ri['reg_number']) ?>">
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </datalist>
                     </div>
                     <div>
                         <label class="label">Category *</label>
