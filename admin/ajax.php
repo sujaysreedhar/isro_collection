@@ -353,8 +353,16 @@ switch ($action) {
                 $absPath = $file->getRealPath();
                 $relPath = str_replace('\\', '/', substr($absPath, strlen($uploadsDir) + 1));
                 
-                // Ignore branding and categories folders completely
-                if (strpos($relPath, 'branding/') === 0 || strpos($relPath, 'categories/') === 0) {
+                // ONLY scan core media silos. This prevents flagging valid module assets (blog, people, categories) as orphans.
+                $isCoreSilo = false;
+                foreach (['originals/', 'display/', 'thumbnails/', 'pdfs/', 'panoramics/'] as $prefix) {
+                    if (strpos($relPath, $prefix) === 0) {
+                        $isCoreSilo = true;
+                        break;
+                    }
+                }
+                
+                if (!$isCoreSilo) {
                     continue;
                 }
                 
