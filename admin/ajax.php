@@ -150,6 +150,37 @@ switch ($action) {
         }
         
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+        // 1. Fetch & Delete Media Files
+        $mStmt = $pdo->prepare("SELECT file_path, media_type FROM media WHERE item_id IN ({$placeholders})");
+        $mStmt->execute($ids);
+        foreach ($mStmt->fetchAll() as $file) {
+            if ($file['media_type'] === 'image') {
+                @unlink(__DIR__ . '/../uploads/originals/' . $file['file_path']);
+                @unlink(__DIR__ . '/../uploads/display/' . $file['file_path']);
+                @unlink(__DIR__ . '/../uploads/thumbnails/' . $file['file_path']);
+            } elseif ($file['media_type'] === 'pdf') {
+                @unlink(__DIR__ . '/../uploads/pdfs/' . $file['file_path']);
+            }
+        }
+        $pdo->prepare("DELETE FROM media WHERE item_id IN ({$placeholders})")->execute($ids);
+
+        // 2. Fetch & Delete 360 Panoramas (Safely)
+        try {
+            $pStmt = $pdo->prepare("SELECT file_path FROM item_panoramics WHERE item_id IN ({$placeholders})");
+            $pStmt->execute($ids);
+            foreach ($pStmt->fetchAll() as $file) {
+                @unlink(__DIR__ . '/../uploads/panoramics/' . $file['file_path']);
+            }
+            $pdo->prepare("DELETE FROM item_panoramics WHERE item_id IN ({$placeholders})")->execute($ids);
+        } catch (\PDOException $e) {}
+
+        // 3. Delete Relationships
+        $pdo->prepare("DELETE FROM item_tag WHERE item_id IN ({$placeholders})")->execute($ids);
+        $pdo->prepare("DELETE FROM item_narrative WHERE item_id IN ({$placeholders})")->execute($ids);
+        $pdo->prepare("DELETE FROM item_related WHERE item_id IN ({$placeholders}) OR related_item_id IN ({$placeholders})")->execute($ids);
+
+        // 4. Finally Delete Items
         $stmt = $pdo->prepare("DELETE FROM items WHERE id IN ({$placeholders})");
         $stmt->execute($ids);
         

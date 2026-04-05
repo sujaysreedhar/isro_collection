@@ -17,7 +17,7 @@ function loadScene(url) {
         viewer = new Marzipano.Viewer(viewerElement, { controls: { mouseViewMode: 'drag' } });
     }
 
-    var source = Marzipano.ImageUrlSource.fromString(url);
+    var source = new Marzipano.ImageUrlSource(function() { return { url: url }; });
     var geometry = new Marzipano.EquirectGeometry([{ width: 8192 }]);
     var lims = Marzipano.RectilinearView.limit.traditional(2048, 120*Math.PI/180);
     var view = new Marzipano.RectilinearView({ yaw: 0, pitch: 0, fov: Math.PI/2 }, lims);
