@@ -64,10 +64,11 @@ switch ($action) {
             $visText  = $item['is_visible'] ? 'Visible' : 'Hidden';
             $toggleLabel = $item['is_visible'] ? 'Hide' : 'Show';
             $editUrl  = SITE_URL . '/admin/edit_item.php?id=' . $item['id'];
+            $liveUrl  = SITE_URL . '/item/' . $item['id'];
 
             return [
                 "<span class='text-gray-400 font-mono text-xs'>{$item['reg_number']}</span>",
-                "<span class='font-medium text-gray-900'>" . htmlspecialchars($item['title']) . "</span>",
+                "<a href='{$liveUrl}' target='_blank' class='font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors'>" . htmlspecialchars($item['title']) . "</a>",
                 "<span class='text-sm text-gray-600'>" . htmlspecialchars($item['category_name'] ?? '—') . "</span>",
                 "<span class='text-xs text-gray-500'>" . htmlspecialchars($item['production_date'] ?? '—') . "</span>",
                 "<span class='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {$visClass}'>{$visText}</span>",

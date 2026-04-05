@@ -59,6 +59,37 @@ h1, h2, h3, h4, .serif {
 }
 .tc-card:hover { box-shadow: 0 8px 24px -4px rgba(0,0,0,.12); transform: translateY(-2px); }
 
+/* ── Gallery ───────────────────────────────────────────────────────────────── */
+.gallery-thumbnail {
+    width: 64px;
+    height: 64px;
+    border-radius: 8px; /* forced for icons */
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    object-fit: cover;
+    background-color: #f3f4f6;
+}
+.gallery-thumbnail:hover { border-color: var(--color-border, #e5e7eb); }
+.gallery-thumbnail.active { border-color: var(--color-accent, #2563eb); box-shadow: 0 0 0 2px var(--color-accent, #2563eb); }
+
+.main-image-container {
+    background-color: #ffffff;
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--border-radius, 0.5rem);
+    overflow: hidden;
+    position: relative;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.main-image-container img {
+    max-width: 100%;
+    height: auto;
+    transition: opacity 0.3s ease;
+}
+
 /* ── Hero styles ───────────────────────────────────────────────────────────── */
 .hero-pattern {
     background-color: var(--color-hero-bg, #ffffff);
@@ -70,6 +101,10 @@ h1, h2, h3, h4, .serif {
     color: var(--color-accent, #111827);
     border-bottom: 2px solid var(--color-accent, #111827);
 }
+
+/* ── Item Detail Utilities ────────────────────────────────────────────────── */
+.spec-label { color: var(--color-text-muted); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.025em; }
+.spec-value { color: var(--color-text); font-weight: 600; font-size: 0.9375rem; }
 
 /* ── Footer ────────────────────────────────────────────────────────────────── */
 footer.tc-footer-bg { padding: 3rem 0; margin-top: auto; }

@@ -6,7 +6,6 @@ global $appSettings;
 
 $pageTitle        = SITE_TITLE;
 $currentMenu      = 'home';
-$hideHeaderSearch = true; // search is in the hero
 
 // Theme Studio layout settings (safe defaults so page works even without the module active)
 $ts = static fn(string $k, string $d = '') => $GLOBALS['appSettings']['theme_studio_' . $k] ?? $d;

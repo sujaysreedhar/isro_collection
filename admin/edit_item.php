@@ -4,6 +4,21 @@ require_once __DIR__ . '/layout.php';
 
 
 $mp = new MediaProcessor($pdo, $storage ?? null);
+
+function reIndexFiles(array $files): array {
+    $out = [];
+    foreach ($files['name'] as $i => $name) {
+        $out[] = [
+            'name'     => $files['name'][$i],
+            'type'     => $files['type'][$i],
+            'tmp_name' => $files['tmp_name'][$i],
+            'error'    => $files['error'][$i],
+            'size'     => $files['size'][$i],
+        ];
+    }
+    return $out;
+}
+
 $hasIsPrimary = false;
 try {
     $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
@@ -150,18 +165,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success .= ' Selected media deleted.';
         }
 
-        // — Image via MediaProcessor —
-        if (isset($_FILES['media_upload']) && $_FILES['media_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
-            $result = $mp->process(
-                $_FILES['media_upload'], $id,
-                trim($_POST['media_caption'] ?? ''),
-                $_POST['media_license'] ?? 'Public Domain',
-                isset($_POST['is_primary'])
-            );
-            if ($result['success']) {
-                $success .= ' ' . $result['message'];
-            } else {
-                throw new RuntimeException($result['message']);
+        // — Images via MediaProcessor (Multiple Support) —
+        if (isset($_FILES['media_upload'])) {
+            $files = is_array($_FILES['media_upload']['name']) 
+                ? reIndexFiles($_FILES['media_upload']) 
+                : [$_FILES['media_upload']];
+
+            $isFirstInBatch = true;
+            foreach ($files as $file) {
+                if ($file['error'] === UPLOAD_ERR_NO_FILE) continue;
+
+                $result = $mp->process(
+                    $file, $id,
+                    trim($_POST['media_caption'] ?? ''),
+                    $_POST['media_license'] ?? 'Public Domain',
+                    (isset($_POST['is_primary']) && $isFirstInBatch)
+                );
+
+                if ($result['success']) {
+                    $success .= ' ' . $result['message'];
+                    $isFirstInBatch = false; // Only the first one is primary if checked
+                } else {
+                    throw new RuntimeException($result['message']);
+                }
             }
         }
 
@@ -427,8 +453,8 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
 
                 <!-- Image tab -->
                 <div id="tab-image" class="media-tab p-6 space-y-4">
-                    <p class="text-xs text-gray-400">JPG · PNG · WebP · max 5 MB → auto-converted to WebP in 3 sizes</p>
-                    <input type="file" name="media_upload" accept=".jpg,.jpeg,.png,.webp,.gif"
+                    <p class="text-xs text-gray-400">JPG · PNG · WebP · max 5 MB → auto-converted to WebP in 3 sizes. <span class="text-blue-600">You can select multiple files.</span></p>
+                    <input type="file" name="media_upload[]" accept=".jpg,.jpeg,.png,.webp,.gif" multiple
                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div><label class="label">Caption</label><input type="text" name="media_caption" class="input"></div>
