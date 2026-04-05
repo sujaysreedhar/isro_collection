@@ -28,7 +28,7 @@ require_once ThemeManager::getHeader();
                     <h3 class="hidden md:block text-sm font-bold uppercase tracking-wider text-gray-900 mb-4">Refine Search</h3>
 
                 <!-- Active Filters chips -->
-                <?php $hasActiveFilters = $q || $selectedCategories || $selectedMaterials || !empty($params['tag']) || $params['year_start'] || $params['year_end'] || $params['has_images']; ?>
+                <?php $hasActiveFilters = $q || $selectedCategories || $selectedMaterials || !empty($params['tag']) || !empty($params['tags']) || $params['year_start'] || $params['year_end'] || $params['has_images']; ?>
                 <?php if ($hasActiveFilters): ?>
                 <div class="mb-5 bg-gray-100 p-3 rounded text-sm">
                     <div class="flex items-center justify-between mb-2">
@@ -85,13 +85,17 @@ require_once ThemeManager::getHeader();
                             </a>
                         <?php endif; ?>
 
-                        <?php if (!empty($params['tag'])): ?>
-                            <a href="<?= buildFilterUrl($params, 'tag', $params['tag']) ?>"
+                        <?php 
+                        $activeTags = $params['tags'] ?? [];
+                        if (!empty($params['tag'])) $activeTags[] = $params['tag'];
+                        $activeTags = array_unique($activeTags);
+                        foreach ($activeTags as $aTag): ?>
+                            <a href="<?= buildFilterUrl($params, 'tags', $aTag) ?>"
                                class="inline-flex items-center px-2 py-1 rounded bg-gray-800 text-white text-xs hover:bg-red-600 transition">
-                                #<?= htmlspecialchars($tagNameMap[$params['tag']] ?? 'Tag') ?>
+                                #<?= htmlspecialchars($tagNameMap[$aTag] ?? $aTag) ?>
                                 <span class="ml-1 leading-none">&times;</span>
                             </a>
-                        <?php endif; ?>
+                        <?php endforeach; ?>
 
                     </div>
                 </div>
@@ -103,7 +107,8 @@ require_once ThemeManager::getHeader();
                     <form action="<?= SITE_URL ?>/search.php" method="GET" class="flex items-center gap-2 mt-3">
                         <!-- Hidden inputs to preserve existing non-date filters -->
                         <?php if ($q): ?><input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>"><?php endif; ?>
-                        <?php if (!empty($params['tag'])): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($params['tag']) ?>"><?php endif; ?>
+                        <?php if (!empty($params['tag'])): ?><input type="hidden" name="tags[]" value="<?= htmlspecialchars($params['tag']) ?>"><?php endif; ?>
+                        <?php foreach(($params['tags'] ?? []) as $t): ?><input type="hidden" name="tags[]" value="<?= htmlspecialchars($t) ?>"><?php endforeach; ?>
                         <?php foreach($selectedCategories as $cid): ?><input type="hidden" name="category_ids[]" value="<?= htmlspecialchars($cid) ?>"><?php endforeach; ?>
                         <?php foreach($selectedMaterials as $m): ?><input type="hidden" name="materials[]" value="<?= htmlspecialchars($m) ?>"><?php endforeach; ?>
                         <?php if ($params['has_images']): ?><input type="hidden" name="has_images" value="1"><?php endif; ?>
@@ -184,9 +189,13 @@ require_once ThemeManager::getHeader();
                 <div class="mb-6">
                     <h4 class="font-semibold text-gray-800 mb-2 border-b border-gray-200 pb-2">Tags</h4>
                     <div class="flex flex-wrap gap-1.5 mt-3">
-                        <?php foreach ($facets['tags'] as $tagFacet): ?>
-                            <?php $isActiveTag = ($params['tag'] === $tagFacet['slug']); ?>
-                            <a href="<?= buildFilterUrl($params, 'tag', $tagFacet['slug']) ?>"
+                        <?php 
+                        $activeTagsForFacet = $params['tags'] ?? [];
+                        if (!empty($params['tag'])) $activeTagsForFacet[] = $params['tag'];
+                        foreach ($facets['tags'] as $tagFacet): 
+                            $isActiveTag = in_array($tagFacet['slug'], $activeTagsForFacet);
+                        ?>
+                            <a href="<?= buildFilterUrl($params, 'tags', $tagFacet['slug']) ?>"
                                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors
                                    <?= $isActiveTag
                                        ? 'bg-gray-900 text-white'

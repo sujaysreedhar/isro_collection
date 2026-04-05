@@ -12,6 +12,7 @@ $params = [
     'materials'    => array_values(array_filter(array_map('trim', (array)($_GET['materials'] ?? [])))),
     'has_images'   => isset($_GET['has_images']) && $_GET['has_images'] === '1',
     'exact'        => isset($_GET['exact']) && $_GET['exact'] === '1',
+    'tags'         => array_values(array_filter(array_map('trim', (array)($_GET['tags'] ?? [])))),
     'tag'          => trim($_GET['tag'] ?? ''),
     'year_start'   => (isset($_GET['year_start']) && is_numeric($_GET['year_start'])) ? (int)$_GET['year_start'] : null,
     'year_end'     => (isset($_GET['year_end']) && is_numeric($_GET['year_end'])) ? (int)$_GET['year_end'] : null,
@@ -63,9 +64,19 @@ function buildFilterUrl(array $currentParams, string $key, $value): string {
         $p['has_images'] = $p['has_images'] ? null : '1';
     }
     
-    // For single tags (kept as single for simplicity, logic can easily expand to multi)
-    if ($key === 'tag') {
-        $p['tag'] = ($p['tag'] === $value) ? '' : $value;
+    // For tags (array-based toggling)
+    if ($key === 'tags') {
+        $tgs = $p['tags'] ?? [];
+        if (!empty($p['tag'])) {
+            $tgs[] = $p['tag']; // migrate legacy single-tag
+            unset($p['tag']);
+        }
+        if (in_array((string)$value, $tgs)) {
+            $tgs = array_values(array_filter($tgs, fn($t) => $t !== (string)$value));
+        } else {
+            $tgs[] = (string)$value;
+        }
+        $p['tags'] = $tgs;
     }
 
     return SITE_URL . '/search.php?' . buildQuery($p);
@@ -89,7 +100,12 @@ function buildQuery(array $p): string {
     if ($p['year_end'] !== null)   $out[] = 'year_end=' . $p['year_end'];
     if (!empty($p['has_images']))  $out[] = 'has_images=1';
     if (!empty($p['exact']))       $out[] = 'exact=1';
-    if (!empty($p['tag']))         $out[] = 'tag=' . urlencode($p['tag']);
+    if (!empty($p['tag']))         $out[] = 'tags[]=' . urlencode($p['tag']);
+    if (!empty($p['tags'])) {
+        foreach (array_unique($p['tags']) as $t) {
+            $out[] = 'tags[]=' . urlencode($t);
+        }
+    }
     return implode('&', $out);
 }
 

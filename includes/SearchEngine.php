@@ -99,6 +99,7 @@ class SearchEngine {
         $searchTerm = $params['q'] ?? '';
         $categoryIds = $params['category_ids'] ?? [];
         $materials = $params['materials'] ?? [];
+        $tags = $params['tags'] ?? [];
         $tagSlug = $params['tag'] ?? '';
         $yearStart = $params['year_start'] ?? null;
         $yearEnd = $params['year_end'] ?? null;
@@ -109,9 +110,15 @@ class SearchEngine {
         }
 
         if (!empty($tagSlug)) {
+            $tags[] = $tagSlug;
+        }
+        $tags = array_unique(array_filter($tags));
+
+        if (!empty($tags)) {
+            $placeholders = implode(',', array_fill(0, count($tags), '?'));
             $joinSql .= " INNER JOIN item_tag it_filter ON i.id = it_filter.item_id ";
-            $joinSql .= " INNER JOIN tags t_filter ON it_filter.tag_id = t_filter.id AND t_filter.slug = ? ";
-            $bindings[] = $tagSlug;
+            $joinSql .= " INNER JOIN tags t_filter ON it_filter.tag_id = t_filter.id AND t_filter.slug IN ({$placeholders}) ";
+            foreach ($tags as $t) $bindings[] = $t;
         }
 
         if (!empty($searchTerm)) {
