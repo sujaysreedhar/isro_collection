@@ -35,13 +35,14 @@ require_once ThemeManager::getHeader();
         <div class="lg:col-span-7">
 
             <!-- Main Viewer -->
-            <div class="main-image-container tc-surface tc-border mb-4">
+            <div class="main-image-container tc-surface tc-border mb-4 relative min-h-[400px] flex items-center justify-center overflow-hidden">
                 <?php if ($primaryMedia):
                     $displaySrc = MediaProcessor::url($primaryMedia['file_path'], 'display', 'image', $storage ?? null);
                     ?>
                     <img id="main-viewer" src="<?= $displaySrc ?>" alt="<?= htmlspecialchars($item['title']) ?>"
-                        data-caption="<?= htmlspecialchars($primaryMedia['caption'] ?? '') ?>" class="max-h-[680px] w-auto">
+                        data-caption="<?= htmlspecialchars($primaryMedia['caption'] ?? '') ?>" class="max-h-[680px] w-auto transition-opacity duration-300">
                 <?php else: ?>
+                    <img id="main-viewer" style="display:none;" />
                     <div class="flex flex-col items-center justify-center h-80 tc-text-muted">
                         <svg class="w-14 h-14 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -51,6 +52,9 @@ require_once ThemeManager::getHeader();
                         <span class="text-sm">Digitization Pending</span>
                     </div>
                 <?php endif; ?>
+                
+                <!-- 360 Viewer (Hidden by default) -->
+                <div id="panorama-viewer" class="absolute inset-0 w-full h-full hidden"></div>
             </div>
 
             <!-- Secondary Thumbnails -->
@@ -281,16 +285,27 @@ require_once ThemeManager::getHeader();
 <script>
     function switchImage(el) {
         const main = document.getElementById('main-viewer');
+        const panoContainer = document.getElementById('panorama-viewer');
         const caption = document.getElementById('image-caption');
 
-        main.style.opacity = '0';
-        setTimeout(() => {
-            main.src = el.dataset.full;
-            caption.innerText = el.dataset.caption || 'No caption available for this view.';
-            document.querySelectorAll('.gallery-thumbnail').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
-            main.style.opacity = '1';
-        }, 200);
+        if (panoContainer) {
+            panoContainer.classList.add('hidden');
+        }
+
+        if (main) {
+            main.style.display = 'block';
+            main.style.opacity = '0';
+            setTimeout(() => {
+                if (el.dataset.full) main.src = el.dataset.full;
+                caption.innerText = el.dataset.caption || 'No caption available for this view.';
+                
+                document.querySelectorAll('.gallery-thumbnail').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.pano-thumbnail img').forEach(img => img.classList.remove('border-blue-500'));
+                
+                el.classList.add('active');
+                main.style.opacity = '1';
+            }, 200);
+        }
     }
 </script>
 
