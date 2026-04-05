@@ -197,20 +197,20 @@ require_once ThemeManager::getHeader();
                 </dl>
             </div>
 
-            <!-- Related Items Section -->
+            <!-- Related Items Section (Moved below Description) -->
             <?php if (!empty($relatedItems)): ?>
-            <div class="mb-12">
+            <div class="mt-12">
                 <div class="flex items-center justify-between mb-6">
                     <h3 class="text-xl font-bold tc-primary-text serif">You May Also Like</h3>
                     <div class="h-px flex-1 bg-tc-border ml-6 opacity-30"></div>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <div class="grid grid-cols-2 gap-6">
                     <?php foreach ($relatedItems as $ri): ?>
                     <a href="<?= SITE_URL ?>/item/<?= $ri['id'] ?>" class="group block h-full">
                         <div class="tc-surface tc-border tc-radius overflow-hidden h-full flex flex-col hover:shadow-lg transition-all hover:-translate-y-1">
                             <div class="aspect-[4/3] bg-tc-accent-bg/5 flex items-center justify-center overflow-hidden">
                                 <?php if ($ri['thumb']): ?>
-                                    <img src="<?= MediaProcessor::url($ri['thumb'], 'thumbs', 'image', $storage ?? null) ?>" 
+                                    <img src="<?= MediaProcessor::url($ri['thumb'], 'thumbnails', 'image', $storage ?? null) ?>" 
                                          class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="<?= htmlspecialchars($ri['title']) ?>">
                                 <?php else: ?>
                                     <div class="w-full h-full flex items-center justify-center bg-gray-100">
@@ -246,10 +246,12 @@ require_once ThemeManager::getHeader();
             <?php endif; ?>
 
             <!-- Citation -->
+            <?php if (($appSettings['site_show_citation'] ?? '1') === '1'): ?>
             <div class="tc-surface tc-border tc-radius p-5">
                 <h4 class="text-xs font-bold uppercase tracking-widest tc-text-muted mb-3">How to Cite</h4>
                 <div class="text-xs font-mono tc-text leading-relaxed cursor-text select-all"><?= $citation ?></div>
             </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>

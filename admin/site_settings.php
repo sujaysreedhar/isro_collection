@@ -21,6 +21,7 @@ $siteTitle   = $appSettings['site_title'] ?? SITE_TITLE;
 $siteDesc    = $appSettings['site_description'] ?? '';
 $debugMode   = $appSettings['debug_mode'] ?? '0';
 $enableCache = $appSettings['enable_cache'] ?? '1';
+$showCitation = $appSettings['site_show_citation'] ?? '1';
 
 // Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -67,13 +68,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $newDebug = isset($_POST['debug_mode']) ? '1' : '0';
             $newCache = isset($_POST['enable_cache']) ? '1' : '0';
+            $newShowCite = isset($_POST['site_show_citation']) ? '1' : '0';
             $upsert = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (:k, :v) ON DUPLICATE KEY UPDATE setting_value = :v2");
             $upsert->execute([':k' => 'site_url',         ':v' => $newUrl,   ':v2' => $newUrl]);
             $upsert->execute([':k' => 'site_title',        ':v' => $newTitle, ':v2' => $newTitle]);
             $upsert->execute([':k' => 'site_description',  ':v' => $newDesc,  ':v2' => $newDesc]);
             $upsert->execute([':k' => 'debug_mode',        ':v' => $newDebug, ':v2' => $newDebug]);
             $upsert->execute([':k' => 'enable_cache',      ':v' => $newCache, ':v2' => $newCache]);
-            $siteUrl = $newUrl; $siteTitle = $newTitle; $siteDesc = $newDesc; $debugMode = $newDebug; $enableCache = $newCache;
+            $upsert->execute([':k' => 'site_show_citation', ':v' => $newShowCite, ':v2' => $newShowCite]);
+            
+            $siteUrl = $newUrl; $siteTitle = $newTitle; $siteDesc = $newDesc; 
+            $debugMode = $newDebug; $enableCache = $newCache; $showCitation = $newShowCite;
+            
             $success = 'Settings saved. Changes apply on the next page load.';
         }
     }
@@ -190,6 +196,17 @@ echo renderAdminHeader('Site Settings');
                     <div>
                         <span class="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">Enable Global Caching</span>
                         <p class="text-xs text-gray-500">Improves performance by caching search data, module metadata, and optimized theme assets.</p>
+                    </div>
+                </label>
+
+                <label class="flex items-center gap-3 cursor-pointer group">
+                    <div class="relative">
+                        <input type="checkbox" name="site_show_citation" value="1" <?= ($showCitation === '1') ? 'checked' : '' ?> class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </div>
+                    <div>
+                        <span class="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">Show "How to Cite" Block</span>
+                        <p class="text-xs text-gray-500">Enables the automated citation generation block on all item detail pages.</p>
                     </div>
                 </label>
             </div>

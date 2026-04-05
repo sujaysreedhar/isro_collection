@@ -23,7 +23,7 @@ class MediaProcessor {
         $this->hasIsPrimary = $this->columnExists('media', 'is_primary');
         $this->storage    = $storage;
 
-        foreach (['thumbs','display','original','pdfs'] as $dir) {
+        foreach (['thumbnails','display','original','pdfs'] as $dir) {
             $path = $this->uploadRoot . $dir;
             if (!is_dir($path)) mkdir($path, 0755, true);
         }
@@ -70,7 +70,7 @@ class MediaProcessor {
 
         // WebP variants
         $webpName = $baseName . '.webp';
-        $this->saveVariant($src, $origW, $origH, 'thumbs',  $webpName, 200,  true);
+        $this->saveVariant($src, $origW, $origH, 'thumbnails',  $webpName, 200,  true);
         $this->saveVariant($src, $origW, $origH, 'display', $webpName, 1200, false);
         imagedestroy($src);
 
@@ -204,7 +204,7 @@ class MediaProcessor {
                         $this->storage->delete('pdfs/' . $filePath);
                     }
                 } elseif ($mediaType === 'image') {
-                    foreach (['thumbs', 'display', 'original'] as $dir) {
+                    foreach (['thumbnails', 'display', 'original'] as $dir) {
                         foreach (glob($this->uploadRoot . $dir . DIRECTORY_SEPARATOR . pathinfo($filePath, PATHINFO_FILENAME) . '.*') ?: [] as $candidate) {
                             $this->deleteFileIfExists($candidate);
                         }
@@ -270,7 +270,7 @@ class MediaProcessor {
         $known    = $this->db->query("SELECT file_path FROM media")->fetchAll(\PDO::FETCH_COLUMN);
         $knownSet = array_flip($known);
         $orphans  = [];
-        foreach (['thumbs','display','original','pdfs'] as $dir) {
+        foreach (['thumbnails','display','original','pdfs'] as $dir) {
             foreach (glob($this->uploadRoot . $dir . DIRECTORY_SEPARATOR . '*.*') ?: [] as $f) {
                 $base = basename($f);
                 if (!isset($knownSet[$base])) $orphans[] = "$dir/$base";
