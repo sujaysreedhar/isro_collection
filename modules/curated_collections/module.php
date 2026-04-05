@@ -1,8 +1,10 @@
 <?php
 
-class CuratedCollectionsModule extends BaseModule {
+class CuratedCollectionsModule extends BaseModule
+{
 
-    public function boot() {
+    public function boot()
+    {
         // Add Collections to the main navigation
         HookRegistry::addFilter('frontend_nav_links', [$this, 'addNavLinks']);
 
@@ -18,11 +20,13 @@ class CuratedCollectionsModule extends BaseModule {
         HookRegistry::addAction('home_page_sections', [$this, 'renderHomeSection']);
     }
 
-    public function handleAdminLogic() {
+    public function handleAdminLogic()
+    {
         require_once __DIR__ . '/admin_collections_logic.php';
     }
 
-    public function addNavLinks($links) {
+    public function addNavLinks($links)
+    {
         $links['collections'] = [
             'url' => SITE_URL . '/collections.php',
             'label' => 'Collections'
@@ -30,9 +34,11 @@ class CuratedCollectionsModule extends BaseModule {
         return $links;
     }
 
-    public function injectIntoSearch($results, $params) {
+    public function injectIntoSearch($results, $params)
+    {
         $q = $params['q'] ?? '';
-        if (empty($q)) return;
+        if (empty($q))
+            return;
 
         $stmt = $this->pdo->prepare("SELECT * FROM collections WHERE is_public = 1 AND (title LIKE ? OR description LIKE ?) LIMIT 3");
         $stmt->execute(['%' . $q . '%', '%' . $q . '%']);
@@ -59,45 +65,49 @@ class CuratedCollectionsModule extends BaseModule {
         }
     }
 
-    public function addAdminMenu() {
+    public function addAdminMenu()
+    {
         $url = SITE_URL . '/admin/module_page.php?m=curated_collections';
         echo '<a href="' . $url . '" class="sidebar-link text-slate-300">Curated Collections</a>';
     }
 
-    public function renderAdminPage() {
+    public function renderAdminPage()
+    {
         require_once __DIR__ . '/admin_collections.php';
     }
 
-    public function renderHomeSection() {
+    public function renderHomeSection()
+    {
         $stmt = $this->pdo->query("SELECT * FROM collections WHERE is_public = 1 ORDER BY id DESC LIMIT 3");
         $collections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        if (!$collections) return;
+        if (!$collections)
+            return;
 
-        echo '<div class="py-16 border-t border-gray-100 dark:border-gray-800">';
+        echo '<div class="py-16 border-t border-gray-100 ">';
         echo '<div class="flex items-center justify-between mb-10">';
         echo '<div>';
-        echo '<h2 class="text-3xl font-extrabold text-gray-900 dark:text-white serif">Curated Collections</h2>';
+        echo '<h2 class="text-3xl font-extrabold text-gray-900  serif">Curated Collections</h2>';
         echo '<p class="mt-2 text-gray-500 dark:text-gray-400 text-sm">Hand-picked groups of related historical artifacts.</p>';
         echo '</div>';
         echo '<a href="' . SITE_URL . '/collections.php" class="inline-flex items-center text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">View All <svg class="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg></a>';
         echo '</div>';
         echo '<div class="grid grid-cols-1 md:grid-cols-3 gap-8">';
-        
+
         foreach ($collections as $col) {
             $url = SITE_URL . '/collection.php?slug=' . urlencode($col['slug']);
-            echo '<a href="' . $url . '" class="group relative flex flex-col bg-white dark:bg-gray-800/50 rounded-3xl p-8 border border-gray-200 dark:border-gray-700/50 hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-300 dark:hover:border-blue-500/50 transition-all duration-300 transform hover:-translate-y-1">';
-            echo '<div class="w-14 h-14 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mb-6 group-hover:scale-110 transition-transform shadow-inner">';
+            echo '<a href="' . $url . '" class="group relative flex flex-col bg-white rounded-3xl p-8 border border-gray-200 dark:border-gray-700/50 hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-300 dark:hover:border-blue-500/50 transition-all duration-300 transform hover:-translate-y-1">';
+            echo '<div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mb-6 group-hover:scale-110 transition-transform shadow-inner">';
             echo '<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>';
             echo '</div>';
-            echo '<h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">' . htmlspecialchars($col['title']) . '</h3>';
+            echo '<h3 class="text-xl font-bold text-gray-900  mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">' . htmlspecialchars($col['title']) . '</h3>';
             echo '<p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-3 mb-4">' . htmlspecialchars(strip_tags($col['description'] ?? '')) . '</p>';
             echo '<div class="mt-auto pt-4 flex items-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest group-hover:text-blue-500 transition-colors">';
             echo 'Explore Items <svg class="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>';
             echo '</div>';
             echo '</a>';
         }
-        
+
         echo '</div></div>';
     }
 }
