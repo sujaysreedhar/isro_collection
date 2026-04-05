@@ -41,7 +41,9 @@ $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Get counts for tabs
 $counts = [];
 foreach ($allowedStatuses as $s) {
-    $counts[$s] = $pdo->query("SELECT COUNT(*) FROM item_comments WHERE status = '$s'")->fetchColumn();
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM item_comments WHERE status = ?");
+    $stmtCount->execute([$s]);
+    $counts[$s] = $stmtCount->fetchColumn();
 }
 $counts['total'] = array_sum($counts);
 ?>

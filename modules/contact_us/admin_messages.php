@@ -22,11 +22,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['msg_action'])) {
 
 // Fetch messages
 $filter = $_GET['filter'] ?? 'all';
-$sql = "SELECT * FROM contact_messages";
-if ($filter === 'unread') $sql .= " WHERE is_read = 0";
-elseif ($filter === 'read') $sql .= " WHERE is_read = 1";
-$sql .= " ORDER BY created_at DESC";
-$messages = $pdo->query($sql)->fetchAll();
+$query = "SELECT * FROM contact_messages";
+$params = [];
+
+if ($filter === 'unread') {
+    $query .= " WHERE is_read = 0";
+} elseif ($filter === 'read') {
+    $query .= " WHERE is_read = 1";
+}
+$query .= " ORDER BY created_at DESC";
+
+$stmt = $pdo->prepare($query);
+$stmt->execute($params);
+$messages = $stmt->fetchAll();
 
 $unreadCount = (int)$pdo->query("SELECT COUNT(*) FROM contact_messages WHERE is_read = 0")->fetchColumn();
 $totalCount  = (int)$pdo->query("SELECT COUNT(*) FROM contact_messages")->fetchColumn();
