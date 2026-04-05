@@ -13,10 +13,17 @@ if (empty($q) || strlen($q) < 2) {
 try {
     $searchTerm = '%' . $q . '%';
 
+    $hasIsPrimary = false;
+    try {
+        $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
+        $hasIsPrimary = (bool) $columnStmt->fetch();
+    } catch (\PDOException $e) {}
+    $orderClause = $hasIsPrimary ? "m.is_primary DESC, m.upload_date ASC" : "m.upload_date ASC";
+
     // 1. Search items by title or reg_number
     $sqlItems = "
         SELECT i.id, i.title, i.reg_number,
-            (SELECT m.file_path FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY m.id ASC LIMIT 1) as preview_file_path
+            (SELECT m.file_path FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as preview_file_path
         FROM items i
         WHERE i.is_visible = 1 AND (i.title LIKE :q1 OR i.reg_number LIKE :q2)
         ORDER BY i.id DESC LIMIT 5

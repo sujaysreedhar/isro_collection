@@ -112,13 +112,10 @@ $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | 
 $relatedItems = [];
 $manualIds = [];
 try {
-    // Stage A: Manual Links
+    $orderClause = $hasIsPrimary ? "is_primary DESC, upload_date ASC" : "upload_date ASC";
     $manualStmt = $pdo->prepare("
         SELECT i.id, i.title, i.reg_number, 
-               COALESCE(
-                   (SELECT file_path FROM media WHERE item_id = i.id AND is_primary = 1 LIMIT 1),
-                   (SELECT file_path FROM media WHERE item_id = i.id AND media_type = 'image' ORDER BY id ASC LIMIT 1)
-               ) as thumb
+               (SELECT file_path FROM media WHERE item_id = i.id AND media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as thumb
         FROM items i
         JOIN item_related r ON i.id = r.related_item_id
         WHERE r.item_id = :id
@@ -134,12 +131,10 @@ if (count($relatedItems) < 4) {
     $excludeIds = array_merge([$id], $manualIds);
     $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
     
+    $orderClause = $hasIsPrimary ? "is_primary DESC, upload_date ASC" : "upload_date ASC";
     $autoStmt = $pdo->prepare("
         SELECT id, title, reg_number, 
-               COALESCE(
-                   (SELECT file_path FROM media WHERE item_id = items.id AND is_primary = 1 LIMIT 1),
-                   (SELECT file_path FROM media WHERE item_id = items.id AND media_type = 'image' ORDER BY id ASC LIMIT 1)
-               ) as thumb
+               (SELECT file_path FROM media WHERE item_id = items.id AND media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as thumb
         FROM items
         WHERE category_id = ? AND id NOT IN ($placeholders)
         ORDER BY id DESC

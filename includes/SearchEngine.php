@@ -179,12 +179,17 @@ class SearchEngine {
         $totalResults = (int)$countStmt->fetchColumn();
 
         // ── 2. Items query with pagination ───────────────────────────────
-        $sql = "SELECT DISTINCT i.*, pm.file_path AS preview_file_path FROM items i ";
-        $sql .= "LEFT JOIN ("
-             .  "SELECT m.item_id, m.file_path FROM media m INNER JOIN ("
-             .      "SELECT item_id, MIN(id) AS min_media_id FROM media WHERE media_type = 'image' GROUP BY item_id"
-             .  ") first_media ON first_media.min_media_id = m.id"
-             .  ") pm ON pm.item_id = i.id ";
+        $hasIsPrimary = false;
+        try {
+            $columnStmt = $this->db->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
+            $hasIsPrimary = (bool) $columnStmt->fetch();
+        } catch (\PDOException $e) {}
+        
+        $orderClause = $hasIsPrimary ? "m.is_primary DESC, m.upload_date ASC" : "m.upload_date ASC";
+
+        $sql = "SELECT DISTINCT i.*, "
+             . "(SELECT m.file_path FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY {$orderClause} LIMIT 1) AS preview_file_path "
+             . "FROM items i ";
         $sql .= $baseParts['join'];
         if ($baseParts['where']) $sql .= " WHERE " . implode(" AND ", $baseParts['where']);
         

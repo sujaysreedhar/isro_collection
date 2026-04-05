@@ -8,12 +8,20 @@ global $appSettings;
 $featuredLimit = (int) ($appSettings['theme_studio_featured_count'] ?? 6);
 if ($featuredLimit < 1 || $featuredLimit > 24) $featuredLimit = 6;
 
+$hasIsPrimary = false;
+try {
+    $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
+    $hasIsPrimary = (bool) $columnStmt->fetch();
+} catch (\PDOException $e) {}
+
+$orderClause = $hasIsPrimary ? "m.is_primary DESC, m.upload_date ASC" : "m.upload_date ASC";
+
 // Fetch a few featured/recent items to display on the home page
 $stmt = $pdo->prepare("
-    SELECT i.*, m.file_path, m.caption 
+    SELECT i.*, 
+        (SELECT m.file_path FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as file_path,
+        (SELECT m.caption FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as caption
     FROM items i
-    LEFT JOIN media m ON i.id = m.item_id
-    GROUP BY i.id
     ORDER BY i.id DESC
     LIMIT " . $featuredLimit . "
 ");
