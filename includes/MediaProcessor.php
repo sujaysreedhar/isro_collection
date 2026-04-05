@@ -253,6 +253,11 @@ class MediaProcessor {
             default => $variant,
         };
 
+        // Fallback for renamed folder: thumbnails -> thumbs
+        if ($subdir === 'thumbnails' && !is_dir(__DIR__ . '/../uploads/thumbnails')) {
+            $subdir = 'thumbs';
+        }
+
         $storagePath = $subdir . '/' . $filename;
 
         if ($storage) {

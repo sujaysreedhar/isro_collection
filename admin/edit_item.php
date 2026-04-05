@@ -593,7 +593,7 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                 <?php else: ?>
                     <!-- Image preview -->
                     <div class="h-36 bg-gray-100">
-                        <img src="<?= MediaProcessor::url($m['file_path'], 'thumbs', 'image', $storage ?? null) ?>"
+                        <img src="<?= MediaProcessor::url($m['file_path'], 'thumbnails', 'image', $storage ?? null) ?>"
                              onerror="this.src='<?= MediaProcessor::url($m['file_path'], 'display', 'image', $storage ?? null) ?>'"
                              class="object-cover w-full h-full" alt="thumbnail">
                     </div>

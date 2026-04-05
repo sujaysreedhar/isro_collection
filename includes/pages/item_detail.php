@@ -1,6 +1,7 @@
 <?php
 // Include database connection
 require_once __DIR__ . '/../../config/config.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
 global $pdo;
 
 // Get and validate the Item ID from the URL (rewritten by .htaccess)
@@ -26,9 +27,13 @@ if (!$item) {
     die("Item not found.");
 }
 
-// 1b. Increment View Count
+// 1b. Increment View Count (once per session)
 try {
-    $pdo->prepare("UPDATE items SET view_count = view_count + 1 WHERE id = :id")->execute([':id' => $id]);
+    if (!isset($_SESSION['viewed_items'])) $_SESSION['viewed_items'] = [];
+    if (!in_array($id, $_SESSION['viewed_items'])) {
+        $pdo->prepare("UPDATE items SET view_count = view_count + 1 WHERE id = :id")->execute([':id' => $id]);
+        $_SESSION['viewed_items'][] = $id;
+    }
 } catch (\Exception $e) {}
 
 // 2. Fetch Media for the item — split by type
@@ -110,7 +115,10 @@ try {
     // Stage A: Manual Links
     $manualStmt = $pdo->prepare("
         SELECT i.id, i.title, i.reg_number, 
-               (SELECT file_path FROM media WHERE item_id = i.id AND is_primary = 1 LIMIT 1) as thumb
+               COALESCE(
+                   (SELECT file_path FROM media WHERE item_id = i.id AND is_primary = 1 LIMIT 1),
+                   (SELECT file_path FROM media WHERE item_id = i.id AND media_type = 'image' ORDER BY id ASC LIMIT 1)
+               ) as thumb
         FROM items i
         JOIN item_related r ON i.id = r.related_item_id
         WHERE r.item_id = :id
@@ -128,7 +136,10 @@ if (count($relatedItems) < 4) {
     
     $autoStmt = $pdo->prepare("
         SELECT id, title, reg_number, 
-               (SELECT file_path FROM media WHERE item_id = items.id AND is_primary = 1 LIMIT 1) as thumb
+               COALESCE(
+                   (SELECT file_path FROM media WHERE item_id = items.id AND is_primary = 1 LIMIT 1),
+                   (SELECT file_path FROM media WHERE item_id = items.id AND media_type = 'image' ORDER BY id ASC LIMIT 1)
+               ) as thumb
         FROM items
         WHERE category_id = ? AND id NOT IN ($placeholders)
         ORDER BY id DESC

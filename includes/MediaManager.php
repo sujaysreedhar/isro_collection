@@ -17,7 +17,7 @@ class MediaManager {
     
     // Target dimensions for each derived size
     const SIZES = [
-        'thumbs'  => [300, 300],  // Square crops for search grids
+        'thumbnails'  => [300, 300],  // Square crops for search grids
         'display' => [1200, 900], // Main display, proportional
         'archive' => null,        // Original resolution, just converted
     ];
@@ -73,7 +73,7 @@ class MediaManager {
         
         // --- Process and save each size ---
         $archivePath = $this->baseDir . 'archive' . DIRECTORY_SEPARATOR . $baseName;
-        $thumbPath   = $this->baseDir . 'thumbs'  . DIRECTORY_SEPARATOR . $baseName;
+        $thumbPath   = $this->baseDir . 'thumbnails'  . DIRECTORY_SEPARATOR . $baseName;
         $displayPath = $this->baseDir . 'display' . DIRECTORY_SEPARATOR . $baseName;
         
         // Archive: save original at maximum quality
@@ -85,7 +85,7 @@ class MediaManager {
         imagedestroy($displayImg);
         
         // Thumb: smart crop to 300x300 square
-        $thumbImg = $this->cropSquare($srcImage, self::SIZES['thumbs'][0]);
+        $thumbImg = $this->cropSquare($srcImage, self::SIZES['thumbnails'][0]);
         $this->saveGdImage($thumbImg, $thumbPath, $mimeType, 82);
         imagedestroy($thumbImg);
         
