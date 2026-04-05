@@ -211,7 +211,7 @@ Creates a table if it doesn't exist. Returns `true` on success.
 
 **Constraints:**
 - Table names must be alphanumeric + underscores only (`^[a-zA-Z0-9_]+$`).
-- Core table names are **protected** and cannot be used: `items`, `categories`, `media`, `settings`, `admins`, `tags`, `narratives`.
+- Core table names are **protected** and cannot be used: `items`, `categories`, `media`, `settings`, `admins`, `tags`, `narratives`, `item_related`.
 
 ```php
 ModuleDB::createTable($this->pdo, 'trade_offers', "
@@ -778,6 +778,25 @@ Delete (or rename) one of your theme templates temporarily. Verify the site fall
 
 ---
 
+# Part 3: Advanced Core Features
+
+## 3.1 Item Analytics (View Tracking)
+The portal automatically tracks item popularity using the `view_count` column in the `items` table. Use this to create "Trending" or "Popular" widgets.
+- **Logic**: Incremented in `includes/pages/item_detail.php`.
+- **Session Protection**: Prevents duplicate counts on page reloads within the same session.
+
+## 3.2 Manual Related Items
+Items can be manually linked using the `item_related` pivot table. This allows for curated "You May Also Like" associations.
+- **Database**: `item_related (item_id, related_item_id)`.
+- **Admin**: Managed via the "Related Items" multi-select in the item editor.
+
+## 3.3 Homepage Discovery Grid
+The homepage features a dynamic "Browse by Category" section driven by category thumbnails.
+- **Media**: Thumbnails are stored in `uploads/categories/`.
+- **Filtering**: The grid automatically only displays categories that have an assigned `image_path` in the database.
+
+---
+
 ## Appendix A: File Tree Overview
 
 ```
@@ -808,14 +827,18 @@ collection/
 │   │   └── atlas.php
 │   └── modern_blue/            # Example: custom "Modern Blue" theme
 ├── admin/
+│   ├── categories.php          # Category management
+│   ├── edit_item.php           # Core item editor (Rich Text + Tags)
 │   ├── modules.php             # Module enable/disable UI
 │   ├── themes.php              # Theme activation UI
-│   ├── module_page.php         # Generic module admin page renderer
 │   └── layout.php              # Admin sidebar + header/footer wrappers
-├── index.php                   # Homepage controller
+├── uploads/
+│   ├── display/                # Primary item images
+│   ├── thumbnails/             # Standard variants (replaces legacy thumbs/)
+│   └── categories/             # Discovery grid category images
+├── index.php                   # Homepage controller (Featured + Categories)
 ├── search.php                  # Search/catalog controller
-├── gallery.php                 # Gallery controller
-├── item_detail.php             # Item detail controller
+├── item_detail.php             # Item detail controller (Analytics + Related)
 └── atlas.php                   # Atlas map controller
 ```
 

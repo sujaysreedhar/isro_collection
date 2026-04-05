@@ -9,6 +9,7 @@ To ensure consistent environments across all deployments, any automated agent (l
     - Each SQL block must be preceded by a comment (`--`) describing what the change does and which feature it belongs to.
     - If a change is destructive (e.g., `DROP COLUMN`), add a warning comment.
 4. **Settings Whitelist**: If adding new configuration to the `settings` table, also ensure `admin/ajax.php` is updated to whitelist the new keys.
+5. **Media Pipeline**: Use `uploads/thumbnails/` for all image variants. The legacy `thumbs/` directory is deprecated and should be avoided in new code.
 
 ## Example `update.sql` entry:
 ```sql
