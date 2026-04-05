@@ -3,6 +3,11 @@
 require_once __DIR__ . '/../../config/config.php';
 global $pdo;
 
+// Respect Theme Studio featured item count (defaults to 6)
+global $appSettings;
+$featuredLimit = (int) ($appSettings['theme_studio_featured_count'] ?? 6);
+if ($featuredLimit < 1 || $featuredLimit > 24) $featuredLimit = 6;
+
 // Fetch a few featured/recent items to display on the home page
 $stmt = $pdo->prepare("
     SELECT i.*, m.file_path, m.caption 
@@ -10,10 +15,11 @@ $stmt = $pdo->prepare("
     LEFT JOIN media m ON i.id = m.item_id
     GROUP BY i.id
     ORDER BY i.id DESC
-    LIMIT 6
+    LIMIT " . $featuredLimit . "
 ");
 $stmt->execute();
 $featuredItems = $stmt->fetchAll();
+
 
 // Fetch tags for all featured items in one query
 $featuredTags = []; // item_id => [tag, tag, ...]

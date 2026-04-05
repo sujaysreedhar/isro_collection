@@ -12,12 +12,14 @@ if (!$isAtlasActive) {
     die("Postmark Atlas is currently unavailable.");
 }
 
-// Fetch only ACQUIRED locations for the public frontend, or optionally all
-// Often frontends only show what is collected. We will show all but visually distinguish.
-$stmt = $pdo->query("SELECT * FROM postmark_locations");
-$locations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Output as JSON for Leaflet
+// Fetch all locations with linked item details
+$stmt = $pdo->query("
+    SELECT pl.*, i.title AS linked_item_title, i.id AS linked_item_id
+    FROM postmark_locations pl
+    LEFT JOIN items i ON i.id = pl.linked_item_id
+");
+$locations     = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $jsonLocations = json_encode($locations);
+
 ?>
 <?php require_once ThemeManager::getTemplatePath('atlas.php'); ?>

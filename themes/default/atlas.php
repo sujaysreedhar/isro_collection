@@ -21,10 +21,29 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
     <!-- Main Map View -->
     <main class="flex-grow flex flex-col items-center justify-center p-4">
         <div class="max-w-7xl mx-auto w-full mb-4">
-            <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 serif">Postmark Atlas</h1>
-            <p class="mt-2 text-lg text-gray-600">Explore the geographical footprint of our active collection.</p>
+            <div class="flex flex-wrap justify-between items-end gap-3">
+                <div>
+                    <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 serif">Postmark Atlas</h1>
+                    <p class="mt-1 text-lg text-gray-600">Explore the geographical footprint of our active collection.</p>
+                </div>
+                <!-- Filter buttons -->
+                <div class="flex items-center gap-2">
+                    <button id="btn-all" onclick="setFilter('all')"
+                            class="atlas-filter-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full border transition-colors bg-gray-900 text-white border-gray-900">
+                        All
+                    </button>
+                    <button id="btn-collected" onclick="setFilter('collected')"
+                            class="atlas-filter-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full border transition-colors bg-white text-green-700 border-green-200 hover:bg-green-50">
+                        <span class="w-2.5 h-2.5 bg-green-500 rounded-full"></span> Collected
+                    </button>
+                    <button id="btn-seeking" onclick="setFilter('seeking')"
+                            class="atlas-filter-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full border transition-colors bg-white text-gray-500 border-gray-200 hover:bg-gray-50">
+                        <span class="w-2.5 h-2.5 bg-gray-400 rounded-full"></span> Seeking
+                    </button>
+                </div>
+            </div>
         </div>
-        
+
         <div class="max-w-7xl w-full bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex-grow relative" style="min-height: 60vh;">
             <div id="frontendAtlasMap" class="absolute inset-0"></div>
         </div>
@@ -55,30 +74,66 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
             iconSize: [13, 21], iconAnchor: [6, 21], popupAnchor: [0, -21], shadowSize: [21, 21]
         });
 
+        // Two layer groups for filtering
+        var collectedGroup = L.layerGroup().addTo(map);
+        var seekingGroup   = L.layerGroup().addTo(map);
+
         var rawData = <?= $jsonLocations ?>;
         
         rawData.forEach(function(loc) {
             if (loc.latitude && loc.longitude) {
                 var isAcquired = parseInt(loc.is_acquired, 10) === 1;
-                var markerTitle = loc.post_office + ' - ' + loc.district;
-                
-                var statusHtml = isAcquired ? 
-                    '<span style="background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">In Collection</span>' : 
-                    '<span style="background: #f3f4f6; color: #4b5563; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">Not Acquired</span>';
+                var markerTitle = (loc.ppc_name || loc.post_office) + ' - ' + loc.district;
 
-                var popupHtml = '<div style="font-family: Inter, sans-serif;">' +
-                                '<h3 style="font-size:14px; font-weight:bold; margin:0 0 4px 0;">' + loc.post_office + '</h3>' +
-                                '<p style="margin: 0 0 6px 0; color: #6b7280; font-size:12px;">' + loc.district + ', ' + loc.state + ' - ' + loc.pin_code + '</p>' +
+                var statusHtml = isAcquired ?
+                    '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">In Collection</span>' :
+                    '<span style="background:#f3f4f6;color:#4b5563;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">Not Acquired</span>';
+
+                var ppcLine = loc.ppc_name
+                    ? '<p style="margin:0 0 2px 0;font-size:13px;font-weight:600;color:#374151;">' + loc.ppc_name + '</p>'
+                    : '';
+
+                var itemHtml = loc.linked_item_title
+                    ? '<div style="margin:6px 0;padding:5px 7px;background:#eff6ff;border-radius:5px;">'
+                      + '<a href="' + '<?= SITE_URL ?>' + '/item/' + loc.linked_item_id
+                      + '" style="font-size:12px;color:#1d4ed8;text-decoration:none;font-weight:600;">🖼 ' + loc.linked_item_title + '</a>'
+                      + '</div>'
+                    : '';
+
+                var popupHtml = '<div style="font-family: Inter, sans-serif;min-width:200px;">' +
+                                '<h3 style="font-size:14px;font-weight:bold;margin:0 0 2px 0;">' + loc.post_office + '</h3>' +
+                                ppcLine +
+                                '<p style="margin:0 0 6px 0;color:#6b7280;font-size:12px;">' + (loc.district||'') + ', ' + (loc.state||'') + ' · ' + loc.pin_code + '</p>' +
                                 statusHtml +
+                                itemHtml +
                                 '</div>';
 
                 var iconToUse = isAcquired ? greenIcon : greyIcon;
-                
-                L.marker([parseFloat(loc.latitude), parseFloat(loc.longitude)], {icon: iconToUse})
-                 .bindPopup(popupHtml)
-                 .bindTooltip(markerTitle)
-                 .addTo(map);
+                var marker = L.marker([parseFloat(loc.latitude), parseFloat(loc.longitude)], {icon: iconToUse})
+                    .bindPopup(popupHtml, {maxWidth: 260})
+                    .bindTooltip(markerTitle);
+
+                (isAcquired ? collectedGroup : seekingGroup).addLayer(marker);
             }
         });
+
+        // Filter toggle
+        window.setFilter = function(f) {
+            if (f === 'all') {
+                if (!map.hasLayer(collectedGroup)) map.addLayer(collectedGroup);
+                if (!map.hasLayer(seekingGroup))   map.addLayer(seekingGroup);
+            } else if (f === 'collected') {
+                if (!map.hasLayer(collectedGroup)) map.addLayer(collectedGroup);
+                if (map.hasLayer(seekingGroup))    map.removeLayer(seekingGroup);
+            } else {
+                if (map.hasLayer(collectedGroup))  map.removeLayer(collectedGroup);
+                if (!map.hasLayer(seekingGroup))   map.addLayer(seekingGroup);
+            }
+            document.querySelectorAll('.atlas-filter-btn').forEach(function(btn) {
+                btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+            });
+            var active = document.getElementById('btn-' + f);
+            if (active) { active.style.background = '#111827'; active.style.color = '#fff'; active.style.borderColor = '#111827'; }
+        };
     });
     </script>

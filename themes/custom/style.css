@@ -1,0 +1,75 @@
+/* themes/custom/style.css
+ * All visual tokens are driven by CSS custom properties injected by the
+ * Theme Studio module via the frontend_head hook. This file just provides
+ * the structural base and font imports (font URLs are injected inline).
+ */
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+body {
+    font-family: var(--font-body, 'Inter', sans-serif);
+    background-color: var(--color-bg, #f9fafb);
+    color: var(--color-text, #374151);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+h1, h2, h3, h4, .serif {
+    font-family: var(--font-heading, 'Playfair Display', serif);
+    color: var(--color-primary, #111827);
+}
+
+/* ── Custom-theme utility classes ──────────────────────────────────────────── */
+.tc-header        { background-color: var(--color-surface, #ffffff); border-bottom: 1px solid var(--color-border, #e5e7eb); }
+.tc-hero-bg       { background-color: var(--color-hero-bg, #ffffff); }
+.tc-surface       { background-color: var(--color-surface, #ffffff); }
+.tc-border        { border-color: var(--color-border, #e5e7eb); }
+.tc-text          { color: var(--color-text, #374151); }
+.tc-text-muted    { color: var(--color-text-muted, #6b7280); }
+.tc-primary-text  { color: var(--color-primary, #111827); }
+.tc-accent-text   { color: var(--color-accent, #2563eb); }
+.tc-accent-bg     { background-color: var(--color-accent, #2563eb); }
+.tc-accent-hover:hover { background-color: var(--color-accent-dark, #1d4ed8); }
+.tc-footer-bg     { background-color: var(--color-footer-bg, #111827); }
+.tc-footer-text   { color: var(--color-footer-text, #9ca3af); }
+.tc-radius        { border-radius: var(--border-radius, 0.5rem); }
+
+/* Input focus ring driven by accent */
+.tc-input:focus {
+    outline: none;
+    border-color: var(--color-accent, #2563eb);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent, #2563eb) 20%, transparent);
+}
+
+/* ── Search button & inputs ────────────────────────────────────────────────── */
+.tc-search-btn {
+    background-color: var(--color-accent, #111827);
+    color: #ffffff;
+    border-radius: 0 var(--border-radius, 0.5rem) var(--border-radius, 0.5rem) 0;
+    transition: opacity .15s;
+}
+.tc-search-btn:hover { opacity: .88; }
+
+/* ── Cards ─────────────────────────────────────────────────────────────────── */
+.tc-card {
+    background-color: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--border-radius, 0.5rem);
+    transition: box-shadow .2s, transform .2s;
+}
+.tc-card:hover { box-shadow: 0 8px 24px -4px rgba(0,0,0,.12); transform: translateY(-2px); }
+
+/* ── Hero styles ───────────────────────────────────────────────────────────── */
+.hero-pattern {
+    background-color: var(--color-hero-bg, #ffffff);
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f3f4f6' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ── Nav links ─────────────────────────────────────────────────────────────── */
+.tc-nav-active {
+    color: var(--color-accent, #111827);
+    border-bottom: 2px solid var(--color-accent, #111827);
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+footer.tc-footer-bg { padding: 3rem 0; margin-top: auto; }

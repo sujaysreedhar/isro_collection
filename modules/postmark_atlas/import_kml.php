@@ -68,7 +68,7 @@ if ($step === 'prepare') {
         $items = json_decode($jsonContent, true) ?? [];
         $chkStmt = $pdo->prepare(
             "SELECT id, post_office, ppc_name, is_acquired
-             FROM postmark_locations WHERE pin_code = ? LIMIT 1"
+             FROM postmark_locations WHERE pin_code = ?"
         );
         foreach ($items as $item) {
             if (empty($item['collected'])) continue;
@@ -78,8 +78,19 @@ if ($step === 'prepare') {
             if (empty($pin)) continue;
 
             $chkStmt->execute([$pin]);
-            $row = $chkStmt->fetch(PDO::FETCH_ASSOC);
-            if (!$row) continue; // Not in DB yet — HTML import will add it
+            $rows = $chkStmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!$rows) continue; // Not in DB yet — HTML import will add it
+
+            // Find best match if multiple locations share PIN
+            $row = $rows[0];
+            if (count($rows) > 1 && $po !== '') {
+                foreach ($rows as $r) {
+                    if (strcasecmp((string)$r['post_office'], $po) === 0 || strcasecmp((string)$r['ppc_name'], $name) === 0) {
+                        $row = $r;
+                        break;
+                    }
+                }
+            }
 
             if (!$row['is_acquired']) {
                 $plan['mark_acquired'][] = [
@@ -116,8 +127,9 @@ if ($step === 'prepare') {
         $xpath = new DOMXPath($dom);
 
         $rows    = $xpath->query('//table//tbody//tr');
-        $chk2    = $pdo->prepare("SELECT id, ppc_name FROM postmark_locations WHERE pin_code = ? AND post_office LIKE ? LIMIT 1");
-        $chkPin  = $pdo->prepare("SELECT id, ppc_name FROM postmark_locations WHERE pin_code = ? LIMIT 1");
+        $chkStmt = $pdo->prepare("SELECT id, post_office, ppc_name FROM postmark_locations WHERE pin_code = ?");
+
+        $claimedIdsForUpdate = []; // Track which legacy DB rows we've already "claimed" to update their empty ppc_name
 
         foreach ($rows as $row) {
             $cells = $xpath->query('td', $row);
@@ -132,41 +144,51 @@ if ($step === 'prepare') {
 
             if (strlen($pin) !== 6 || empty($po)) continue;
 
-            // Check exact match
-            $chk2->execute([$pin, $po]);
-            $existing = $chk2->fetch(PDO::FETCH_ASSOC);
+            $chkStmt->execute([$pin]);
+            $dbRows = $chkStmt->fetchAll(PDO::FETCH_ASSOC);
 
-            if ($existing) {
-                // Row exists — backfill ppc_name if missing (avoid duplicating update_name)
-                if (empty($existing['ppc_name']) && $name) {
-                    $alreadyQueued = false;
-                    foreach ($plan['update_name'] as $u) {
-                        if ($u['id'] === $existing['id']) { $alreadyQueued = true; break; }
-                    }
-                    if (!$alreadyQueued) {
-                        $plan['update_name'][] = [
-                            'id'          => $existing['id'],
-                            'pin'         => $pin,
-                            'post_office' => $po,
-                            'old_name'    => '',
-                            'new_name'    => $name,
-                        ];
-                    }
+            $exactMatch = false;
+            $legacyEmptyMatch = null;
+
+            foreach ($dbRows as $dbRow) {
+                // Must match PO string (case-insensitive for safety)
+                if (strcasecmp($dbRow['post_office'], $po) !== 0) continue;
+
+                if (strcasecmp((string)$dbRow['ppc_name'], $name) === 0) {
+                    $exactMatch = true;
+                    break;
                 }
+
+                if (empty($dbRow['ppc_name']) && !in_array($dbRow['id'], $claimedIdsForUpdate)) {
+                    $legacyEmptyMatch = $dbRow;
+                }
+            }
+
+            if ($exactMatch) {
+                // Already perfectly synced in DB. Check next HTML row.
+                continue;
+            } else if ($legacyEmptyMatch && $name) {
+                // Found an existing row with same PIN+PO but empty PPC name
+                $claimedIdsForUpdate[] = $legacyEmptyMatch['id'];
+                $plan['update_name'][] = [
+                    'id'          => $legacyEmptyMatch['id'],
+                    'pin'         => $pin,
+                    'post_office' => $po,
+                    'old_name'    => '',
+                    'new_name'    => $name,
+                ];
             } else {
-                // Try PIN-only match
-                $chkPin->execute([$pin]);
-                $pinMatch = $chkPin->fetch(PDO::FETCH_ASSOC);
-                if (!$pinMatch) {
-                    // Truly new — queue for insert
-                    $plan['insert_new'][] = [
-                        'pin'         => $pin,
-                        'post_office' => $po,
-                        'ppc_name'    => $name,
-                        'district'    => $dist,
-                        'state'       => $state,
-                    ];
-                }
+                // Either no PIN+PO matched, OR the PIN+PO matched but all its DB rows 
+                // already have a DIFFERENT ppc_name! This means it's a multi-PPC post office (like Kolkata GPO).
+                // Or we already claimed the empty legacy row for a previous iteration.
+                // It must be a new record!
+                $plan['insert_new'][] = [
+                    'pin'         => $pin,
+                    'post_office' => $po,
+                    'ppc_name'    => $name,
+                    'district'    => $dist,
+                    'state'       => $state,
+                ];
             }
         }
     } else {
