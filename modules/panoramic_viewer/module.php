@@ -13,18 +13,18 @@ class PanoramicViewerModule extends BaseModule
         // Register Frontend Hooks
         HookRegistry::addAction('frontend_head', [$this, 'injectAssets']);
         HookRegistry::addAction('item_before_content', [$this, 'renderViewer'], 5, 1);
+        
+        // New Hooks per user request
+        HookRegistry::addAction('item_card_badge', [$this, 'renderCardBadge'], 10, 1);
+        HookRegistry::addAction('item_gallery_thumbnails', [$this, 'renderGalleryThumbnails'], 10, 1);
     }
 
     public function activate()
     {
-        // Ensure upload directory exists
-        $uploadDir = ABSPATH . '/uploads/panoramics';
+        $uploadDir = ABSPATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'panoramics';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
-
-        // Schema is handled via update.sql in this project's workflow,
-        // but we could also use ModuleDB::createTable here if needed.
     }
 
     public function renderAdminFields($id, $item)
@@ -36,18 +36,11 @@ class PanoramicViewerModule extends BaseModule
             $stmt->execute([$id]);
             $panoramics = $stmt->fetchAll();
         }
-        require __DIR__ . '/admin_fields.php';
+        require __DIR__ . DIRECTORY_SEPARATOR . 'admin_fields.php';
     }
 
     public function handleSave($id)
     {
-        error_log("Panoramic handleSave triggered for id $id");
-        $logFile = ABSPATH . '/pano_debug.log';
-        $logData = "ID: $id - TIME: " . date('Y-m-d H:i:s') . "\n";
-        $logData .= "FILES: " . print_r($_FILES, true) . "\n";
-        $logData .= "POST: " . print_r($_POST, true) . "\n";
-        file_put_contents($logFile, $logData, FILE_APPEND);
-
         if ($_SERVER['REQUEST_METHOD'] !== 'POST')
             return;
 
@@ -57,13 +50,12 @@ class PanoramicViewerModule extends BaseModule
         $deleteIds = $_POST['delete_panoramic'] ?? [];
         if (!empty($deleteIds)) {
             $placeholders = implode(',', array_fill(0, count($deleteIds), '?'));
-            // Fetch file paths to delete physical files
             $stmt = $pdo->prepare("SELECT file_path FROM item_panoramics WHERE id IN ($placeholders) AND item_id = ?");
             $stmt->execute(array_merge($deleteIds, [$id]));
             $toDelete = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
             foreach ($toDelete as $file) {
-                $filePath = ABSPATH . '/uploads/panoramics/' . $file;
+                $filePath = ABSPATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'panoramics' . DIRECTORY_SEPARATOR . $file;
                 if (file_exists($filePath))
                     unlink($filePath);
             }
@@ -72,7 +64,14 @@ class PanoramicViewerModule extends BaseModule
             $stmtDel->execute(array_merge($deleteIds, [$id]));
         }
 
-        // 2. Handle New Uploads
+        // 2. Handle Caption Updates for Existing
+        $existingCaptions = $_POST['existing_panoramic_captions'] ?? [];
+        foreach ($existingCaptions as $panoId => $newCaption) {
+            $stmtUpd = $pdo->prepare("UPDATE item_panoramics SET caption = ? WHERE id = ? AND item_id = ?");
+            $stmtUpd->execute([$newCaption, $panoId, $id]);
+        }
+
+        // 3. Handle New Uploads
         if (isset($_FILES['panoramic_files'])) {
             $files = $this->reIndexFiles($_FILES['panoramic_files']);
             $captions = $_POST['panoramic_captions'] ?? [];
@@ -86,12 +85,12 @@ class PanoramicViewerModule extends BaseModule
                 if (!in_array($ext, $allowed))
                     continue;
 
-                // 20 MB Max Size
-                if ($file['size'] > 20 * 1024 * 1024)
+                // 25 MB Max Size
+                if ($file['size'] > 25 * 1024 * 1024)
                     continue;
 
                 $newFileName = 'pano_' . $id . '_' . time() . '_' . $i . '.' . $ext;
-                $targetPath = ABSPATH . '/uploads/panoramics/' . $newFileName;
+                $targetPath = ABSPATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'panoramics' . DIRECTORY_SEPARATOR . $newFileName;
 
                 if (move_uploaded_file($file['tmp_name'], $targetPath)) {
                     $caption = $captions[$i] ?? '';
@@ -102,17 +101,52 @@ class PanoramicViewerModule extends BaseModule
         }
     }
 
+    public function renderCardBadge($item) {
+        $pdo = $this->pdo;
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM item_panoramics WHERE item_id = ?");
+        $stmt->execute([$item['id']]);
+        $hasPano = (bool) $stmt->fetchColumn();
+
+        if ($hasPano) {
+            echo '<div class="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5 shadow-lg border border-white/10 z-10">
+                    <svg class="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    360°
+                  </div>';
+        }
+    }
+
+    public function renderGalleryThumbnails($item) {
+        $pdo = $this->pdo;
+        $stmt = $pdo->prepare("SELECT * FROM item_panoramics WHERE item_id = ? ORDER BY sort_order ASC, id ASC");
+        $stmt->execute([$item['id']]);
+        $panos = $stmt->fetchAll();
+
+        foreach ($panos as $p) {
+            $url = SITE_URL . '/uploads/panoramics/' . $p['file_path'];
+            // Since these are 360 viewer images, clicking them will scroll the user to the top viewer
+            echo '<div class="relative group cursor-pointer" onclick="document.querySelector(\'.pano-container\').scrollIntoView({behavior: \'smooth\'})">
+                    <img src="'.$url.'" class="w-20 h-14 object-cover rounded-lg border-2 border-transparent hover:border-blue-500 transition-all opacity-80 hover:opacity-100 shadow-sm" alt="360 view">
+                    <div class="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg group-hover:bg-transparent transition-all">
+                        <span class="text-white text-[10px] font-bold">360°</span>
+                    </div>
+                  </div>';
+        }
+    }
+
     public function injectAssets()
     {
-        // Pannellum CDN
         echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>' . "\n";
         echo '<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>' . "\n";
         echo '<style>
-            .pano-container { width: 100%; height: 450px; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
-            .pano-nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 5px; }
-            .pano-nav-btn { padding: 0.5rem 1rem; background: #f3f4f6; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; cursor: pointer; white-space: nowrap; transition: all 0.2s; border: 1px solid transparent; }
-            .pano-nav-btn.active { background: #111827; color: #fff; }
-            .pano-nav-btn:hover:not(.active) { background: #e5e7eb; }
+            .pano-container { width: 100%; height: 500px; background: #111; border-radius: 16px; overflow: hidden; margin-bottom: 2rem; position: relative; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+            .pano-nav { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+            .pano-nav::-webkit-scrollbar { display: none; }
+            .pano-nav-btn { padding: 0.625rem 1.25rem; background: #fff; border-radius: 12px; font-size: 0.813rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid #e2e8f0; color: #475569; position: relative; overflow: hidden; }
+            .pano-nav-btn.active { background: #1e293b; color: #fff; border-color: #1e293b; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            .pano-nav-btn:hover:not(.active) { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
+            
+            .gallery-thumbnail { cursor: pointer; width: 80px; height: 60px; object-cover; border-radius: 8px; border: 2px solid transparent; transition: all 0.2s; }
+            .gallery-thumbnail.active { border-color: #3b82f6; }
         </style>' . "\n";
     }
 
@@ -126,7 +160,7 @@ class PanoramicViewerModule extends BaseModule
         if (empty($panoramics))
             return;
 
-        require __DIR__ . '/viewer_template.php';
+        require __DIR__ . DIRECTORY_SEPARATOR . 'viewer_template.php';
     }
 
     private function reIndexFiles($files)

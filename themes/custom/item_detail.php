@@ -65,6 +65,8 @@ require_once ThemeManager::getHeader();
                             data-caption="<?= htmlspecialchars($img['caption'] ?? '') ?>" onclick="switchImage(this)"
                             alt="View <?= $i + 1 ?>">
                     <?php endforeach; ?>
+                    
+                    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_gallery_thumbnails', $item); } ?>
                 </div>
             <?php endif; ?>
 

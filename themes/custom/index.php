@@ -206,6 +206,8 @@ require_once ThemeManager::getHeader();
                              style="background:color-mix(in srgb,var(--color-surface,#fff) 90%,transparent);">
                             <?= htmlspecialchars($item['reg_number']) ?>
                         </div>
+                        
+                        <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_card_badge', $item); } ?>
                     </div>
                     <div class="p-5 flex flex-col flex-grow">
                         <h3 class="text-lg font-bold serif tc-primary-text mb-2 group-hover:tc-accent-text transition-colors line-clamp-2">
