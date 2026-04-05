@@ -10,6 +10,7 @@ To ensure consistent environments across all deployments, any automated agent (l
     - If a change is destructive (e.g., `DROP COLUMN`), add a warning comment.
 4. **Settings Whitelist**: If adding new configuration to the `settings` table, also ensure `admin/ajax.php` is updated to whitelist the new keys.
 5. **Media Pipeline**: Use `uploads/thumbnails/` for all image variants. The legacy `thumbs/` directory is deprecated and should be avoided in new code.
+6. **Test Code Hygiene**: Any scripts, test files, or one-off tools created during development **MUST** be moved to the `scripts/` directory after use. Never leave diagnostic or testing code in the root directory.
 
 ## Example `update.sql` entry:
 ```sql

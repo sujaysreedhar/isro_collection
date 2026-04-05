@@ -797,6 +797,17 @@ The homepage features a dynamic "Browse by Category" section driven by category 
 
 ---
 
+## 3.4 Coding Hygiene & Test Data
+To keep the production environment clean and secure, all non-core development scripts (one-off migrations, diagnostic tools, and feature tests) must be moved to the `scripts/` directory after use.
+
+- **Checklist**:
+  - [ ] No `phpinfo()` or `print_r($config)` scripts in the root.
+  - [ ] No database dumps (`.sql`) in the root.
+  - [ ] All diagnostic tools (e.g. `diag.php`, `test_auth.php`) moved to `scripts/`.
+  - [ ] All temporary files removed or moved to `tmp/`.
+
+---
+
 ## Appendix A: File Tree Overview
 
 ```
