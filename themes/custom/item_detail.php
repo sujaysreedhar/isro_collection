@@ -82,6 +82,17 @@ require_once ThemeManager::getHeader();
                 <?php endif; ?>
             </div>
 
+            <!-- Description (Moved from right column) -->
+            <?php 
+                $descClean = trim(strip_tags($item['physical_description'] ?? ''));
+                if (!empty($descClean)): 
+            ?>
+            <div class="mt-8 tc-text text-base leading-relaxed serif quill-content">
+                <h3 class="text-xs font-bold uppercase tracking-widest tc-text-muted mb-4 opacity-70">Physical Description</h3>
+                <?= $item['physical_description'] ?>
+            </div>
+            <?php endif; ?>
+
             <!-- YouTube Embeds -->
             <?php foreach ($youtubeMedia as $yt): ?>
             <div class="mt-8 aspect-video tc-radius overflow-hidden tc-border">
@@ -134,11 +145,6 @@ require_once ThemeManager::getHeader();
                 <?php endif; ?>
             </header>
 
-            <!-- Description -->
-            <div class="tc-text text-base leading-relaxed mb-10 serif">
-                <?= nl2br(htmlspecialchars($item['physical_description'] ?? '')) ?>
-            </div>
-
             <!-- Specifications Table -->
             <div class="tc-surface tc-border tc-radius overflow-hidden mb-10">
                 <div class="p-5 border-b tc-border">
@@ -170,19 +176,58 @@ require_once ThemeManager::getHeader();
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($item['credit_line'])): ?>
-                    <div class="p-5 grid grid-cols-3 gap-4">
-                        <dt class="spec-label col-span-1">Credit</dt>
-                        <dd class="spec-value col-span-2 tc-text-muted text-sm font-normal"><?= htmlspecialchars($item['credit_line']) ?></dd>
+                    <div class="p-5 flex flex-col sm:flex-row sm:items-center">
+                        <span class="spec-label sm:w-1/3 mb-1 sm:mb-0">Provenance</span>
+                        <span class="spec-value sm:w-2/3 tc-text-muted text-sm font-normal"><?= htmlspecialchars($item['credit_line']) ?></span>
                     </div>
                     <?php endif; ?>
-                    <?php if (!empty($item['historical_significance'])): ?>
+                    <div class="p-5 flex flex-col sm:flex-row sm:items-center bg-tc-accent-bg/5">
+                        <span class="spec-label sm:w-1/3 mb-1 sm:mb-0">Total Views</span>
+                        <span class="spec-value sm:w-2/3 tc-accent-text font-bold"><?= number_format(($item['view_count'] ?? 0) + 1) ?></span>
+                    </div>
+                    <?php 
+                        $histClean = trim(strip_tags($item['historical_significance'] ?? ''));
+                        if (!empty($histClean)): 
+                    ?>
                     <div class="p-5">
                         <dt class="spec-label mb-2">Historical Significance</dt>
-                        <dd class="tc-text text-sm leading-relaxed"><?= htmlspecialchars($item['historical_significance']) ?></dd>
+                        <dd class="tc-text text-sm leading-relaxed quill-content"><?= $item['historical_significance'] ?></dd>
                     </div>
                     <?php endif; ?>
                 </dl>
             </div>
+
+            <!-- Related Items Section -->
+            <?php if (!empty($relatedItems)): ?>
+            <div class="mb-12">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold tc-primary-text serif">You May Also Like</h3>
+                    <div class="h-px flex-1 bg-tc-border ml-6 opacity-30"></div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                    <?php foreach ($relatedItems as $ri): ?>
+                    <a href="<?= SITE_URL ?>/item/<?= $ri['id'] ?>" class="group block h-full">
+                        <div class="tc-surface tc-border tc-radius overflow-hidden h-full flex flex-col hover:shadow-lg transition-all hover:-translate-y-1">
+                            <div class="aspect-[4/3] bg-tc-accent-bg/5 flex items-center justify-center overflow-hidden">
+                                <?php if ($ri['thumb']): ?>
+                                    <img src="<?= MediaProcessor::url($ri['thumb'], 'thumbs', 'image', $storage ?? null) ?>" 
+                                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="<?= htmlspecialchars($ri['title']) ?>">
+                                <?php else: ?>
+                                    <div class="w-full h-full flex items-center justify-center bg-gray-100">
+                                        <svg class="w-10 h-10 tc-text-muted opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="p-4 flex-1">
+                                <span class="text-[9px] font-bold uppercase tracking-widest tc-text-muted mb-1 block"><?= htmlspecialchars($ri['reg_number']) ?></span>
+                                <h4 class="text-xs font-bold tc-text group-hover:tc-accent-text line-clamp-2 leading-snug"><?= htmlspecialchars($ri['title']) ?></h4>
+                            </div>
+                        </div>
+                    </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Related Stories -->
             <?php if ($stories): ?>

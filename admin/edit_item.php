@@ -42,6 +42,8 @@ $success = '';
 $categories   = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
 $allNarratives = $pdo->query("SELECT id, title FROM narratives ORDER BY title ASC")->fetchAll();
 $allTags       = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
+$allItems      = $pdo->query("SELECT id, reg_number, title FROM items ORDER BY title ASC")->fetchAll();
+$linkedRelated = [];
 
 if ($id > 0) {
     $stmt = $pdo->prepare("SELECT * FROM items WHERE id = :id");
@@ -58,6 +60,12 @@ if ($id > 0) {
         $tStmt = $pdo->prepare("SELECT tag_id FROM item_tag WHERE item_id = :id");
         $tStmt->execute([':id' => $id]);
         $linkedTags = $tStmt->fetchAll(PDO::FETCH_COLUMN);
+        // Related items
+        try {
+            $rStmt = $pdo->prepare("SELECT related_item_id FROM item_related WHERE item_id = :id");
+            $rStmt->execute([':id' => $id]);
+            $linkedRelated = $rStmt->fetchAll(PDO::FETCH_COLUMN);
+        } catch (\PDOException) { $linkedRelated = []; }
     } else {
         $error = "Item not found.";
         $id = 0;
@@ -117,6 +125,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $title                  = trim($_POST['title'] ?? '');
         $physical_description   = trim($_POST['physical_description'] ?? '');
         $historical_significance= trim($_POST['historical_significance'] ?? '');
+        
+        // Clean up empty Quill artifacts (e.g., <p><br></p>)
+        $cleanDescription = strip_tags($physical_description);
+        if (trim($cleanDescription) === '') $physical_description = '';
+        $cleanHist = strip_tags($historical_significance);
+        if (trim($cleanHist) === '') $historical_significance = '';
+
         $production_date        = trim($_POST['production_date'] ?? '');
         $credit_line            = trim($_POST['credit_line'] ?? '');
         $category_id            = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
@@ -267,6 +282,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // — Related Items pivot sync —
+        try {
+            $pdo->prepare("DELETE FROM item_related WHERE item_id = :id")->execute([':id' => $id]);
+            $relatedIds = array_filter(array_map('intval', (array)($_POST['related_items'] ?? [])));
+            if ($relatedIds) {
+                $rsStmt = $pdo->prepare("INSERT IGNORE INTO item_related (item_id, related_item_id) VALUES (:i, :r)");
+                foreach ($relatedIds as $rid) {
+                    if ($rid !== $id) $rsStmt->execute([':i' => $id, ':r' => $rid]);
+                }
+            }
+        } catch (\PDOException $e) {
+            // Log it and possibly inform the user — if this fails, they might need to run update.sql
+            error_log("Failed to save related items: " . $e->getMessage());
+            if (str_contains($e->getMessage(), "doesn't exist")) {
+                $error .= " / Warning: 'item_related' table not found. Please run the SQL in update.sql.";
+            }
+        }
+
             $pdo->commit();
 
             if (class_exists('HookRegistry')) {
@@ -287,6 +320,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tStmt->execute([':id' => $id]);
             $linkedTags = $tStmt->fetchAll(PDO::FETCH_COLUMN);
             $allTags = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
+            // Related items reload
+            try {
+                $rStmt = $pdo->prepare("SELECT related_item_id FROM item_related WHERE item_id = :id");
+                $rStmt->execute([':id' => $id]);
+                $linkedRelated = $rStmt->fetchAll(PDO::FETCH_COLUMN);
+            } catch (\PDOException) { $linkedRelated = []; }
 
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -310,6 +349,11 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
 <!-- TomSelect -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
+<!-- Quill Rich Text Editor -->
+<link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+
 <style>
 .ts-control { border: 1px solid #d1d5db !important; border-radius: 6px !important; padding: 6px 8px !important; }
 .ts-control:focus-within { border-color: #111827 !important; box-shadow: 0 0 0 1px #111827 !important; }
@@ -390,11 +434,14 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                 </div>
                 <div>
                     <label class="label">Physical Description</label>
-                    <textarea name="physical_description" rows="4" class="input"><?= htmlspecialchars($item['physical_description'] ?? '') ?></textarea>
+                    <!-- hidden input carries HTML to server -->
+                    <input type="hidden" name="physical_description" id="physical_description_input">
+                    <div id="editor-description" style="min-height:160px"></div>
                 </div>
                 <div>
                     <label class="label">Historical Significance</label>
-                    <textarea name="historical_significance" rows="3" class="input"><?= htmlspecialchars($item['historical_significance'] ?? '') ?></textarea>
+                    <input type="hidden" name="historical_significance" id="historical_significance_input">
+                    <div id="editor-significance" style="min-height:120px"></div>
                 </div>
 
                 <!-- TomSelect Narrative Linker -->
@@ -422,6 +469,22 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                         <?php foreach ($allTags as $t): ?>
                             <option value="<?= $t['id'] ?>" <?= in_array($t['id'], $linkedTags) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($t['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- Related Items Linker -->
+                <div>
+                    <label class="label">
+                        Related Items
+                        <span class="text-gray-400 font-normal">(shown as "You May Also Like" — leave empty to auto-suggest by category)</span>
+                    </label>
+                    <select id="related-select" name="related_items[]" multiple placeholder="Search for an item…" class="w-full">
+                        <?php foreach ($allItems as $ri): ?>
+                            <?php if ($ri['id'] == $id) continue; ?>
+                            <option value="<?= $ri['id'] ?>" <?= in_array($ri['id'], $linkedRelated) ? 'selected' : '' ?>>
+                                [<?= htmlspecialchars($ri['reg_number']) ?>] <?= htmlspecialchars($ri['title']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -605,6 +668,12 @@ new TomSelect('#tag-select', {
     }
 });
 
+new TomSelect('#related-select', {
+    plugins: ['remove_button'],
+    placeholder: 'Search for an item…',
+    maxOptions: 500,
+});
+
 // Media upload tab switcher
 function showTab(id) {
     document.querySelectorAll('.media-tab').forEach(el => el.classList.add('hidden'));
@@ -618,6 +687,38 @@ function showTab(id) {
     activeBtn.classList.remove('border-transparent', 'text-gray-500');
     activeBtn.classList.add('border-gray-900', 'text-gray-900');
 }
+
+// ── Quill Editors ─────────────────────────────────────────────────────────
+const toolbarOptions = [
+    ['bold', 'italic', 'underline'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    ['blockquote', 'link'],
+    ['clean']
+];
+
+const quillDesc = new Quill('#editor-description', {
+    theme: 'snow',
+    placeholder: 'Describe the physical characteristics of the artifact…',
+    modules: { toolbar: toolbarOptions }
+});
+
+const quillHist = new Quill('#editor-significance', {
+    theme: 'snow',
+    placeholder: 'Describe the historical context and significance…',
+    modules: { toolbar: toolbarOptions }
+});
+
+// Pre-fill editors with saved HTML content
+const savedDesc = <?= json_encode($item['physical_description'] ?? '') ?>;
+const savedHist = <?= json_encode($item['historical_significance'] ?? '') ?>;
+if (savedDesc) quillDesc.clipboard.dangerouslyPasteHTML(savedDesc);
+if (savedHist) quillHist.clipboard.dangerouslyPasteHTML(savedHist);
+
+// Before form submit, copy editor HTML into hidden inputs
+document.getElementById('item-form').addEventListener('submit', function() {
+    document.getElementById('physical_description_input').value   = quillDesc.root.innerHTML;
+    document.getElementById('historical_significance_input').value = quillHist.root.innerHTML;
+});
 </script>
 
 <?= renderAdminFooter(); ?>

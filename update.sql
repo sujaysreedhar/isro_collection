@@ -42,3 +42,14 @@ INSERT INTO settings (setting_key, setting_value) VALUES
 ('theme_studio_hero_image', ''),
 ('theme_studio_footer_text', '')
 ON DUPLICATE KEY UPDATE setting_value = IF(setting_value = '' OR setting_value IS NULL, VALUES(setting_value), setting_value);
+
+-- ITEM ANALYTICS & RELATED ITEMS
+-- Add view_count to items table for tracking popular items
+ALTER TABLE items ADD COLUMN IF NOT EXISTS view_count INT DEFAULT 0;
+
+-- Create item_related table for manual linking between items
+CREATE TABLE IF NOT EXISTS item_related (
+    item_id INT NOT NULL,
+    related_item_id INT NOT NULL,
+    PRIMARY KEY (item_id, related_item_id)
+);

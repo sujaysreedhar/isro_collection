@@ -26,6 +26,11 @@ if (!$item) {
     die("Item not found.");
 }
 
+// 1b. Increment View Count
+try {
+    $pdo->prepare("UPDATE items SET view_count = view_count + 1 WHERE id = :id")->execute([':id' => $id]);
+} catch (\Exception $e) {}
+
 // 2. Fetch Media for the item — split by type
 $hasIsPrimary = false;
 try {
@@ -97,6 +102,44 @@ $jsonLd = array_filter([
     'isPartOf'    => ['@type' => 'ArchiveOrganization', 'name' => SITE_TITLE],
 ]);
 $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+
+// 6. Fetch Related Items (Manual Links + Category Fallback)
+$relatedItems = [];
+$manualIds = [];
+try {
+    // Stage A: Manual Links
+    $manualStmt = $pdo->prepare("
+        SELECT i.id, i.title, i.reg_number, 
+               (SELECT file_path FROM media WHERE item_id = i.id AND is_primary = 1 LIMIT 1) as thumb
+        FROM items i
+        JOIN item_related r ON i.id = r.related_item_id
+        WHERE r.item_id = :id
+    ");
+    $manualStmt->execute([':id' => $id]);
+    $relatedItems = $manualStmt->fetchAll();
+    $manualIds = array_column($relatedItems, 'id');
+} catch (\Exception $e) {}
+
+// Stage B: Support with Auto-Suggestions (same category) if < 4
+if (count($relatedItems) < 4) {
+    $limit = 4 - count($relatedItems);
+    $excludeIds = array_merge([$id], $manualIds);
+    $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
+    
+    $autoStmt = $pdo->prepare("
+        SELECT id, title, reg_number, 
+               (SELECT file_path FROM media WHERE item_id = items.id AND is_primary = 1 LIMIT 1) as thumb
+        FROM items
+        WHERE category_id = ? AND id NOT IN ($placeholders)
+        ORDER BY id DESC
+        LIMIT " . (int)$limit
+    );
+    
+    $params = array_merge([$item['category_id'] ?? 0], $excludeIds);
+    $autoStmt->execute($params);
+    $autoResults = $autoStmt->fetchAll();
+    $relatedItems = array_merge($relatedItems, $autoResults);
+}
 
 ?>
 <?php require_once ThemeManager::getTemplatePath('item_detail.php'); ?>
