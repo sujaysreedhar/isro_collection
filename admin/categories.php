@@ -24,7 +24,7 @@ if (isset($_POST['delete_id'])) {
 
 // Fetch all categories
 $stmt = $pdo->query("
-    SELECT c.id, c.name, COUNT(i.id) as item_count 
+    SELECT c.id, c.name, c.image_path, COUNT(i.id) as item_count 
     FROM categories c
     LEFT JOIN items i ON c.id = i.category_id
     GROUP BY c.id
@@ -64,6 +64,7 @@ echo renderAdminHeader("Manage Categories");
             <thead class="bg-gray-50 text-gray-500 uppercase font-semibold text-xs border-b border-gray-200">
                 <tr>
                     <th class="px-6 py-4">ID</th>
+                    <th class="px-6 py-4">Image</th>
                     <th class="px-6 py-4 w-1/2">Name</th>
                     <th class="px-6 py-4">Linked Items</th>
                     <th class="px-6 py-4 text-right">Actions</th>
@@ -74,6 +75,16 @@ echo renderAdminHeader("Manage Categories");
                     <?php foreach ($categories as $cat): ?>
                     <tr class="hover:bg-gray-50 transition">
                         <td class="px-6 py-4 whitespace-nowrap text-gray-500"><?= $cat['id'] ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <?php if (!empty($cat['image_path'])): ?>
+                                <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($cat['image_path']) ?>" 
+                                     class="h-10 w-10 object-cover rounded-full border border-gray-200 shadow-sm" alt="thumb">
+                            <?php else: ?>
+                                <div class="h-10 w-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                </div>
+                            <?php endif; ?>
+                        </td>
                         <td class="px-6 py-4 font-medium text-gray-800"><?= htmlspecialchars($cat['name']) ?></td>
                         <td class="px-6 py-4">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
@@ -95,7 +106,7 @@ echo renderAdminHeader("Manage Categories");
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="4" class="px-6 py-12 text-center text-gray-500">No categories available. Click "Add New Category" to create one.</td>
+                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">No categories available. Click "Add New Category" to create one.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>

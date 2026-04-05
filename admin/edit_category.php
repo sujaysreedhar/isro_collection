@@ -27,6 +27,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('Invalid CSRF token.');
     }
     $name = trim($_POST['name'] ?? '');
+    $imagePath = $category['image_path'] ?? null;
+
+    // Handle Image Upload
+    if (!empty($_FILES['category_image']['name'])) {
+        $file = $_FILES['category_image'];
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+
+        if (in_array($ext, $allowed)) {
+            $destDir = __DIR__ . '/../uploads/categories/';
+            if (!is_dir($destDir)) mkdir($destDir, 0755, true);
+
+            $newName = 'cat_' . uniqid() . '.' . $ext;
+            if (move_uploaded_file($file['tmp_name'], $destDir . $newName)) {
+                // Delete old image if exists
+                if ($imagePath && file_exists($destDir . $imagePath)) {
+                    unlink($destDir . $imagePath);
+                }
+                $imagePath = $newName;
+            }
+        }
+    }
 
     if (empty($name)) {
         $error = "Category name is required.";
@@ -34,13 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($id > 0) {
                 // UPDATE
-                $stmt = $pdo->prepare("UPDATE categories SET name = :name WHERE id = :id");
-                $stmt->execute([':name' => $name, ':id' => $id]);
+                $stmt = $pdo->prepare("UPDATE categories SET name = :name, image_path = :image WHERE id = :id");
+                $stmt->execute([':name' => $name, ':image' => $imagePath, ':id' => $id]);
                 $success = "Category updated successfully.";
             } else {
                 // INSERT
-                $stmt = $pdo->prepare("INSERT INTO categories (name) VALUES (:name)");
-                $stmt->execute([':name' => $name]);
+                $stmt = $pdo->prepare("INSERT INTO categories (name, image_path) VALUES (:name, :image)");
+                $stmt->execute([':name' => $name, ':image' => $imagePath]);
             $id = $pdo->lastInsertId();
             $success = "Category created successfully.";
         }
@@ -48,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             HookRegistry::doAction('category_saved', $id);
         }
         $category['name'] = $name;
+        $category['image_path'] = $imagePath;
         } catch (\PDOException $e) {
             if ($e->getCode() == 23000) {
                 // Unique constraint violation
@@ -86,13 +109,29 @@ echo renderAdminHeader($id > 0 ? "Edit Category - " . htmlspecialchars($category
 <?php endif; ?>
 
 <div class="max-w-2xl">
-    <form method="POST" action="" class="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <form method="POST" action="" enctype="multipart/form-data" class="bg-white rounded-lg border border-gray-200 shadow-sm">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
         <div class="p-6">
-            <div class="mb-4">
+            <div class="mb-6">
                 <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Category Name *</label>
                 <input type="text" id="name" name="name" value="<?= htmlspecialchars($category['name'] ?? '') ?>" required
                        class="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 shadow-sm sm:text-sm">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Category Thumbnail</label>
+                <?php if (!empty($category['image_path'])): ?>
+                    <div class="mb-4">
+                        <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($category['image_path']) ?>" 
+                             class="h-32 w-32 object-cover rounded-lg border border-gray-200 shadow-sm" alt="Current thumb">
+                        <p class="text-xs text-gray-400 mt-2 italic">Uploading a new image will replace the current one.</p>
+                    </div>
+                <?php endif; ?>
+                <div class="flex items-center gap-3">
+                    <input type="file" name="category_image" accept="image/*"
+                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Recommended: 400x400px (WebP, JPG, or PNG).</p>
             </div>
         </div>
 

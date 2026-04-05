@@ -43,6 +43,11 @@ ob_start();
 // (no additionalHead needed — Theme Studio injects via frontend_head hook)
 $additionalHead = ob_get_clean();
 
+// Fetch Categories for discovery section
+global $pdo;
+$stmtCats = $pdo->query("SELECT id, name, image_path FROM categories WHERE image_path IS NOT NULL AND image_path != '' ORDER BY id ASC LIMIT 8");
+$homeCategories = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
+
 require_once ThemeManager::getHeader();
 ?>
 
@@ -235,6 +240,30 @@ require_once ThemeManager::getHeader();
             <h3 class="mt-2 text-sm font-medium tc-primary-text">No items available</h3>
             <p class="mt-1 text-sm tc-text-muted">Get started by importing data into your MySQL database.</p>
         </div>
+    <?php endif; ?>
+
+    <?php /* ═══════════ BROWSE BY CATEGORY ═══════════ */ ?>
+    <?php if ($homeCategories): ?>
+    <div class="mt-20">
+        <div class="flex items-center justify-between mb-8">
+            <h2 class="text-3xl font-bold serif tc-primary-text">Browse by Category</h2>
+            <div class="h-px flex-1 bg-tc-border ml-8 opacity-30"></div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6">
+            <?php foreach ($homeCategories as $cat): ?>
+            <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int)$cat['id'] ?>" class="group block">
+                <div class="relative aspect-video rounded-2xl overflow-hidden tc-border bg-tc-accent-bg/5 hover:shadow-xl transition-all duration-300">
+                    <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($cat['image_path']) ?>" 
+                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="<?= htmlspecialchars($cat['name']) ?>">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                    <div class="absolute inset-0 p-6 flex flex-col justify-end">
+                        <h4 class="text-white font-bold text-lg serif group-hover:tc-accent-text transition-colors"><?= htmlspecialchars($cat['name']) ?></h4>
+                    </div>
+                </div>
+            </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
     <?php endif; ?>
 
     <!-- Modular Sections -->

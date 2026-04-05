@@ -57,3 +57,6 @@ CREATE TABLE IF NOT EXISTS item_related (
 -- Toggle for "How to Cite" block
 INSERT INTO settings (setting_key, setting_value) VALUES ('site_show_citation', '1')
 ON DUPLICATE KEY UPDATE setting_value = IF(setting_value = '' OR setting_value IS NULL, '1', setting_value);
+
+-- Add category thumbnails support
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_path VARCHAR(255) DEFAULT NULL;
