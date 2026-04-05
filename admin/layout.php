@@ -2,6 +2,30 @@
 // admin/layout.php
 // Premium admin layout with sidebar, topbar, and mobile drawer
 
+/**
+ * Render sidebar nav links from a data structure.
+ * Defined at file scope to avoid "Cannot redeclare" if renderAdminHeader() is
+ * called more than once per request.
+ * $withIcons: desktop shows SVG icons; mobile omits them.
+ */
+if (!function_exists('renderAdminSidebarNav')) {
+    function renderAdminSidebarNav(array $sections, string $linkClass, string $sectionClass, bool $withIcons = true): void {
+        foreach ($sections as $sectionLinks) {
+            echo '<div class="' . $sectionClass . '">' . htmlspecialchars($sectionLinks['label']) . '</div>';
+            foreach ($sectionLinks['links'] as $link) {
+                echo '<a href="' . htmlspecialchars($link['url']) . '" class="' . $linkClass . ' active-link-target">';
+                if ($withIcons && !empty($link['icon'])) {
+                    echo '<svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
+                       . $link['icon']
+                       . '</svg>';
+                }
+                echo $link['label'];
+                echo '</a>';
+            }
+        }
+    }
+}
+
 function renderAdminHeader($title) {
     ob_start();
 ?>

@@ -78,6 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $error = "No locations selected.";
             }
+        } elseif ($action === 'link_item') {
+            $id     = (int)$_POST['id'];
+            $itemId = (int)$_POST['item_id'];
+            $stmt   = $pdo->prepare("UPDATE postmark_locations SET linked_item_id = ? WHERE id = ?");
+            $stmt->execute([$itemId ?: null, $id]);
+            $success = $itemId ? "Item linked." : "Item link removed.";
         } elseif ($action === 'bulk_delete') {
             $ids = $_POST['selected_ids'] ?? [];
             if (!empty($ids)) {
@@ -116,9 +122,17 @@ if ($filterStatus !== '') {
 
 $whereSql = count($whereClauses) > 0 ? 'WHERE ' . implode(' AND ', $whereClauses) : '';
 
-$stmt = $pdo->prepare("SELECT * FROM postmark_locations $whereSql ORDER BY state ASC, district ASC, post_office ASC");
+$stmt = $pdo->prepare("
+    SELECT pl.*, i.title AS linked_item_title
+    FROM postmark_locations pl
+    LEFT JOIN items i ON i.id = pl.linked_item_id
+    $whereSql ORDER BY pl.state ASC, pl.district ASC, pl.post_office ASC
+");
 $stmt->execute($params);
 $locations = $stmt->fetchAll();
+
+// Items for the link picker (just id + title)
+$allItems = $pdo->query("SELECT id, title FROM items ORDER BY title ASC")->fetchAll();
 
 // Get unique states for dropdown
 $stateStmt = $pdo->query("SELECT DISTINCT state FROM postmark_locations WHERE state IS NOT NULL AND state != '' ORDER BY state ASC");
@@ -212,9 +226,11 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
                     <input type="checkbox" id="select-all" class="rounded border-gray-300 text-yellow-600 focus:ring-yellow-500 cursor-pointer" onchange="toggleSelectAll(this)">
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PIN Code</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name of PPC</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Post Office</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District / City</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Linked Item</th>
                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acquired</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
@@ -229,9 +245,35 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
                         <input type="checkbox" class="row-checkbox rounded border-gray-300 text-yellow-600 focus:ring-yellow-500 cursor-pointer" value="<?= $loc['id'] ?>" onchange="updateBulkBar()">
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= htmlspecialchars($loc['pin_code']) ?></td>
+                    <td class="px-6 py-4 text-sm font-semibold text-indigo-700"><?= htmlspecialchars($loc['ppc_name'] ?? '—') ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= htmlspecialchars($loc['post_office']) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= htmlspecialchars($loc['district']) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= htmlspecialchars($loc['state']) ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <?php if ($loc['linked_item_id'] && $loc['linked_item_title']): ?>
+                            <a href="<?= SITE_URL ?>/item_detail.php?id=<?= $loc['linked_item_id'] ?>" target="_blank" class="text-blue-600 hover:underline font-medium"><?= htmlspecialchars($loc['linked_item_title']) ?></a>
+                            <form method="POST" class="inline ml-1">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+                                <input type="hidden" name="action" value="link_item">
+                                <input type="hidden" name="id" value="<?= $loc['id'] ?>">
+                                <input type="hidden" name="item_id" value="0">
+                                <button type="submit" class="text-xs text-red-400 hover:text-red-600" title="Unlink">✕</button>
+                            </form>
+                        <?php else: ?>
+                            <form method="POST" class="flex items-center gap-1">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+                                <input type="hidden" name="action" value="link_item">
+                                <input type="hidden" name="id" value="<?= $loc['id'] ?>">
+                                <select name="item_id" class="text-xs border border-gray-300 rounded px-1 py-0.5 max-w-[140px]">
+                                    <option value="">— link item —</option>
+                                    <?php foreach ($allItems as $it): ?>
+                                        <option value="<?= $it['id'] ?>"><?= htmlspecialchars($it['title']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="submit" class="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded hover:bg-blue-700">Link</button>
+                            </form>
+                        <?php endif; ?>
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-center">
                         <form method="POST" class="inline">
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">

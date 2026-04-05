@@ -287,10 +287,44 @@ HookRegistry::addFilter('frontend_nav_links', function($links) {
 | Hook Name | Type | Location | Arguments | Description |
 |---|---|---|---|---|
 | `admin_head` | Action | `admin/layout.php` `<head>` | — | Inject CSS, meta tags, or JS into the admin `<head>` |
-| `admin_menu` | Action | `admin/layout.php` sidebar (desktop) | — | Add navigation links to the admin sidebar |
-| `admin_menu_mobile` | Action | `admin/layout.php` sidebar (mobile) | — | Add navigation links to the mobile admin drawer |
+| `admin_menu` | Action | `admin/layout.php` sidebar | — | Add navigation links to the admin sidebar (both desktop and mobile) |
 | `admin_footer` | Action | `admin/layout.php` before `</body>` | — | Inject scripts or HTML at the bottom of admin pages |
 | `admin_page_{slug}` | Action | `admin/module_page.php` | — | Render the content area of a module's custom admin page. Replace `{slug}` with your module slug |
+
+> **Note:** `admin_menu_mobile` is deprecated. The mobile drawer now uses the same `admin_menu` hook automatically.
+
+### Admin Sidebar Sections — `admin_sidebar_links` Filter
+
+The admin sidebar is **data-driven**. Use the `admin_sidebar_links` filter to add links to any existing section, or add a brand-new section:
+
+```php
+HookRegistry::addFilter('admin_sidebar_links', function(array $sections) {
+    // Add a link to an existing section:
+    $sections['catalog']['links']['my_report'] = [
+        'url'   => SITE_URL . '/admin/module_page.php?m=my_module',
+        'label' => 'My Report',
+        'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="..."/>',
+    ];
+
+    // Or add a completely new section:
+    $sections['my_module'] = [
+        'label' => 'My Module',
+        'links' => [
+            'settings' => [
+                'url'   => SITE_URL . '/admin/module_page.php?m=my_module',
+                'label' => 'Settings',
+                'icon'  => '<path .../>', // Optional SVG path content
+            ],
+        ],
+    ];
+
+    return $sections; // MUST return
+});
+```
+
+Existing section keys: `overview`, `catalog`, `content`, `system`.
+
+> The old `admin_menu` hook (raw HTML strings) still works for backward compatibility. Prefer `admin_sidebar_links` for new modules.
 
 ### Frontend Hooks
 
@@ -309,6 +343,9 @@ HookRegistry::addFilter('frontend_nav_links', function($links) {
 | Hook Name | Type | Location | Arguments | Description |
 |---|---|---|---|---|
 | `frontend_nav_links` | Filter | `includes/frontend.php` | `$links` (array) | Modify the frontend navigation links array |
+| `admin_sidebar_links` | Filter | `admin/layout.php` | `$sections` (array) | Modify or extend the admin sidebar sections/links |
+| `route_request` | Filter | `includes/Router.php` | `$handled` (bool), `$uri` (string) | Handle a URL and return `true` to stop further routing |
+| `search_results` | Filter | `includes/SearchEngine.php` | `$results` (array), `$params` (array) | Append or modify search results (e.g., add module content) |
 
 ### Module Lifecycle Hooks
 
