@@ -131,8 +131,16 @@ $stmt = $pdo->prepare("
 $stmt->execute($params);
 $locations = $stmt->fetchAll();
 
-// Items for the link picker (just id + title)
-$allItems = $pdo->query("SELECT id, title FROM items ORDER BY title ASC")->fetchAll();
+// Items for the link picker — exclude items already linked to any location
+$linkedItemIds = array_values(array_filter(array_column($locations, 'linked_item_id')));
+if (!empty($linkedItemIds)) {
+    $ph       = implode(',', array_fill(0, count($linkedItemIds), '?'));
+    $aiStmt   = $pdo->prepare("SELECT id, title FROM items WHERE id NOT IN ($ph) ORDER BY title ASC");
+    $aiStmt->execute($linkedItemIds);
+    $allItems = $aiStmt->fetchAll();
+} else {
+    $allItems = $pdo->query("SELECT id, title FROM items ORDER BY title ASC")->fetchAll();
+}
 
 // Get unique states for dropdown
 $stateStmt = $pdo->query("SELECT DISTINCT state FROM postmark_locations WHERE state IS NOT NULL AND state != '' ORDER BY state ASC");
@@ -218,83 +226,123 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
 </form>
 
 <!-- Data Table -->
-<div class="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200">
-    <table class="min-w-full divide-y divide-gray-200">
+<div class="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200 overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
         <thead class="bg-gray-50">
             <tr>
-                <th class="px-4 py-3 text-left">
+                <th class="px-3 py-2 text-left w-8">
                     <input type="checkbox" id="select-all" class="rounded border-gray-300 text-yellow-600 focus:ring-yellow-500 cursor-pointer" onchange="toggleSelectAll(this)">
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PIN Code</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name of PPC</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Post Office</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District / City</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Linked Item</th>
-                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acquired</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">PIN</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name of PPC</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Post Office</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">District / State</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">✓</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
             </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="bg-white divide-y divide-gray-100">
             <?php if (empty($locations)): ?>
-            <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No locations added yet.</td></tr>
+            <tr><td colspan="8" class="px-4 py-6 text-center text-gray-400 text-sm">No locations added yet.</td></tr>
             <?php else: ?>
                 <?php foreach ($locations as $loc): ?>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-4">
+                <tr class="hover:bg-gray-50 align-middle">
+                    <td class="px-3 py-2">
                         <input type="checkbox" class="row-checkbox rounded border-gray-300 text-yellow-600 focus:ring-yellow-500 cursor-pointer" value="<?= $loc['id'] ?>" onchange="updateBulkBar()">
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= htmlspecialchars($loc['pin_code']) ?></td>
-                    <td class="px-6 py-4 text-sm font-semibold text-indigo-700"><?= htmlspecialchars($loc['ppc_name'] ?? '—') ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= htmlspecialchars($loc['post_office']) ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= htmlspecialchars($loc['district']) ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= htmlspecialchars($loc['state']) ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+
+                    <!-- PIN -->
+                    <td class="px-3 py-2 whitespace-nowrap font-mono text-xs text-gray-700"><?= htmlspecialchars($loc['pin_code']) ?></td>
+
+                    <!-- Name of PPC -->
+                    <td class="px-3 py-2" style="max-width:180px;">
+                        <div style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                             title="<?= htmlspecialchars($loc['ppc_name'] ?? '') ?>">
+                            <span class="font-medium text-indigo-700"><?= htmlspecialchars($loc['ppc_name'] ?? '—') ?></span>
+                        </div>
+                    </td>
+
+                    <!-- Post Office -->
+                    <td class="px-3 py-2" style="max-width:160px;">
+                        <div style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                             title="<?= htmlspecialchars($loc['post_office']) ?>">
+                            <span class="text-gray-700"><?= htmlspecialchars($loc['post_office']) ?></span>
+                        </div>
+                    </td>
+
+                    <!-- District / State (combined) -->
+                    <td class="px-3 py-2 whitespace-nowrap">
+                        <div class="text-xs text-gray-700"><?= htmlspecialchars($loc['district']) ?></div>
+                        <div class="text-xs text-gray-400"><?= htmlspecialchars($loc['state']) ?></div>
+                    </td>
+
+                    <!-- Linked Item (compact) -->
+                    <td class="px-3 py-2" style="min-width:120px;">
                         <?php if ($loc['linked_item_id'] && $loc['linked_item_title']): ?>
-                            <a href="<?= SITE_URL ?>/item_detail.php?id=<?= $loc['linked_item_id'] ?>" target="_blank" class="text-blue-600 hover:underline font-medium"><?= htmlspecialchars($loc['linked_item_title']) ?></a>
-                            <form method="POST" class="inline ml-1">
-                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
-                                <input type="hidden" name="action" value="link_item">
-                                <input type="hidden" name="id" value="<?= $loc['id'] ?>">
-                                <input type="hidden" name="item_id" value="0">
-                                <button type="submit" class="text-xs text-red-400 hover:text-red-600" title="Unlink">✕</button>
-                            </form>
+                            <div class="flex items-center gap-1">
+                                <a href="<?= SITE_URL ?>/item_detail.php?id=<?= $loc['linked_item_id'] ?>" target="_blank"
+                                   class="text-xs text-blue-600 hover:underline font-medium"
+                                   style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;"
+                                   title="<?= htmlspecialchars($loc['linked_item_title']) ?>">
+                                    <?= htmlspecialchars($loc['linked_item_title']) ?>
+                                </a>
+                                <form method="POST" class="inline">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+                                    <input type="hidden" name="action" value="link_item">
+                                    <input type="hidden" name="id" value="<?= $loc['id'] ?>">
+                                    <input type="hidden" name="item_id" value="0">
+                                    <button type="submit" class="text-red-300 hover:text-red-500 text-xs leading-none" title="Unlink">✕</button>
+                                </form>
+                            </div>
                         <?php else: ?>
                             <form method="POST" class="flex items-center gap-1">
                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                                 <input type="hidden" name="action" value="link_item">
                                 <input type="hidden" name="id" value="<?= $loc['id'] ?>">
-                                <select name="item_id" class="text-xs border border-gray-300 rounded px-1 py-0.5 max-w-[140px]">
-                                    <option value="">— link item —</option>
+                                <select name="item_id" class="text-xs border border-gray-200 rounded px-1 py-0.5 text-gray-600" style="max-width:95px;">
+                                    <option value="">— link —</option>
                                     <?php foreach ($allItems as $it): ?>
                                         <option value="<?= $it['id'] ?>"><?= htmlspecialchars($it['title']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <button type="submit" class="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded hover:bg-blue-700">Link</button>
+                                <button type="submit" class="text-xs text-blue-600 hover:text-blue-800 font-semibold whitespace-nowrap">+</button>
                             </form>
                         <?php endif; ?>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-center">
+
+                    <!-- Acquired toggle -->
+                    <td class="px-3 py-2 text-center">
                         <form method="POST" class="inline">
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                             <input type="hidden" name="action" value="toggle_acquired">
                             <input type="hidden" name="id" value="<?= $loc['id'] ?>">
                             <input type="hidden" name="is_acquired" value="<?= $loc['is_acquired'] ? '0' : '1' ?>">
-                            <button type="submit" class="text-<?= $loc['is_acquired'] ? 'yellow' : 'gray' ?>-500 hover:text-<?= $loc['is_acquired'] ? 'yellow' : 'gray' ?>-700 focus:outline-none">
+                            <button type="submit" class="focus:outline-none"
+                                    style="color:<?= $loc['is_acquired'] ? '#eab308' : '#d1d5db' ?>;"
+                                    title="<?= $loc['is_acquired'] ? 'Unmark' : 'Mark acquired' ?>">
                                 <?php if ($loc['is_acquired']): ?>
-                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
                                 <?php else: ?>
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
                                 <?php endif; ?>
                             </button>
                         </form>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+
+                    <!-- Delete -->
+                    <td class="px-3 py-2 text-right">
                         <form method="POST" class="inline" onsubmit="return confirm('Delete this location?');">
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="id" value="<?= $loc['id'] ?>">
-                            <button type="submit" class="text-red-600 hover:text-red-900 ml-3">Delete</button>
+                            <button type="submit" class="text-gray-300 hover:text-red-500 transition-colors" title="Delete">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
                         </form>
                     </td>
                 </tr>
@@ -302,10 +350,11 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
             <?php endif; ?>
         </tbody>
     </table>
-    <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
-        Showing <strong><?= number_format(count($locations)) ?></strong> location(s)
+    <div class="px-4 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-400">
+        Showing <strong class="text-gray-600"><?= number_format(count($locations)) ?></strong> location(s)
     </div>
 </div>
+
 
 <!-- Add Modal -->
 <div id="add-location-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">

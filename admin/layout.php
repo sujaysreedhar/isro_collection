@@ -171,24 +171,6 @@ function renderAdminHeader($title) {
         $adminSidebarSections = HookRegistry::applyFilters('admin_sidebar_links', $adminSidebarSections);
     }
 
-    // ── Sidebar Renderer (shared between desktop and mobile) ──────────────────
-    // Renders each section + links from the data structure.
-    // $withIcons: desktop shows icons; mobile omits them for compactness.
-    function renderAdminSidebarNav(array $sections, string $linkClass, string $sectionClass, bool $withIcons = true): void {
-        foreach ($sections as $sectionLinks) {
-            echo '<div class="' . $sectionClass . '">' . htmlspecialchars($sectionLinks['label']) . '</div>';
-            foreach ($sectionLinks['links'] as $link) {
-                echo '<a href="' . htmlspecialchars($link['url']) . '" class="' . $linkClass . ' active-link-target">';
-                if ($withIcons && !empty($link['icon'])) {
-                    echo '<svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
-                       . $link['icon']
-                       . '</svg>';
-                }
-                echo $link['label'];
-                echo '</a>';
-            }
-        }
-    }
 
     // Module-injected links via admin_menu hook (legacy string technique kept for compatibility).
     // Captured once, reused in both sidebars to avoid running hooks twice.
