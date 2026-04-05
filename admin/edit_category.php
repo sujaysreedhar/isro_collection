@@ -77,8 +77,11 @@ echo renderAdminHeader($id > 0 ? "Edit Category - " . htmlspecialchars($category
 <?php endif; ?>
 
 <?php if ($success): ?>
-    <div class="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded relative">
-        <?= htmlspecialchars($success) ?>
+    <div class="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded relative flex justify-between items-center">
+        <span><?= htmlspecialchars($success) ?></span>
+        <?php if (!isset($_GET['id'])): ?>
+            <a href="edit_category.php" class="ml-4 text-xs font-bold uppercase tracking-wider bg-green-100 px-3 py-1.5 rounded hover:bg-green-200 transition">Add Another</a>
+        <?php endif; ?>
     </div>
 <?php endif; ?>
 

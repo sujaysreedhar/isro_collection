@@ -287,8 +287,8 @@ foreach ($fontPairs as $pair) {
                             $cur = $s('theme_studio_border_radius','0.5rem');
                         ?>
                         <label class="ts-radio-card <?= ($cur===$rv?'selected':'') ?> flex-none"
-                               style="min-width:5rem"
-                               onclick="document.querySelectorAll('.ts-radio-card').forEach(c=>c.classList.remove('selected'));this.classList.add('selected');document.getElementById('ts-radius').value='<?= $rv ?>'">
+                               style="min-width:5rem" data-group="radius"
+                               onclick="selectCard('radius',this);document.getElementById('ts-radius').value='<?= $rv ?>'">
                             <div class="w-8 h-8 mx-auto mb-1 bg-blue-100 border-2 border-blue-400"
                                  style="border-radius:<?= $rv ?>"></div>
                             <div class="text-xs font-semibold text-gray-700"><?= $rl ?></div>
@@ -377,6 +377,18 @@ foreach ($fontPairs as $pair) {
                                    oninput="fromHexInput('theme_studio_hero_tagline_color',this.value)" maxlength="7">
                             <button class="text-xs text-gray-400 hover:text-red-500 ml-1" title="Use theme default"
                                     onclick="clearHeroColor('theme_studio_hero_tagline_color')">✕</button>
+                        </div>
+                        <div class="ts-color-row">
+                            <?php $heroAccColor = $s('theme_studio_hero_accent_color',''); ?>
+                            <div class="ts-pickr-btn" id="cp-theme_studio_hero_accent_color"
+                                 data-key="theme_studio_hero_accent_color"
+                                 data-value="<?= htmlspecialchars($heroAccColor ?: '#2563eb') ?>"></div>
+                            <span class="ts-color-label">Site Title / Accent color</span>
+                            <input type="text" class="ts-color-hex" id="hex-theme_studio_hero_accent_color" data-key="theme_studio_hero_accent_color"
+                                   value="<?= htmlspecialchars($heroAccColor ?: '#2563eb') ?>"
+                                   oninput="fromHexInput('theme_studio_hero_accent_color',this.value)" maxlength="7">
+                            <button class="text-xs text-gray-400 hover:text-red-500 ml-1" title="Use theme default"
+                                    onclick="clearHeroColor('theme_studio_hero_accent_color')">✕</button>
                         </div>
                         <p class="text-xs text-gray-400 mt-1">Tip: use white (#ffffff) when the hero has a dark image for readability.</p>
                     </div>
@@ -542,7 +554,9 @@ function clearHeroColor(key) {
     if (hexEl)  hexEl.value = '';
     // Reset Pickr to placeholder
     const p = _pickrs[key];
-    const def = key.includes('tagline') ? '#6b7280' : '#111827';
+    let def = '#111827';
+    if (key.includes('tagline')) def = '#6b7280';
+    if (key.includes('accent'))  def = '#2563eb';
     if (p) p.setColor(def, true);
 }
 
@@ -632,6 +646,15 @@ const PREVIEW_MAP = {
     theme_studio_color_footer_text:el => {
         const e=document.getElementById('pv-footer'); if(e)e.style.color=el;
     },
+    theme_studio_hero_text_color:el => {
+        const e=document.getElementById('pv-heading'); if(e)e.style.color=el;
+    },
+    theme_studio_hero_tagline_color:el => {
+        const e=document.getElementById('pv-sub'); if(e)e.style.color=el;
+    },
+    theme_studio_hero_accent_color:el => {
+        const e=document.getElementById('pv-title'); if(e)e.style.color=el;
+    },
 };
 function updatePreview(key, val) {
     if (PREVIEW_MAP[key]) PREVIEW_MAP[key](val);
@@ -720,6 +743,8 @@ function gatherSettings() {
     settings['theme_studio_hero_text_color']     = (_htc === '#111827') ? '' : _htc;
     const _htagc = document.getElementById('cp-theme_studio_hero_tagline_color')?.dataset.value || '';
     settings['theme_studio_hero_tagline_color']  = (_htagc === '#6b7280') ? '' : _htagc;
+    const _hacc = document.getElementById('cp-theme_studio_hero_accent_color')?.dataset.value || '';
+    settings['theme_studio_hero_accent_color']   = (_hacc === '#2563eb') ? '' : _hacc;
     settings['theme_studio_hero_overlay_color']  = document.getElementById('cp-theme_studio_hero_overlay_color')?.dataset.value || '#ffffff';
     settings['theme_studio_hero_overlay_opacity']= document.getElementById('ts-overlay-opacity')?.value || '75';
     settings['theme_studio_grid_cols']           = document.getElementById('ts-grid-cols').value;

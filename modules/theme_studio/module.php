@@ -28,6 +28,7 @@ $THEME_STUDIO_DEFAULTS = [
     'theme_studio_hero_title'       => '',
     'theme_studio_hero_text_color'  => '',
     'theme_studio_hero_tagline_color' => '',
+    'theme_studio_hero_accent_color'  => '',
     'theme_studio_hero_overlay_color'   => '#ffffff',
     'theme_studio_hero_overlay_opacity' => '75',
     'theme_studio_grid_cols'        => '3',

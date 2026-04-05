@@ -202,7 +202,7 @@ switch ($action) {
             'theme_studio_font_body','theme_studio_font_heading',
             'theme_studio_border_radius',
             'theme_studio_hero_style','theme_studio_hero_title',
-            'theme_studio_hero_text_color','theme_studio_hero_tagline_color',
+            'theme_studio_hero_text_color','theme_studio_hero_tagline_color','theme_studio_hero_accent_color',
             'theme_studio_hero_overlay_color','theme_studio_hero_overlay_opacity',
             'theme_studio_grid_cols',
             'theme_studio_show_search','theme_studio_show_stats',

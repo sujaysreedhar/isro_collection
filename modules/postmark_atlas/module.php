@@ -46,6 +46,7 @@ class PostmarkAtlasModule extends BaseModule {
             longitude DECIMAL(11,8),
             is_acquired TINYINT(1) DEFAULT 0,
             linked_item_id INT DEFAULT NULL,
+            is_locked TINYINT(1) DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ";
 
@@ -67,6 +68,9 @@ class PostmarkAtlasModule extends BaseModule {
         }
         if (!in_array('linked_item_id', $cols)) {
             $this->pdo->exec("ALTER TABLE postmark_locations ADD COLUMN linked_item_id INT DEFAULT NULL AFTER is_acquired");
+        }
+        if (!in_array('is_locked', $cols)) {
+            $this->pdo->exec("ALTER TABLE postmark_locations ADD COLUMN is_locked TINYINT(1) DEFAULT 0 AFTER linked_item_id");
         }
     }
 }

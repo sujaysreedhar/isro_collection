@@ -19,6 +19,7 @@ $heroTagline     = $ts('hero_tagline',         '');
 $heroTitle       = $ts('hero_title',           '');
 $heroTextColor   = $ts('hero_text_color',      '');
 $heroTaglineColor= $ts('hero_tagline_color',   '');
+$heroAccentColor = $ts('hero_accent_color',    '');
 $heroOverlayColor   = $ts('hero_overlay_color', '#ffffff');
 $heroOverlayOpacity = max(0, min(100, (int) $ts('hero_overlay_opacity', '75')));
 $featuredCount   = (int) $ts('featured_count', '6');
@@ -53,10 +54,13 @@ require_once ThemeManager::getHeader();
         <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch min-h-[420px]">
             <!-- Text side -->
             <div class="flex-1 flex flex-col justify-center px-6 lg:px-12 py-16 lg:py-24">
-                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold serif tracking-tight leading-tight"
-                    style="color:<?= $heroTextColor ? htmlspecialchars($heroTextColor) : 'var(--color-primary,#111827)' ?>">
+                <?php 
+                $h1Style = $heroTextColor ? "color:".htmlspecialchars($heroTextColor) : "";
+                $acStyle = $heroAccentColor ? "style=\"color:".htmlspecialchars($heroAccentColor)."\"" : "";
+                ?>
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold serif tracking-tight leading-tight" style="<?= $h1Style ?>">
                     <?= htmlspecialchars($heroTitle ?: 'Discover history in the') ?><br>
-                    <span style="color:var(--color-accent,#2563eb)"><?= htmlspecialchars(SITE_TITLE) ?></span>
+                    <span class="tc-accent-text" <?= $acStyle ?>><?= htmlspecialchars(SITE_TITLE) ?></span>
                 </h1>
                 <?php if ($heroTagline): ?>
                     <p class="mt-4 text-lg max-w-lg"

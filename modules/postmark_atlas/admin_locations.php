@@ -100,6 +100,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $error = "No locations selected.";
             }
+        } elseif ($action === 'edit') {
+            $id = (int)$_POST['id'];
+            $pin = trim($_POST['pin_code'] ?? '');
+            $po = trim($_POST['post_office'] ?? '');
+            $ppc = trim($_POST['ppc_name'] ?? '');
+            $dist = trim($_POST['district'] ?? '');
+            $state = trim($_POST['state'] ?? '');
+            $lat = (float)($_POST['latitude'] ?? 0);
+            $lng = (float)($_POST['longitude'] ?? 0);
+            $acquired = (int)($_POST['is_acquired'] ?? 0);
+            $locked = (int)($_POST['is_locked'] ?? 0);
+
+            if ($id && $pin && $po) {
+                $stmt = $pdo->prepare("UPDATE postmark_locations SET pin_code=?, post_office=?, ppc_name=?, district=?, state=?, latitude=?, longitude=?, is_acquired=?, is_locked=? WHERE id=?");
+                if ($stmt->execute([$pin, $po, $ppc, $dist, $state, $lat, $lng, $acquired, $locked, $id])) {
+                    $success = "Location updated.";
+                } else {
+                    $error = "Failed to update location.";
+                }
+            } else {
+                $error = "PIN, Post Office and ID are required.";
+            }
+        } elseif ($action === 'toggle_lock') {
+            $id = (int)$_POST['id'];
+            $val = (int)$_POST['is_locked'] === 1 ? 1 : 0;
+            $stmt = $pdo->prepare("UPDATE postmark_locations SET is_locked = ? WHERE id = ?");
+            if ($stmt->execute([$val, $id])) {
+                $success = "Lock status updated.";
+            }
         }
     }
 }
@@ -107,6 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Filter Logic
 $filterState = $_GET['state'] ?? '';
 $filterStatus = $_GET['status'] ?? '';
+$filterMissingCoords = $_GET['missing_coords'] ?? '';
+$filterLinked = $_GET['linked'] ?? '';
 
 $whereClauses = [];
 $params = [];
@@ -119,6 +150,16 @@ if ($filterState !== '') {
 if ($filterStatus !== '') {
     $whereClauses[] = "is_acquired = ?";
     $params[] = (int) $filterStatus;
+}
+
+if ($filterMissingCoords === '1') {
+    $whereClauses[] = "(latitude = 0 OR longitude = 0 OR latitude IS NULL OR longitude IS NULL)";
+}
+
+if ($filterLinked === '1') {
+    $whereClauses[] = "linked_item_id IS NOT NULL";
+} elseif ($filterLinked === '0') {
+    $whereClauses[] = "linked_item_id IS NULL";
 }
 
 $whereSql = count($whereClauses) > 0 ? 'WHERE ' . implode(' AND ', $whereClauses) : '';
@@ -207,6 +248,21 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
             </select>
         </div>
         <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Coordinates</label>
+            <select name="missing_coords" class="block w-full border border-gray-300 rounded-md py-2 px-3 text-sm">
+                <option value="">All</option>
+                <option value="1" <?= $filterMissingCoords === '1' ? 'selected' : '' ?>>Missing (0,0)</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Linking</label>
+            <select name="linked" class="block w-full border border-gray-300 rounded-md py-2 px-3 text-sm">
+                <option value="">All</option>
+                <option value="1" <?= $filterLinked === '1' ? 'selected' : '' ?>>Linked</option>
+                <option value="0" <?= $filterLinked === '0' ? 'selected' : '' ?>>Not Linked</option>
+            </select>
+        </div>
+        <div>
             <button type="submit"
                 class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Filter</button>
             <a href="?m=postmark_atlas&page=locations"
@@ -277,6 +333,9 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
                 <th
                     class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     ✓</th>
+                <th
+                    class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    🔒</th>
                 <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
             </tr>
         </thead>
@@ -383,8 +442,38 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
                             </form>
                         </td>
 
-                        <!-- Delete -->
-                        <td class="px-3 py-2 text-right">
+                        <!-- Lock toggle -->
+                        <td class="px-3 py-2 text-center">
+                            <form method="POST" class="inline">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+                                <input type="hidden" name="action" value="toggle_lock">
+                                <input type="hidden" name="id" value="<?= $loc['id'] ?>">
+                                <input type="hidden" name="is_locked" value="<?= $loc['is_locked'] ? '0' : '1' ?>">
+                                <button type="submit" class="focus:outline-none"
+                                    style="color:<?= $loc['is_locked'] ? '#4b5563' : '#d1d5db' ?>;"
+                                    title="<?= $loc['is_locked'] ? 'Unlock to allow sync updates' : 'Lock to prevent automated sync' ?>">
+                                    <?php if ($loc['is_locked']): ?>
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                                        </svg>
+                                    <?php else: ?>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2z" />
+                                        </svg>
+                                    <?php endif; ?>
+                                </button>
+                            </form>
+                        </td>
+
+                        <!-- Edit & Delete -->
+                        <td class="px-3 py-2 text-right whitespace-nowrap">
+                            <button type="button" 
+                                onclick='openEditModal(<?= json_encode($loc) ?>)'
+                                class="text-gray-300 hover:text-blue-500 transition-colors mr-2" title="Edit">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
                             <form method="POST" class="inline" onsubmit="return confirm('Delete this location?');">
                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                                 <input type="hidden" name="action" value="delete">
@@ -435,6 +524,11 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
                     <input type="text" name="post_office" required
                         class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
                 </div>
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">Name of PPC</label>
+                    <input type="text" name="ppc_name"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">District / City</label>
                     <input type="text" name="district"
@@ -469,7 +563,98 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
     </div>
 </div>
 
+<!-- Edit Modal -->
+<div id="edit-location-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium text-gray-900">Edit Location</h3>
+            <button onclick="document.getElementById('edit-location-modal').classList.add('hidden')"
+                class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <form method="POST" class="space-y-4" id="edit-location-form">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="id" id="edit-id">
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">PIN Code</label>
+                    <input type="text" name="pin_code" id="edit-pin" required
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Post Office</label>
+                    <input type="text" name="post_office" id="edit-po" required
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">Name of PPC</label>
+                    <input type="text" name="ppc_name" id="edit-ppc"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">District / City</label>
+                    <input type="text" name="district" id="edit-dist"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">State</label>
+                    <input type="text" name="state" id="edit-state"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Latitude</label>
+                    <input type="number" step="any" name="latitude" id="edit-lat" required
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Longitude</label>
+                    <input type="number" step="any" name="longitude" id="edit-lng" required
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                </div>
+                <div class="flex items-center gap-4 col-span-2 pt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="is_acquired" value="1" id="edit-acquired" class="rounded border-gray-300 text-yellow-600">
+                        <span class="text-sm font-medium text-gray-700">Mark as Acquired</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="is_locked" value="1" id="edit-locked" class="rounded border-gray-300 text-gray-600">
+                        <span class="text-sm font-medium text-gray-700">Lock for Manual Changes</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-5 sm:mt-6">
+                <button type="submit"
+                    class="inline-flex justify-center w-full rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm">
+                    Update Location
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+    // ── Edit Modal handling ───────────────────────────────────────────────────────
+    function openEditModal(loc) {
+        document.getElementById('edit-id').value = loc.id;
+        document.getElementById('edit-pin').value = loc.pin_code;
+        document.getElementById('edit-po').value = loc.post_office;
+        document.getElementById('edit-ppc').value = loc.ppc_name || '';
+        document.getElementById('edit-dist').value = loc.district || '';
+        document.getElementById('edit-state').value = loc.state || '';
+        document.getElementById('edit-lat').value = loc.latitude;
+        document.getElementById('edit-lng').value = loc.longitude;
+        document.getElementById('edit-acquired').checked = parseInt(loc.is_acquired) === 1;
+        document.getElementById('edit-locked').checked = parseInt(loc.is_locked) === 1;
+        
+        document.getElementById('edit-location-modal').classList.remove('hidden');
+    }
+
     // ── Item picker data (all linkable items, PHP-rendered once) ─────────────────
     const PICKER_ITEMS = <?= json_encode(array_map(fn($i) => ['id' => $i['id'], 'title' => $i['title']], $allItems)) ?>;
 

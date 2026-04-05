@@ -67,7 +67,7 @@ if ($step === 'prepare') {
     if ($jsonContent) {
         $items = json_decode($jsonContent, true) ?? [];
         $chkStmt = $pdo->prepare(
-            "SELECT id, post_office, ppc_name, is_acquired
+            "SELECT id, post_office, ppc_name, is_acquired, is_locked
              FROM postmark_locations WHERE pin_code = ?"
         );
         foreach ($items as $item) {
@@ -92,7 +92,7 @@ if ($step === 'prepare') {
                 }
             }
 
-            if (!$row['is_acquired']) {
+            if (!$row['is_acquired'] && !$row['is_locked']) {
                 $plan['mark_acquired'][] = [
                     'id'          => $row['id'],
                     'pin'         => $pin,
@@ -100,8 +100,8 @@ if ($step === 'prepare') {
                     'ppc_name'    => $name,
                 ];
             }
-            // Also update ppc_name if missing
-            if (empty($row['ppc_name']) && $name) {
+            // Also update ppc_name if missing and not locked
+            if (empty($row['ppc_name']) && $name && !$row['is_locked']) {
                 $plan['update_name'][] = [
                     'id'          => $row['id'],
                     'pin'         => $pin,
@@ -127,7 +127,7 @@ if ($step === 'prepare') {
         $xpath = new DOMXPath($dom);
 
         $rows    = $xpath->query('//table//tbody//tr');
-        $chkStmt = $pdo->prepare("SELECT id, post_office, ppc_name FROM postmark_locations WHERE pin_code = ?");
+        $chkStmt = $pdo->prepare("SELECT id, post_office, ppc_name, is_locked FROM postmark_locations WHERE pin_code = ?");
 
         $claimedIdsForUpdate = []; // Track which legacy DB rows we've already "claimed" to update their empty ppc_name
 
@@ -167,7 +167,7 @@ if ($step === 'prepare') {
             if ($exactMatch) {
                 // Already perfectly synced in DB. Check next HTML row.
                 continue;
-            } else if ($legacyEmptyMatch && $name) {
+            } else if ($legacyEmptyMatch && $name && !$legacyEmptyMatch['is_locked']) {
                 // Found an existing row with same PIN+PO but empty PPC name
                 $claimedIdsForUpdate[] = $legacyEmptyMatch['id'];
                 $plan['update_name'][] = [
