@@ -13,7 +13,7 @@ class MediaProcessor {
     private bool   $hasIsPrimary;
     private ?StorageInterface $storage;
 
-    const MAX_IMG_BYTES = 5  * 1024 * 1024;   // 5 MB for images
+    const MAX_IMG_BYTES = 20 * 1024 * 1024;   // 20 MB for images
     const MAX_PDF_BYTES = 20 * 1024 * 1024;   // 20 MB for PDFs
     const ALLOWED_IMG   = ['image/jpeg','image/png','image/gif','image/webp'];
 

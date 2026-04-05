@@ -1,0 +1,108 @@
+ID: 100 - TIME: 2026-04-05 15:56:42
+FILES: Array
+(
+    [panoramic_files] => Array
+        (
+            [name] => Array
+                (
+                    [0] => Sydney_Harbour_Bridge_night.jpg
+                )
+
+            [full_path] => Array
+                (
+                    [0] => Sydney_Harbour_Bridge_night.jpg
+                )
+
+            [type] => Array
+                (
+                    [0] => 
+                )
+
+            [tmp_name] => Array
+                (
+                    [0] => 
+                )
+
+            [error] => Array
+                (
+                    [0] => 1
+                )
+
+            [size] => Array
+                (
+                    [0] => 0
+                )
+
+        )
+
+    [media_upload] => Array
+        (
+            [name] => Array
+                (
+                    [0] => 
+                )
+
+            [full_path] => Array
+                (
+                    [0] => 
+                )
+
+            [type] => Array
+                (
+                    [0] => 
+                )
+
+            [tmp_name] => Array
+                (
+                    [0] => 
+                )
+
+            [error] => Array
+                (
+                    [0] => 4
+                )
+
+            [size] => Array
+                (
+                    [0] => 0
+                )
+
+        )
+
+    [pdf_upload] => Array
+        (
+            [name] => 
+            [full_path] => 
+            [type] => 
+            [tmp_name] => 
+            [error] => 4
+            [size] => 0
+        )
+
+)
+
+POST: Array
+(
+    [csrf_token] => c99eb38dfe5678aa6f5e4dbea93b4d07e2ed5c05357e47f77181eae7e4919d27
+    [reg_number] => PanoTEst
+    [category_id] => 12
+    [title] => Panorama Test
+    [production_date] => 
+    [year_start] => 
+    [year_end] => 
+    [material] => 
+    [credit_line] => 
+    [physical_description] => <p><br></p>
+    [historical_significance] => <p><br></p>
+    [panoramic_captions] => Array
+        (
+            [0] => 
+        )
+
+    [media_caption] => 
+    [media_license] => Public Domain
+    [pdf_caption] => 
+    [youtube_url] => 
+    [youtube_caption] => 
+)
+

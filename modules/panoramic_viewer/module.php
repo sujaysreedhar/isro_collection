@@ -1,9 +1,11 @@
 <?php
 // modules/panoramic_viewer/module.php
 
-class PanoramicViewerModule extends BaseModule {
+class PanoramicViewerModule extends BaseModule
+{
 
-    public function boot() {
+    public function boot()
+    {
         // Register Admin Hooks
         HookRegistry::addAction('admin_item_edit_after_fields', [$this, 'renderAdminFields'], 10, 2);
         HookRegistry::addAction('item_saved', [$this, 'handleSave'], 10, 1);
@@ -13,7 +15,8 @@ class PanoramicViewerModule extends BaseModule {
         HookRegistry::addAction('item_before_content', [$this, 'renderViewer'], 5, 1);
     }
 
-    public function activate() {
+    public function activate()
+    {
         // Ensure upload directory exists
         $uploadDir = ABSPATH . '/uploads/panoramics';
         if (!is_dir($uploadDir)) {
@@ -24,7 +27,8 @@ class PanoramicViewerModule extends BaseModule {
         // but we could also use ModuleDB::createTable here if needed.
     }
 
-    public function renderAdminFields($id, $item) {
+    public function renderAdminFields($id, $item)
+    {
         $pdo = $this->pdo;
         $panoramics = [];
         if ($id > 0) {
@@ -35,8 +39,17 @@ class PanoramicViewerModule extends BaseModule {
         require __DIR__ . '/admin_fields.php';
     }
 
-    public function handleSave($id) {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
+    public function handleSave($id)
+    {
+        error_log("Panoramic handleSave triggered for id $id");
+        $logFile = ABSPATH . '/pano_debug.log';
+        $logData = "ID: $id - TIME: " . date('Y-m-d H:i:s') . "\n";
+        $logData .= "FILES: " . print_r($_FILES, true) . "\n";
+        $logData .= "POST: " . print_r($_POST, true) . "\n";
+        file_put_contents($logFile, $logData, FILE_APPEND);
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST')
+            return;
 
         $pdo = $this->pdo;
 
@@ -48,10 +61,11 @@ class PanoramicViewerModule extends BaseModule {
             $stmt = $pdo->prepare("SELECT file_path FROM item_panoramics WHERE id IN ($placeholders) AND item_id = ?");
             $stmt->execute(array_merge($deleteIds, [$id]));
             $toDelete = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            
+
             foreach ($toDelete as $file) {
                 $filePath = ABSPATH . '/uploads/panoramics/' . $file;
-                if (file_exists($filePath)) unlink($filePath);
+                if (file_exists($filePath))
+                    unlink($filePath);
             }
 
             $stmtDel = $pdo->prepare("DELETE FROM item_panoramics WHERE id IN ($placeholders) AND item_id = ?");
@@ -62,13 +76,19 @@ class PanoramicViewerModule extends BaseModule {
         if (isset($_FILES['panoramic_files'])) {
             $files = $this->reIndexFiles($_FILES['panoramic_files']);
             $captions = $_POST['panoramic_captions'] ?? [];
-            
+
             foreach ($files as $i => $file) {
-                if ($file['error'] === UPLOAD_ERR_NO_FILE) continue;
+                if ($file['error'] === UPLOAD_ERR_NO_FILE)
+                    continue;
 
                 $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
                 $allowed = ['jpg', 'jpeg', 'png', 'webp'];
-                if (!in_array($ext, $allowed)) continue;
+                if (!in_array($ext, $allowed))
+                    continue;
+
+                // 20 MB Max Size
+                if ($file['size'] > 20 * 1024 * 1024)
+                    continue;
 
                 $newFileName = 'pano_' . $id . '_' . time() . '_' . $i . '.' . $ext;
                 $targetPath = ABSPATH . '/uploads/panoramics/' . $newFileName;
@@ -82,7 +102,8 @@ class PanoramicViewerModule extends BaseModule {
         }
     }
 
-    public function injectAssets() {
+    public function injectAssets()
+    {
         // Pannellum CDN
         echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>' . "\n";
         echo '<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>' . "\n";
@@ -95,29 +116,32 @@ class PanoramicViewerModule extends BaseModule {
         </style>' . "\n";
     }
 
-    public function renderViewer($item) {
+    public function renderViewer($item)
+    {
         $pdo = $this->pdo;
         $stmt = $pdo->prepare("SELECT * FROM item_panoramics WHERE item_id = ? ORDER BY sort_order ASC, id ASC");
         $stmt->execute([$item['id']]);
         $panoramics = $stmt->fetchAll();
 
-        if (empty($panoramics)) return;
+        if (empty($panoramics))
+            return;
 
         require __DIR__ . '/viewer_template.php';
     }
 
-    private function reIndexFiles($files) {
+    private function reIndexFiles($files)
+    {
         $out = [];
         if (!is_array($files['name'])) {
             return [$files];
         }
         foreach ($files['name'] as $i => $name) {
             $out[] = [
-                'name'     => $files['name'][$i],
-                'type'     => $files['type'][$i],
+                'name' => $files['name'][$i],
+                'type' => $files['type'][$i],
                 'tmp_name' => $files['tmp_name'][$i],
-                'error'    => $files['error'][$i],
-                'size'     => $files['size'][$i],
+                'error' => $files['error'][$i],
+                'size' => $files['size'][$i],
             ];
         }
         return $out;
