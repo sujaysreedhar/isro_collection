@@ -367,7 +367,15 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
             <p class="text-sm text-gray-500 mt-1">Reg: <strong><?= htmlspecialchars($item['reg_number']) ?></strong></p>
         <?php endif; ?>
     </div>
-    <a href="items.php" class="text-gray-600 hover:text-gray-900 text-sm font-medium">&larr; Back to List</a>
+    <div class="flex items-center gap-4">
+        <?php if ($id > 0): ?>
+            <a href="<?= SITE_URL ?>/item/<?= $id ?>" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                View This Item
+            </a>
+        <?php endif; ?>
+        <a href="items.php" class="text-gray-600 hover:text-gray-900 text-sm font-medium">&larr; Back to List</a>
+    </div>
 </div>
 
 <?php if ($error): ?>
