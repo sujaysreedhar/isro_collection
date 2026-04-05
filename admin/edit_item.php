@@ -473,6 +473,9 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                         <?php endforeach; ?>
                     </select>
                 </div>
+                
+                <!-- NEW MODULE HOOK: Inject additional fields -->
+                <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_item_edit_after_fields', $id, $item); } ?>
 
                 <!-- Related Items Linker -->
                 <div>

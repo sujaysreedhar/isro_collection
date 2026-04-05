@@ -1,0 +1,7 @@
+{
+    "name": "Panoramic Viewer",
+    "description": "Enables interactive 360° panoramic image support for items with multiple view support.",
+    "version": "1.0",
+    "author": "Antigravity",
+    "admin_menu_priority": 80
+}

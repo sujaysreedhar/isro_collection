@@ -27,6 +27,8 @@ require_once ThemeManager::getHeader();
         </ol>
     </nav>
 
+    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_before_content', $item); } ?>
+
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-16">
 
         <!-- ── Left: Gallery & Media ─────────────────────────────────────── -->

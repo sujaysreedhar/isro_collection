@@ -21,6 +21,7 @@ define('SITE_TITLE_DEFAULT', 'Pictorial Cancellation Collection');
 
 // Single canonical cache directory — all classes reference this constant.
 define('CACHE_DIR', __DIR__ . '/../includes/cache');
+define('ABSPATH',   realpath(__DIR__ . '/..'));
 
 // Composer autoloader (required for AWS SDK and any Composer packages)
 $autoloadPath = __DIR__ . '/../vendor/autoload.php';

@@ -60,3 +60,16 @@ ON DUPLICATE KEY UPDATE setting_value = IF(setting_value = '' OR setting_value I
 
 -- Add category thumbnails support
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_path VARCHAR(255) DEFAULT NULL;
+
+-- PANORAMIC VIEWER MODULE
+-- Create item_panoramics table to support multiple 360 images per item
+CREATE TABLE IF NOT EXISTS item_panoramics (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    item_id INT NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    caption VARCHAR(255) DEFAULT NULL,
+    config_json TEXT DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+);
