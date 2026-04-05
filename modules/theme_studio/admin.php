@@ -319,8 +319,8 @@ foreach ($fontPairs as $pair) {
                             $curHero = $s('theme_studio_hero_style','split');
                             foreach ($heroStyles as $hk => $hv):
                             ?>
-                            <label class="ts-radio-card flex-1 <?= ($curHero===$hk?'selected':'') ?>"
-                                   onclick="document.querySelectorAll('.ts-radio-card').forEach(c=>c.classList.remove('selected'));this.classList.add('selected');document.getElementById('ts-hero-style').value='<?= $hk ?>'">
+                            <label class="ts-radio-card flex-1 <?= ($curHero===$hk?'selected':'') ?>" data-group="hero"
+                                   onclick="selectCard('hero',this);document.getElementById('ts-hero-style').value='<?= $hk ?>'">
                                 <div class="text-2xl mb-1"><?= $hv['icon'] ?></div>
                                 <div class="text-xs font-bold text-gray-700"><?= $hv['label'] ?></div>
                                 <div class="text-xs text-gray-400 mt-0.5"><?= $hv['desc'] ?></div>
@@ -347,6 +347,38 @@ foreach ($fontPairs as $pair) {
                                value="<?= htmlspecialchars($s('theme_studio_hero_tagline','')) ?>"
                                placeholder="e.g. Explore the postmarks of India..."
                                class="mt-1 w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                    </div>
+
+                    <!-- Hero text colors -->
+                    <div class="p-4 rounded-xl border border-gray-200 space-y-3">
+                        <p class="ts-section-title" style="margin-top:0">Hero Text Colors <span class="text-gray-400 font-normal normal-case text-xs">(leave blank to use theme defaults)</span></p>
+                        <?php
+                        $heroTxtColor = $s('theme_studio_hero_text_color','');
+                        $heroTagColor = $s('theme_studio_hero_tagline_color','');
+                        ?>
+                        <div class="ts-color-row">
+                            <div class="ts-pickr-btn" id="cp-theme_studio_hero_text_color"
+                                 data-key="theme_studio_hero_text_color"
+                                 data-value="<?= htmlspecialchars($heroTxtColor ?: '#111827') ?>"></div>
+                            <span class="ts-color-label">H1 heading color</span>
+                            <input type="text" class="ts-color-hex" id="hex-theme_studio_hero_text_color" data-key="theme_studio_hero_text_color"
+                                   value="<?= htmlspecialchars($heroTxtColor ?: '#111827') ?>"
+                                   oninput="fromHexInput('theme_studio_hero_text_color',this.value)" maxlength="7">
+                            <button class="text-xs text-gray-400 hover:text-red-500 ml-1" title="Use theme default"
+                                    onclick="clearHeroColor('theme_studio_hero_text_color')">✕</button>
+                        </div>
+                        <div class="ts-color-row">
+                            <div class="ts-pickr-btn" id="cp-theme_studio_hero_tagline_color"
+                                 data-key="theme_studio_hero_tagline_color"
+                                 data-value="<?= htmlspecialchars($heroTagColor ?: '#6b7280') ?>"></div>
+                            <span class="ts-color-label">Tagline / subtitle color</span>
+                            <input type="text" class="ts-color-hex" id="hex-theme_studio_hero_tagline_color" data-key="theme_studio_hero_tagline_color"
+                                   value="<?= htmlspecialchars($heroTagColor ?: '#6b7280') ?>"
+                                   oninput="fromHexInput('theme_studio_hero_tagline_color',this.value)" maxlength="7">
+                            <button class="text-xs text-gray-400 hover:text-red-500 ml-1" title="Use theme default"
+                                    onclick="clearHeroColor('theme_studio_hero_tagline_color')">✕</button>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">Tip: use white (#ffffff) when the hero has a dark image for readability.</p>
                     </div>
 
                     <!-- Hero image -->
@@ -379,17 +411,25 @@ foreach ($fontPairs as $pair) {
                     <!-- Grid cols -->
                     <div>
                         <p class="ts-section-title">Items Grid Columns</p>
-                        <div class="flex gap-3">
-                            <?php $curCols = $s('theme_studio_grid_cols','3'); ?>
-                            <?php foreach (['2','3','4'] as $cols): ?>
-                            <label class="ts-radio-card flex-1 <?= ($curCols===$cols?'selected':'') ?>"
-                                   onclick="document.querySelectorAll('#ts-tab-layout .ts-radio-card').forEach(c=>c.dataset.group==='cols'&&c.classList.remove('selected'));this.classList.add('selected');document.getElementById('ts-grid-cols').value='<?= $cols ?>'">
-                                <div class="grid gap-1 mx-auto w-12 mb-1" style="grid-template-columns:repeat(<?= $cols ?>,1fr)">
+                        <?php
+                        $colOptions = [
+                            '2' => ['label' => '2 – Comfortable', 'desc' => 'Large cards, 2 per row'],
+                            '3' => ['label' => '3 – Standard',    'desc' => 'Default, 3 per row'],
+                            '4' => ['label' => '4 – Compact',     'desc' => 'More items, 4 per row'],
+                        ];
+                        $curCols = $s('theme_studio_grid_cols','3');
+                        ?>
+                        <div class="flex gap-3 mt-1">
+                            <?php foreach ($colOptions as $cols => $opt): ?>
+                            <label class="ts-radio-card flex-1 <?= ($curCols===$cols?'selected':'') ?>" data-group="cols"
+                                   onclick="selectCard('cols',this);document.getElementById('ts-grid-cols').value='<?= $cols ?>'">
+                                <div class="grid gap-1 mx-auto mb-2" style="grid-template-columns:repeat(<?= $cols ?>,1fr);width:<?= ((int)$cols*14) ?>px">
                                     <?php for($i=0;$i<(int)$cols;$i++): ?>
-                                    <div class="h-3 rounded-sm bg-blue-300"></div>
+                                    <div class="rounded-sm" style="height:18px;background:var(--color-accent,#2563eb);opacity:<?= $curCols===$cols?'1':'.4' ?>"></div>
                                     <?php endfor; ?>
                                 </div>
-                                <div class="text-xs font-bold text-gray-700"><?= $cols ?> columns</div>
+                                <div class="text-xs font-bold text-gray-800"><?= $opt['label'] ?></div>
+                                <div class="text-xs text-gray-400 mt-0.5"><?= $opt['desc'] ?></div>
                             </label>
                             <?php endforeach; ?>
                         </div>
@@ -486,6 +526,24 @@ function tsTab(id, btn) {
     document.querySelectorAll('.ts-tab-btn').forEach(b  => b.classList.remove('active'));
     document.getElementById('ts-tab-' + id).classList.add('active');
     btn.classList.add('active');
+}
+
+// ── Radio card group selection (isolated by data-group) ───────────────────────
+function selectCard(group, el) {
+    document.querySelectorAll(`.ts-radio-card[data-group="${group}"]`).forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+}
+
+// ── Clear hero text color (revert to theme default) ───────────────────────────
+function clearHeroColor(key) {
+    const anchor = document.getElementById('cp-' + key);
+    const hexEl  = document.getElementById('hex-' + key);
+    if (anchor) anchor.dataset.value = '';
+    if (hexEl)  hexEl.value = '';
+    // Reset Pickr to placeholder
+    const p = _pickrs[key];
+    const def = key.includes('tagline') ? '#6b7280' : '#111827';
+    if (p) p.setColor(def, true);
 }
 
 // ── Pickr color picker initialisation ───────────────────────────────────────
@@ -657,6 +715,11 @@ function gatherSettings() {
     // Layout
     settings['theme_studio_hero_style']         = document.getElementById('ts-hero-style').value;
     settings['theme_studio_hero_title']          = document.getElementById('ts-hero-title').value;
+    // Hero text colors — store empty string if the value was cleared (uses theme default on frontend)
+    const _htc = document.getElementById('cp-theme_studio_hero_text_color')?.dataset.value || '';
+    settings['theme_studio_hero_text_color']     = (_htc === '#111827') ? '' : _htc;
+    const _htagc = document.getElementById('cp-theme_studio_hero_tagline_color')?.dataset.value || '';
+    settings['theme_studio_hero_tagline_color']  = (_htagc === '#6b7280') ? '' : _htagc;
     settings['theme_studio_hero_overlay_color']  = document.getElementById('cp-theme_studio_hero_overlay_color')?.dataset.value || '#ffffff';
     settings['theme_studio_hero_overlay_opacity']= document.getElementById('ts-overlay-opacity')?.value || '75';
     settings['theme_studio_grid_cols']           = document.getElementById('ts-grid-cols').value;

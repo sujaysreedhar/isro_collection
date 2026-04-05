@@ -11,16 +11,18 @@ $hideHeaderSearch = true; // search is in the hero
 // Theme Studio layout settings (safe defaults so page works even without the module active)
 $ts = static fn(string $k, string $d = '') => $GLOBALS['appSettings']['theme_studio_' . $k] ?? $d;
 
-$heroStyle       = $ts('hero_style',         'split');   // split | centered | minimal
-$gridCols        = (int) $ts('grid_cols',      '3');       // 2 | 3 | 4
+$heroStyle       = $ts('hero_style',         'split');
+$gridCols        = (int) $ts('grid_cols',      '3');
 $showSearch      = $ts('show_search',          '1') === '1';
 $showStats       = $ts('show_stats',           '0') === '1';
 $heroTagline     = $ts('hero_tagline',         '');
-$heroTitle       = $ts('hero_title',           '');         // h1 first line
-$heroOverlayColor   = $ts('hero_overlay_color', '#ffffff'); // overlay tint on hero image
-$heroOverlayOpacity = max(0, min(100, (int) $ts('hero_overlay_opacity', '75'))); // 0-100
+$heroTitle       = $ts('hero_title',           '');
+$heroTextColor   = $ts('hero_text_color',      '');
+$heroTaglineColor= $ts('hero_tagline_color',   '');
+$heroOverlayColor   = $ts('hero_overlay_color', '#ffffff');
+$heroOverlayOpacity = max(0, min(100, (int) $ts('hero_overlay_opacity', '75')));
 $featuredCount   = (int) $ts('featured_count', '6');
-$heroImage       = $ts('hero_image', '');                  // stored filename in uploads/branding/
+$heroImage       = $ts('hero_image', '');
 
 $heroImgUrl = $heroImage && file_exists(dirname(__DIR__, 2) . '/uploads/branding/' . $heroImage)
     ? SITE_URL . '/uploads/branding/' . rawurlencode($heroImage)
@@ -51,14 +53,21 @@ require_once ThemeManager::getHeader();
         <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch min-h-[420px]">
             <!-- Text side -->
             <div class="flex-1 flex flex-col justify-center px-6 lg:px-12 py-16 lg:py-24">
-                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold serif tc-primary-text tracking-tight leading-tight">
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold serif tracking-tight leading-tight"
+                    style="color:<?= $heroTextColor ? htmlspecialchars($heroTextColor) : 'var(--color-primary,#111827)' ?>">
                     <?= htmlspecialchars($heroTitle ?: 'Discover history in the') ?><br>
-                    <span class="tc-accent-text"><?= htmlspecialchars(SITE_TITLE) ?></span>
+                    <span style="color:var(--color-accent,#2563eb)"><?= htmlspecialchars(SITE_TITLE) ?></span>
                 </h1>
                 <?php if ($heroTagline): ?>
-                    <p class="mt-4 text-lg tc-text-muted max-w-lg"><?= htmlspecialchars($heroTagline) ?></p>
+                    <p class="mt-4 text-lg max-w-lg"
+                       style="color:<?= $heroTaglineColor ? htmlspecialchars($heroTaglineColor) : 'var(--color-text-muted,#6b7280)' ?>">
+                        <?= htmlspecialchars($heroTagline) ?>
+                    </p>
                 <?php else: ?>
-                    <p class="mt-4 text-lg tc-text-muted max-w-lg">Explore pictorial cancellations, narratives, and media from across India.</p>
+                    <p class="mt-4 text-lg max-w-lg"
+                       style="color:<?= $heroTaglineColor ? htmlspecialchars($heroTaglineColor) : 'var(--color-text-muted,#6b7280)' ?>">
+                        Explore pictorial cancellations, narratives, and media from across India.
+                    </p>
                 <?php endif; ?>
                 <?php if ($showSearch): ?>
                 <div class="mt-8 max-w-lg">
@@ -95,10 +104,12 @@ require_once ThemeManager::getHeader();
         <div class="absolute inset-0" style="background: <?= $overlayRgba ?>;"></div>
         <?php endif; ?>
         <div class="relative z-10 max-w-3xl mx-auto text-center px-6 py-24">
-            <h1 class="text-5xl sm:text-6xl font-extrabold serif tc-primary-text tracking-tight">
+            <h1 class="text-5xl sm:text-6xl font-extrabold serif tracking-tight"
+                style="color:<?= $heroTextColor ? htmlspecialchars($heroTextColor) : 'var(--color-primary,#111827)' ?>">
                 <?= htmlspecialchars($heroTitle ?: SITE_TITLE) ?>
             </h1>
-            <p class="mt-4 text-xl tc-text-muted">
+            <p class="mt-4 text-xl"
+               style="color:<?= $heroTaglineColor ? htmlspecialchars($heroTaglineColor) : 'var(--color-text-muted,#6b7280)' ?>">
                 <?= htmlspecialchars($heroTagline ?: 'Explore pictorial cancellations from across India.') ?>
             </p>
             <?php if ($showSearch): ?>
@@ -121,7 +132,10 @@ require_once ThemeManager::getHeader();
     <!-- MINIMAL: just a compact search bar banner -->
     <div class="border-b tc-border" style="background:var(--color-hero-bg,#fff);">
         <div class="max-w-3xl mx-auto px-4 py-10 text-center">
-            <h1 class="text-3xl font-bold serif tc-primary-text mb-6"><?= htmlspecialchars(SITE_TITLE) ?></h1>
+            <h1 class="text-3xl font-bold serif mb-6"
+                style="color:<?= $heroTextColor ? htmlspecialchars($heroTextColor) : 'var(--color-primary,#111827)' ?>">
+                <?= htmlspecialchars(SITE_TITLE) ?>
+            </h1>
             <?php if ($showSearch): ?>
             <form action="<?= SITE_URL ?>/search.php" method="GET" class="relative rounded-lg flex overflow-hidden shadow-sm" style="border:1px solid var(--color-border,#e5e7eb);">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
