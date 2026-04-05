@@ -3,8 +3,9 @@
 class SitemapModule extends BaseModule {
 
     public function boot() {
-        // Handle sitemap.xml request
-        if (strpos($_SERVER['REQUEST_URI'], '/sitemap.xml') !== false) {
+        // Handle sitemap.xml request — guard against CLI where $_SERVER may be absent
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
+        if ($uri && strpos($uri, '/sitemap.xml') !== false) {
             $this->generateSitemap();
             exit;
         }

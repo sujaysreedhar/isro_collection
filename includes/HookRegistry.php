@@ -5,6 +5,15 @@ class HookRegistry {
     private static $actions = [];
     private static $filters = [];
 
+    /**
+     * Clear all registered actions and filters.
+     * Useful for testing or re-bootstrapping.
+     */
+    public static function reset(): void {
+        self::$actions = [];
+        self::$filters = [];
+    }
+
     public static function addAction($tag, $function_to_add, $priority = 10, $accepted_args = 1) {
         self::$actions[$tag][$priority][] = [
             'function' => $function_to_add,

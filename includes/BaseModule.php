@@ -14,9 +14,18 @@ abstract class BaseModule {
 
     /**
      * Called on every request if the module is active.
-     * Register hooks, filters, etc. here.
+     *
+     * Auto-dispatches to optional named sub-methods so large modules can split
+     * concerns cleanly. Override any of: registerRoutes(), registerAdminMenu(),
+     * registerSearch(), registerHooks(). Simple modules may instead override
+     * boot() directly and ignore the sub-methods entirely.
      */
-    abstract public function boot();
+    public function boot() {
+        if (method_exists($this, 'registerRoutes'))    $this->registerRoutes();
+        if (method_exists($this, 'registerAdminMenu')) $this->registerAdminMenu();
+        if (method_exists($this, 'registerSearch'))    $this->registerSearch();
+        if (method_exists($this, 'registerHooks'))     $this->registerHooks();
+    }
 
     /**
      * Called when the module is first enabled.

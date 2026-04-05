@@ -52,11 +52,11 @@ class PeopleModule extends BaseModule {
         }, 10, 2);
 
         // Search Integration
-        HookRegistry::addFilter('search_results', function($results, $params) {
+        $pdo = $this->pdo;
+        HookRegistry::addFilter('search_results', function($results, $params) use ($pdo) {
             $q = trim($params['q'] ?? '');
             if (!$q) return $results;
 
-            global $pdo;
             $searchTerm = '%' . $q . '%';
             $stmt = $pdo->prepare("
                 SELECT * FROM people 

@@ -2,15 +2,15 @@
 // includes/AssetManager.php
 
 class AssetManager {
-    private static $cacheDir = __DIR__ . '/cache/assets';
-    private static $cacheUrl = SITE_URL . '/includes/cache/assets';
+    // Resolved lazily so CACHE_DIR and SITE_URL constants are available at call time.
+    private static function cacheDir(): string { return CACHE_DIR . '/assets'; }
+    private static function cacheUrl(): string { return SITE_URL . '/includes/cache/assets'; }
 
     /**
      * Render a <link> tag for minified CSS.
      */
     public static function renderStyles(array $files): string {
-        global $appSettings;
-        if (($appSettings['enable_cache'] ?? '1') === '0') {
+        if (AppConfig::get('enable_cache', '1') === '0') {
             $html = '';
             foreach ($files as $file) {
                 $version = file_exists(__DIR__ . '/../' . $file) ? filemtime(__DIR__ . '/../' . $file) : time();
@@ -22,16 +22,15 @@ class AssetManager {
         $combinedFile = self::combineAndMinify($files, 'css');
         if (!$combinedFile) return '';
         
-        $version = filemtime(self::$cacheDir . '/' . $combinedFile);
-        return '<link rel="stylesheet" href="' . self::$cacheUrl . '/' . $combinedFile . '?v=' . $version . '">' . "\n";
+        $version = filemtime(self::cacheDir() . '/' . $combinedFile);
+        return '<link rel="stylesheet" href="' . self::cacheUrl() . '/' . $combinedFile . '?v=' . $version . '">' . "\n";
     }
 
     /**
      * Render a <script> tag for minified JS.
      */
     public static function renderScripts(array $files): string {
-        global $appSettings;
-        if (($appSettings['enable_cache'] ?? '1') === '0') {
+        if (AppConfig::get('enable_cache', '1') === '0') {
             $html = '';
             foreach ($files as $file) {
                 $version = file_exists(__DIR__ . '/../' . $file) ? filemtime(__DIR__ . '/../' . $file) : time();
@@ -43,8 +42,8 @@ class AssetManager {
         $combinedFile = self::combineAndMinify($files, 'js');
         if (!$combinedFile) return '';
 
-        $version = filemtime(self::$cacheDir . '/' . $combinedFile);
-        return '<script src="' . self::$cacheUrl . '/' . $combinedFile . '?v=' . $version . '"></script>' . "\n";
+        $version = filemtime(self::cacheDir() . '/' . $combinedFile);
+        return '<script src="' . self::cacheUrl() . '/' . $combinedFile . '?v=' . $version . '"></script>' . "\n";
     }
 
     /**
@@ -53,14 +52,15 @@ class AssetManager {
     private static function combineAndMinify(array $files, string $type): ?string {
         if (empty($files)) return null;
 
-        if (!is_dir(self::$cacheDir)) {
-            mkdir(self::$cacheDir, 0755, true);
+        $cacheDir = self::cacheDir();
+        if (!is_dir($cacheDir)) {
+            mkdir($cacheDir, 0755, true);
         }
 
         // Generate a unique hash for this set of files
         $hash = md5(implode('|', $files));
         $cacheFilename = $hash . '.' . $type;
-        $cachePath = self::$cacheDir . '/' . $cacheFilename;
+        $cachePath = $cacheDir . '/' . $cacheFilename;
 
         // Check if cache needs refresh (if any source file is newer than cache)
         $needsRefresh = !file_exists($cachePath);

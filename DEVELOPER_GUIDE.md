@@ -100,27 +100,72 @@ Your `module.php` **must** define a class that extends `BaseModule`. The class n
 ### Base Class API
 
 ```php
-abstract class BaseModule {
+class BaseModule {
     protected $pdo;       // PDO database connection
     protected $slug;      // Module slug string
     protected $metadata;  // Array from module.json
 
-    // REQUIRED — Called on every page load when module is active.
-    // Register all hooks and filters here.
-    abstract public function boot();
+    // Called on every page load when module is active.
+    // Default implementation auto-dispatches to optional named sub-methods
+    // (see Section 1.3a). Override entirely for simple modules.
+    public function boot();
 
     // OPTIONAL — Called once when module is first enabled via Admin panel.
-    // Use for DB table creation, initial data seeding, etc.
     public function activate() {}
 
     // OPTIONAL — Called once when module is disabled via Admin panel.
-    // Use for cleanup if necessary.
     public function deactivate() {}
 
     public function getSlug(): string;
     public function getMetadata(): array;
 }
 ```
+
+### 1.3a — Optional Sub-method Boot Pattern
+
+For complex modules, instead of putting everything in `boot()`, define any of these named methods — `boot()` calls them automatically:
+
+| Method | Purpose |
+|---|---|
+| `registerRoutes()` | Hook into `route_request` for frontend URLs |
+| `registerAdminMenu()` | Register `admin_menu` and `admin_page_*` hooks |
+| `registerSearch()` | Hook into `search_results` filter |
+| `registerHooks()` | All other actions / filters |
+
+```php
+class MyComplexModule extends BaseModule {
+    // boot() is NOT overridden — BaseModule auto-calls the methods below
+
+    protected function registerRoutes() {
+        HookRegistry::addFilter('route_request', function($handled, $uri) {
+            if ($uri === 'my-page') {
+                require __DIR__ . '/my_page.php';
+                return true;
+            }
+            return $handled;
+        }, 10, 2);
+    }
+
+    protected function registerAdminMenu() {
+        HookRegistry::addAction('admin_menu', function() {
+            echo '<a href="' . SITE_URL . '/admin/module_page.php?m=' . $this->slug . '" class="sidebar-link text-slate-300">My Module</a>';
+        });
+        HookRegistry::addAction('admin_page_' . $this->slug, function() {
+            require_once __DIR__ . '/admin_page.php';
+        });
+    }
+
+    protected function registerSearch() {
+        $pdo = $this->pdo; // capture — never use global $pdo in closures
+        HookRegistry::addFilter('search_results', function($results, $params) use ($pdo) {
+            // ... search logic
+            return $results;
+        }, 10, 2);
+    }
+}
+```
+
+> **Rule:** Never use `global $pdo` inside hook closures. The PDO instance is already available as `$this->pdo` — capture it with `use` before registering the closure.
 
 ### Minimal Example
 
@@ -131,7 +176,7 @@ abstract class BaseModule {
 class MyCustomModuleModule extends BaseModule {
 
     public function boot() {
-        // Register hooks here (see Section 1.5)
+        // Simple module — override boot() directly (sub-methods are optional)
         HookRegistry::addAction('frontend_footer', function() {
             echo '<p style="text-align:center; color:#888; font-size:12px;">Powered by My Custom Module</p>';
         });

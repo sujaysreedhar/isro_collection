@@ -17,9 +17,8 @@ class ModuleManager {
      * Scan the modules directory for available modules and their metadata.
      */
     public function discoverModules(bool $forceRefresh = false): array {
-        global $appSettings;
-        $enableCache = ($appSettings['enable_cache'] ?? '1') === '1';
-        $cacheFile = __DIR__ . '/cache/modules_metadata.json';
+        $enableCache = AppConfig::get('enable_cache', '1') === '1';
+        $cacheFile = CACHE_DIR . '/modules_metadata.json';
 
         if (!$forceRefresh && $enableCache && file_exists($cacheFile)) {
             $cached = json_decode(file_get_contents($cacheFile), true);
@@ -74,7 +73,7 @@ class ModuleManager {
     }
 
     public function clearCache(): void {
-        $cacheFile = __DIR__ . '/cache/modules_metadata.json';
+        $cacheFile = CACHE_DIR . '/modules_metadata.json';
         if (file_exists($cacheFile)) {
             unlink($cacheFile);
         }

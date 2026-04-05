@@ -60,9 +60,122 @@ function renderAdminHeader($title) {
 <body class="bg-[#f4f7f9] text-gray-800 antialiased font-sans">
     <div class="flex h-screen overflow-hidden">
 
-    <?php 
-        $linkClass = "sidebar-link-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:bg-white/10 hover:text-white";
-        $sectionClass = "px-3 pt-6 pb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500";
+    <?php
+    $linkClass    = "sidebar-link-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:bg-white/10 hover:text-white";
+    $sectionClass = "px-3 pt-6 pb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500";
+
+    // ── Admin Sidebar Data Structure ──────────────────────────────────────────
+    // Sections are keyed by slug. Each has a 'label' and an array of 'links'.
+    // Links have: url, label, and an optional SVG icon string.
+    // Pass through admin_sidebar_links filter so modules can add to any section.
+    $adminSidebarSections = [
+        'overview' => [
+            'label' => 'Overview',
+            'links' => [
+                'dashboard' => [
+                    'url'   => SITE_URL . '/admin/index.php',
+                    'label' => 'Dashboard',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>',
+                ],
+            ],
+        ],
+        'catalog' => [
+            'label' => 'Catalog',
+            'links' => [
+                'items' => [
+                    'url'   => SITE_URL . '/admin/items.php',
+                    'label' => 'Items',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>',
+                ],
+                'categories' => [
+                    'url'   => SITE_URL . '/admin/categories.php',
+                    'label' => 'Categories',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/>',
+                ],
+            ],
+        ],
+        'content' => [
+            'label' => 'Content',
+            'links' => [
+                'narratives' => [
+                    'url'   => SITE_URL . '/admin/narratives.php',
+                    'label' => 'Stories &amp; Narratives',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>',
+                ],
+            ],
+        ],
+        'system' => [
+            'label' => 'System',
+            'links' => [
+                'modules' => [
+                    'url'   => SITE_URL . '/admin/modules.php',
+                    'label' => 'Modules',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/>',
+                ],
+                'themes' => [
+                    'url'   => SITE_URL . '/admin/themes.php',
+                    'label' => 'Themes',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>',
+                ],
+                'users' => [
+                    'url'   => SITE_URL . '/admin/users.php',
+                    'label' => 'Administrators',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>',
+                ],
+                'site_settings' => [
+                    'url'   => SITE_URL . '/admin/site_settings.php',
+                    'label' => 'Site Settings',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>',
+                ],
+                'api_keys' => [
+                    'url'   => SITE_URL . '/admin/api_keys.php',
+                    'label' => 'API Management',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>',
+                ],
+                'storage' => [
+                    'url'   => SITE_URL . '/admin/settings.php',
+                    'label' => 'Storage',
+                    'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>',
+                ],
+            ],
+        ],
+    ];
+
+    // Allow modules to add links to any section, or add entirely new sections.
+    // Filter signature: applyFilters('admin_sidebar_links', array $sections) → array
+    if (class_exists('HookRegistry')) {
+        $adminSidebarSections = HookRegistry::applyFilters('admin_sidebar_links', $adminSidebarSections);
+    }
+
+    // ── Sidebar Renderer (shared between desktop and mobile) ──────────────────
+    // Renders each section + links from the data structure.
+    // $withIcons: desktop shows icons; mobile omits them for compactness.
+    function renderAdminSidebarNav(array $sections, string $linkClass, string $sectionClass, bool $withIcons = true): void {
+        foreach ($sections as $sectionLinks) {
+            echo '<div class="' . $sectionClass . '">' . htmlspecialchars($sectionLinks['label']) . '</div>';
+            foreach ($sectionLinks['links'] as $link) {
+                echo '<a href="' . htmlspecialchars($link['url']) . '" class="' . $linkClass . ' active-link-target">';
+                if ($withIcons && !empty($link['icon'])) {
+                    echo '<svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
+                       . $link['icon']
+                       . '</svg>';
+                }
+                echo $link['label'];
+                echo '</a>';
+            }
+        }
+    }
+
+    // Module-injected links via admin_menu hook (legacy string technique kept for compatibility).
+    // Captured once, reused in both sidebars to avoid running hooks twice.
+    ob_start();
+    if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_menu'); }
+    $moduleMenuLinks = ob_get_clean();
+    $moduleMenuLinks = str_replace(
+        ['sidebar-section', 'sidebar-link text-slate-300'],
+        [$sectionClass,     $linkClass . ' active-link-target'],
+        $moduleMenuLinks
+    );
     ?>
 
     <!-- Sidebar (Desktop) -->
@@ -81,66 +194,12 @@ function renderAdminHeader($title) {
                 <span class="text-white font-bold text-lg tracking-tight">Museum<span class="text-blue-400 font-normal">Admin</span></span>
             <?php endif; ?>
         </div>
-        
+
         <nav class="flex-1 py-4 px-3 overflow-y-auto sidebar-scroller">
-            <div class="<?= $sectionClass ?>">Overview</div>
-            <a href="<?= SITE_URL ?>/admin/index.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path></svg>
-                Dashboard
-            </a>
-
-            <div class="<?= $sectionClass ?>">Catalog</div>
-            <a href="<?= SITE_URL ?>/admin/items.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                Items
-            </a>
-            <a href="<?= SITE_URL ?>/admin/categories.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"></path></svg>
-                Categories
-            </a>
-
-            <div class="<?= $sectionClass ?>">Content</div>
-            <a href="<?= SITE_URL ?>/admin/narratives.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                Stories & Narratives
-            </a>
-
-            <div class="<?= $sectionClass ?>">System</div>
-            <a href="<?= SITE_URL ?>/admin/modules.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path></svg>
-                Modules
-            </a>
-            <a href="<?= SITE_URL ?>/admin/themes.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
-                Themes
-            </a>
-            <a href="<?= SITE_URL ?>/admin/users.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                Administrators
-            </a>
-            <a href="<?= SITE_URL ?>/admin/site_settings.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                Site Settings
-            </a>
-            <a href="<?= SITE_URL ?>/admin/api_keys.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-                API Management
-            </a>
-            <a href="<?= SITE_URL ?>/admin/settings.php" class="<?= $linkClass ?> active-link-target">
-                <svg class="w-5 h-5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
-                Storage
-            </a>
-
-            <?php 
-            ob_start();
-            if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_menu'); } 
-            $moduleLinks = ob_get_clean();
-            // Wrap the module injected links with the proper classes dynamically using a simple replace
-            $moduleLinks = str_replace(['sidebar-section', 'sidebar-link text-slate-300'], [$sectionClass, $linkClass . ' active-link-target'], $moduleLinks);
-            echo $moduleLinks;
-            ?>
+            <?php renderAdminSidebarNav($adminSidebarSections, $linkClass, $sectionClass, true); ?>
+            <?= $moduleMenuLinks ?>
         </nav>
-        
+
         <div class="p-4 border-t border-sidebar-border bg-slate-900 shadow-inner">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-md">
@@ -157,7 +216,7 @@ function renderAdminHeader($title) {
         </div>
     </aside>
 
-    <!-- Mobile Drawer styling follows Desktop -->
+    <!-- Mobile Drawer — rendered from same data structure, no icons -->
     <div id="mobile-nav-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 hidden lg:hidden transition-opacity" onclick="closeMobileNav()"></div>
     <aside id="mobile-nav" class="fixed inset-y-0 left-0 w-[280px] max-w-[85vw] bg-sidebar z-50 transform -translate-x-full transition-transform duration-300 ease-out lg:hidden flex flex-col shadow-2xl">
         <div class="h-16 flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
@@ -167,18 +226,11 @@ function renderAdminHeader($title) {
             </button>
         </div>
         <nav class="flex-1 py-4 px-3 overflow-y-auto sidebar-scroller">
-            <!-- (Mobile links would go here, identical to desktop) -->
-            <a href="<?= SITE_URL ?>/admin/index.php" class="<?= $linkClass ?>">Dashboard</a>
-            <div class="<?= $sectionClass ?>">System</div>
-            <a href="<?= SITE_URL ?>/admin/settings.php" class="<?= $linkClass ?>">Settings</a>
-            <?php 
-            ob_start();
-            if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_menu_mobile'); } 
-            $mobLinks = ob_get_clean();
-            echo str_replace(['sidebar-link text-slate-300'], [$linkClass], $mobLinks);
-            ?>
+            <?php renderAdminSidebarNav($adminSidebarSections, $linkClass, $sectionClass, false); ?>
+            <?= $moduleMenuLinks ?>
         </nav>
     </aside>
+
 
     <!-- Main Content wrapper -->
     <div class="flex-1 flex flex-col min-w-0 bg-slate-50 relative">

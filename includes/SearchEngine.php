@@ -37,17 +37,16 @@ class SearchEngine {
         while ($row = $stmt->fetchColumn()) foreach (str_word_count(strtolower($row), 1) as $w) if (strlen($w) > 2) $vocab[$w] = true;
         
         $vocabulary = array_keys($vocab);
-        $cacheFile = __DIR__ . '/cache/vocabulary.json';
+        $cacheFile = CACHE_DIR . '/vocabulary.json';
         file_put_contents($cacheFile, json_encode($vocabulary));
         $this->vocabulary = $vocabulary;
     }
 
     private function getVocabulary(): array {
-        global $appSettings;
         if ($this->vocabulary !== null) return $this->vocabulary;
-        
-        $enableCache = ($appSettings['enable_cache'] ?? '1') === '1';
-        $cacheFile = __DIR__ . '/cache/vocabulary.json';
+
+        $enableCache = AppConfig::get('enable_cache', '1') === '1';
+        $cacheFile = CACHE_DIR . '/vocabulary.json';
 
         if ($enableCache && file_exists($cacheFile)) {
             $this->vocabulary = json_decode(file_get_contents($cacheFile), true);
