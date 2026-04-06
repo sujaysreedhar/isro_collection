@@ -80,8 +80,43 @@ global $pageTitle, $additionalHead, $currentMenu;
                 </form>
             </div>
             
-            <div class="flex items-center gap-6">
-                <?php renderFrontendNav($currentMenu ?? ''); ?>
+            <div class="flex items-center gap-4">
+                <div class="hidden lg:flex items-center gap-6">
+                    <?php renderFrontendNav($currentMenu ?? ''); ?>
+                </div>
+
+                <!-- Mobile Menu Button -->
+                <button type="button" onclick="toggleMobileMenu()" class="lg:hidden inline-flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-modern-600 hover:bg-modern-50 transition-all border border-transparent hover:border-modern-200">
+                    <span class="sr-only">Open main menu</span>
+                    <svg id="menu-icon-open" class="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <svg id="menu-icon-close" class="hidden h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
+        </div>
+
+        <!-- Mobile Menu Container -->
+        <div id="mobile-menu" class="hidden lg:hidden border-b border-slate-200 bg-white/95 backdrop-blur-2xl">
+            <div class="px-4 py-8 text-slate-800">
+                <form action="<?= SITE_URL ?>/search.php" method="GET" class="relative group mb-8">
+                    <input type="text" name="q" class="block w-full pl-4 pr-3 py-3 border border-slate-200 rounded-2xl bg-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-modern-500/20 text-sm transition-all" placeholder="Search...">
+                </form>
+                <?php renderFrontendNav($currentMenu ?? '', true); ?>
+            </div>
+        </div>
+
+        <script>
+            function toggleMobileMenu() {
+                const menu = document.getElementById('mobile-menu');
+                const openIcon = document.getElementById('menu-icon-open');
+                const closeIcon = document.getElementById('menu-icon-close');
+                menu.classList.toggle('hidden');
+                openIcon.classList.toggle('hidden');
+                closeIcon.classList.toggle('hidden');
+            }
+        </script>
         </div>
     </header>
