@@ -80,31 +80,53 @@ $citationUrl = SITE_URL . "/item/" . htmlspecialchars($item['id']);
 $citation = SITE_TITLE . ". (n.d.). \"" . htmlspecialchars($item['title']) . ".\" Reg: " . htmlspecialchars($item['reg_number']) . ". Retrieved " . date('F j, Y') . ", from " . $citationUrl;
 
 // 5. SEO Engine: OpenGraph + Schema.org JSON-LD
-$ogTitle       = htmlspecialchars($item['title'], ENT_QUOTES);
-$ogDescription = htmlspecialchars(substr(strip_tags($item['physical_description'] ?? 'View this artifact in the collection.'), 0, 160), ENT_QUOTES);
-$ogUrl         = SITE_URL . '/item/' . $id;
-$ogImage       = '';
+$rawDescription = strip_tags($item['physical_description'] ?? '');
+$descriptionSnippet = !empty($rawDescription) ? $rawDescription : 'View this artifact in our collection.';
+$itemCategory = $item['category_name'] ?? 'Uncategorized';
+$itemReg = $item['reg_number'] ?? 'No Reg';
+
+// Combine for a richer meta description
+$fullOgDescription = $descriptionSnippet;
+if (strlen($fullOgDescription) < 120) {
+    $fullOgDescription .= " — Part of our {$itemCategory} collection (Registration: {$itemReg}).";
+}
+$ogDescription = htmlspecialchars(substr($fullOgDescription, 0, 160), ENT_QUOTES);
+
+$ogTitle = htmlspecialchars($item['title'] . ' — ' . $itemReg, ENT_QUOTES);
+$ogUrl   = SITE_URL . '/item/' . $id;
+$ogImage = '';
+
 if ($primaryMedia) {
     if (isset($storage)) {
         $ogImage = $storage->url('display/' . $primaryMedia['file_path']);
     } else {
-        $displayPath = __DIR__ . '/uploads/display/' . $primaryMedia['file_path'];
-        $ogImage = file_exists($displayPath)
-            ? SITE_URL . '/uploads/display/'   . rawurlencode($primaryMedia['file_path'])
-            : SITE_URL . '/uploads/originals/' . rawurlencode($primaryMedia['file_path']);
+        // Correct the display path verification
+        $displayFile = $primaryMedia['file_path'];
+        $absDisplayPath = ABSPATH . '/uploads/display/' . $displayFile;
+        $ogImage = (file_exists($absDisplayPath))
+            ? SITE_URL . '/uploads/display/'   . rawurlencode($displayFile)
+            : SITE_URL . '/uploads/originals/' . rawurlencode($displayFile);
     }
 }
+
+$keywords = array_column($itemTags ?? [], 'name');
+
 $jsonLd = array_filter([
     '@context'    => 'https://schema.org',
     '@type'       => (!empty($item['category_name']) && stripos($item['category_name'], 'art') !== false) ? 'VisualArtwork' : 'ArchiveComponent',
     'name'        => $item['title'],
     'identifier'  => $item['reg_number'],
-    'description' => strip_tags($item['physical_description'] ?? ''),
+    'description' => $rawDescription,
     'url'         => $ogUrl,
     'image'       => $ogImage ?: null,
     'dateCreated' => $item['production_date'] ?? null,
     'creditText'  => $item['credit_line'] ?? null,
-    'isPartOf'    => ['@type' => 'ArchiveOrganization', 'name' => SITE_TITLE],
+    'keywords'    => !empty($keywords) ? implode(', ', $keywords) : null,
+    'isPartOf'    => [
+        '@type' => 'ArchiveOrganization', 
+        'name' => SITE_TITLE,
+        'url'  => SITE_URL
+    ],
 ]);
 $jsonLdJson = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 

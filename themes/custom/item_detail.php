@@ -38,9 +38,13 @@ require_once ThemeManager::getHeader();
             <div class="main-image-container tc-surface tc-border mb-4 relative min-h-[400px] flex items-center justify-center overflow-hidden">
                 <?php if ($primaryMedia):
                     $displaySrc = MediaProcessor::url($primaryMedia['file_path'], 'display', 'image', $storage ?? null);
+                    $imageAlt = htmlspecialchars($item['title'] . ' — Registration: ' . $item['reg_number']);
                     ?>
-                    <img id="main-viewer" src="<?= $displaySrc ?>" alt="<?= htmlspecialchars($item['title']) ?>"
-                        data-caption="<?= htmlspecialchars($primaryMedia['caption'] ?? '') ?>" class="max-h-[680px] w-auto transition-opacity duration-300">
+                    <figure class="w-full h-full flex items-center justify-center">
+                        <img id="main-viewer" src="<?= $displaySrc ?>" alt="<?= $imageAlt ?>"
+                            data-caption="<?= htmlspecialchars($primaryMedia['caption'] ?? '') ?>" class="max-h-[680px] w-auto transition-opacity duration-300">
+                        <figcaption class="sr-only"><?= $imageAlt ?></figcaption>
+                    </figure>
                 <?php else: ?>
                     <img id="main-viewer" style="display:none;" />
                     <div class="flex flex-col items-center justify-center h-80 tc-text-muted">
@@ -64,10 +68,11 @@ require_once ThemeManager::getHeader();
                         $thumbSrc = MediaProcessor::url($img['file_path'], 'thumbnails', 'image', $storage ?? null);
                         $fullSrc = MediaProcessor::url($img['file_path'], 'display', 'image', $storage ?? null);
                         $active = ($img['id'] === ($primaryMedia['id'] ?? null)) ? 'active' : '';
+                        $thumbAlt = htmlspecialchars($item['title'] . ' - View ' . ($i + 1));
                         ?>
                         <img src="<?= $thumbSrc ?>" class="gallery-thumbnail <?= $active ?>" data-full="<?= $fullSrc ?>"
                             data-caption="<?= htmlspecialchars($img['caption'] ?? '') ?>" onclick="switchImage(this)"
-                            alt="View <?= $i + 1 ?>">
+                            alt="<?= $thumbAlt ?>">
                     <?php endforeach; ?>
                     
                     <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_gallery_thumbnails', $item); } ?>
@@ -293,10 +298,17 @@ require_once ThemeManager::getHeader();
         }
 
         if (main) {
+            const itemAlt = <?= json_encode($item['title'] . ' — Registration: ' . $item['reg_number']) ?>;
             main.style.display = 'block';
             main.style.opacity = '0';
             setTimeout(() => {
-                if (el.dataset.full) main.src = el.dataset.full;
+                if (el.dataset.full) {
+                    main.src = el.dataset.full;
+                    main.alt = itemAlt;
+                    // Update figcaption if it exists
+                    const figcap = main.closest('figure')?.querySelector('figcaption');
+                    if (figcap) figcap.innerText = itemAlt;
+                }
                 caption.innerText = el.dataset.caption || 'No caption available for this view.';
                 
                 document.querySelectorAll('.gallery-thumbnail').forEach(t => t.classList.remove('active'));
