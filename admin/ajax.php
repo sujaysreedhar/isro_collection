@@ -37,13 +37,15 @@ switch ($action) {
         $totalFiltered = $totalRecords;
 
         if ($search !== '') {
-            $sql .= " WHERE (i.title LIKE :search OR i.reg_number LIKE :search OR c.name LIKE :search)";
-            $params[':search'] = '%' . $search . '%';
+            $sql .= " WHERE (i.title LIKE :search1 OR i.reg_number LIKE :search2 OR c.name LIKE :search3)";
+            $params[':search1'] = '%' . $search . '%';
+            $params[':search2'] = '%' . $search . '%';
+            $params[':search3'] = '%' . $search . '%';
 
             // Count filtered records
-            $countSql = "SELECT COUNT(*) FROM items i LEFT JOIN categories c ON i.category_id = c.id WHERE (i.title LIKE :search OR i.reg_number LIKE :search OR c.name LIKE :search)";
+            $countSql = "SELECT COUNT(*) FROM items i LEFT JOIN categories c ON i.category_id = c.id WHERE (i.title LIKE :search1 OR i.reg_number LIKE :search2 OR c.name LIKE :search3)";
             $countStmt = $pdo->prepare($countSql);
-            $countStmt->execute([':search' => '%' . $search . '%']);
+            $countStmt->execute($params);
             $totalFiltered = (int) $countStmt->fetchColumn();
         }
 
@@ -200,8 +202,9 @@ switch ($action) {
         $sql = "SELECT id, title as text FROM items";
         $params = [];
         if ($q !== '') {
-            $sql .= " WHERE title LIKE :q OR reg_number LIKE :q";
-            $params[':q'] = '%' . $q . '%';
+            $sql .= " WHERE title LIKE :q1 OR reg_number LIKE :q2";
+            $params[':q1'] = '%' . $q . '%';
+            $params[':q2'] = '%' . $q . '%';
         }
         $sql .= " ORDER BY title ASC LIMIT 30";
         $stmt = $pdo->prepare($sql);
