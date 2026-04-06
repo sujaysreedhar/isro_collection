@@ -6,37 +6,49 @@
  * PDFs    → stored in /uploads/pdfs/ — up to 20 MB
  * YouTube → URL stored in the database, no file needed
  */
-class MediaProcessor {
+class MediaProcessor
+{
 
-    private PDO    $db;
+    private PDO $db;
     private string $uploadRoot;
-    private bool   $hasIsPrimary;
+    private bool $hasIsPrimary;
     private ?StorageInterface $storage;
 
     const MAX_IMG_BYTES = 20 * 1024 * 1024;   // 20 MB for images
     const MAX_PDF_BYTES = 20 * 1024 * 1024;   // 20 MB for PDFs
-    const ALLOWED_IMG   = ['image/jpeg','image/png','image/gif','image/webp'];
+    const ALLOWED_IMG = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-    public function __construct(PDO $db, ?StorageInterface $storage = null) {
-        $this->db         = $db;
-        $this->uploadRoot = realpath(__DIR__ . '/uploads') . DIRECTORY_SEPARATOR;
+    public function __construct(PDO $db, ?StorageInterface $storage = null)
+    {
+        $this->db = $db;
         $this->hasIsPrimary = $this->columnExists('media', 'is_primary');
-        $this->storage    = $storage;
+        $this->storage = $storage;
 
-        foreach (['thumbnails','display','original','pdfs'] as $dir) {
+        // Use ABSPATH (defined in config/config.php) to find the root uploads folder
+        $root = defined('ABSPATH') ? ABSPATH : realpath(__DIR__ . '/..');
+        $this->uploadRoot = $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
+
+        // Ensure the root uploads folder exists first
+        if (!is_dir($this->uploadRoot)) {
+            @mkdir($this->uploadRoot, 0755, true);
+        }
+
+        foreach (['thumbnails', 'display', 'original', 'pdfs'] as $dir) {
             $path = $this->uploadRoot . $dir;
-            if (!is_dir($path)) mkdir($path, 0755, true);
+            if (!is_dir($path)) {
+                @mkdir($path, 0755, true);
+            }
         }
     }
 
     // ── Public: Image ────────────────────────────────────────────────────────
 
     public function process(
-        array  $file,
-        int    $itemId,
-        string $caption   = '',
-        string $license   = 'Public Domain',
-        bool   $isPrimary = false
+        array $file,
+        int $itemId,
+        string $caption = '',
+        string $license = 'Public Domain',
+        bool $isPrimary = false
     ): array {
         $runtimeError = $this->imageRuntimeError();
         if ($runtimeError !== null)
@@ -48,19 +60,20 @@ class MediaProcessor {
             return ['success' => false, 'message' => 'File exceeds the 5 MB maximum.'];
 
         $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mime  = $finfo->file($file['tmp_name']);
+        $mime = $finfo->file($file['tmp_name']);
         if (!in_array($mime, self::ALLOWED_IMG, true))
             return ['success' => false, 'message' => 'Unsupported type. Upload JPG, PNG, GIF, or WebP.'];
 
         $src = $this->gdLoad($file['tmp_name'], $mime);
-        if (!$src) return ['success' => false, 'message' => 'Could not decode image — file may be corrupt.'];
+        if (!$src)
+            return ['success' => false, 'message' => 'Could not decode image — file may be corrupt.'];
 
-        $origW    = imagesx($src);
-        $origH    = imagesy($src);
+        $origW = imagesx($src);
+        $origH = imagesy($src);
         $baseName = sprintf('img_%d_%s', $itemId, bin2hex(random_bytes(8)));
 
         // Save untouched original
-        $origExt  = $this->mimeExt($mime);
+        $origExt = $this->mimeExt($mime);
         $origPath = $this->uploadRoot . 'original' . DIRECTORY_SEPARATOR . $baseName . '.' . $origExt;
         move_uploaded_file($file['tmp_name'], $origPath);
         // Upload original to storage backend
@@ -70,7 +83,7 @@ class MediaProcessor {
 
         // WebP variants
         $webpName = $baseName . '.webp';
-        $this->saveVariant($src, $origW, $origH, 'thumbnails',  $webpName, 200,  true);
+        $this->saveVariant($src, $origW, $origH, 'thumbnails', $webpName, 200, true);
         $this->saveVariant($src, $origW, $origH, 'display', $webpName, 1200, false);
         imagedestroy($src);
 
@@ -84,13 +97,13 @@ class MediaProcessor {
                     INSERT INTO media (item_id, file_path, caption, license_type, is_primary,
                                        file_size, mime_type, dimensions, media_type, upload_date)
                     VALUES (?, ?, ?, ?, ?, ?, 'image/webp', ?, 'image', NOW())
-                " )->execute([$itemId, $webpName, $caption, $license, $isPrimary ? 1 : 0, $file['size'], "{$origW}x{$origH}"]);
+                ")->execute([$itemId, $webpName, $caption, $license, $isPrimary ? 1 : 0, $file['size'], "{$origW}x{$origH}"]);
             } else {
                 $this->db->prepare("
                     INSERT INTO media (item_id, file_path, caption, license_type,
                                        file_size, mime_type, dimensions, media_type, upload_date)
                     VALUES (?, ?, ?, ?, ?, 'image/webp', ?, 'image', NOW())
-                " )->execute([$itemId, $webpName, $caption, $license, $file['size'], "{$origW}x{$origH}"]);
+                ")->execute([$itemId, $webpName, $caption, $license, $file['size'], "{$origW}x{$origH}"]);
             }
 
             return ['success' => true, 'message' => 'Image saved in three sizes (thumbnail, display, original).', 'file' => $webpName];
@@ -102,10 +115,10 @@ class MediaProcessor {
     // ── Public: PDF ──────────────────────────────────────────────────────────
 
     public function processPdf(
-        array  $file,
-        int    $itemId,
-        string $caption   = '',
-        bool   $isPrimary = false
+        array $file,
+        int $itemId,
+        string $caption = '',
+        bool $isPrimary = false
     ): array {
         if ($file['error'] !== UPLOAD_ERR_OK)
             return ['success' => false, 'message' => $this->uploadError($file['error'])];
@@ -117,7 +130,7 @@ class MediaProcessor {
             return ['success' => false, 'message' => 'Only PDF files are accepted here.'];
 
         $filename = sprintf('pdf_%d_%s.pdf', $itemId, bin2hex(random_bytes(6)));
-        $dest     = $this->uploadRoot . 'pdfs' . DIRECTORY_SEPARATOR . $filename;
+        $dest = $this->uploadRoot . 'pdfs' . DIRECTORY_SEPARATOR . $filename;
         if (!move_uploaded_file($file['tmp_name'], $dest))
             return ['success' => false, 'message' => 'Failed to write PDF to disk.'];
 
@@ -149,7 +162,8 @@ class MediaProcessor {
 
     // ── Public: YouTube ──────────────────────────────────────────────────────
 
-    public function processYoutube(string $youtubeUrl, int $itemId, string $caption = ''): array {
+    public function processYoutube(string $youtubeUrl, int $itemId, string $caption = ''): array
+    {
         $videoId = self::extractYoutubeId($youtubeUrl);
         if (!$videoId)
             return ['success' => false, 'message' => 'Could not parse a valid YouTube video ID from that URL.'];
@@ -170,9 +184,9 @@ class MediaProcessor {
             }
 
             return [
-                'success'   => true,
-                'message'   => 'YouTube video linked successfully.',
-                'video_id'  => $videoId,
+                'success' => true,
+                'message' => 'YouTube video linked successfully.',
+                'video_id' => $videoId,
                 'embed_url' => "https://www.youtube.com/embed/{$videoId}",
             ];
         } catch (\PDOException $e) {
@@ -182,7 +196,8 @@ class MediaProcessor {
 
     // ── Public: Delete media ────────────────────────────────────────────────
 
-    public function deleteMedia(int $mediaId, int $itemId): array {
+    public function deleteMedia(int $mediaId, int $itemId): array
+    {
         try {
             $stmt = $this->db->prepare('SELECT id, file_path, media_type FROM media WHERE id = ? AND item_id = ? LIMIT 1');
             $stmt->execute([$mediaId, $itemId]);
@@ -213,7 +228,7 @@ class MediaProcessor {
                             $this->storage->delete($dir . '/' . $filePath);
                             // Also try original extension variants
                             $fBase = pathinfo($filePath, PATHINFO_FILENAME);
-                            foreach (['jpg','png','gif','webp'] as $ext) {
+                            foreach (['jpg', 'png', 'gif', 'webp'] as $ext) {
                                 $this->storage->delete($dir . '/' . $fBase . '.' . $ext);
                             }
                         }
@@ -232,7 +247,8 @@ class MediaProcessor {
     /**
      * Extract an 11-char YouTube video ID from any standard YouTube URL format.
      */
-    public static function extractYoutubeId(string $url): ?string {
+    public static function extractYoutubeId(string $url): ?string
+    {
         preg_match('/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/))([a-zA-Z0-9_-]{11})/', $url, $m);
         return $m[1] ?? null;
     }
@@ -243,13 +259,14 @@ class MediaProcessor {
      *   pdf     → /uploads/pdfs/{file_path}
      *   youtube → https://www.youtube.com/embed/{file_path (videoId)}
      */
-    public static function url(string $filename, string $variant = 'display', string $mediaType = 'image', ?StorageInterface $storage = null): string {
+    public static function url(string $filename, string $variant = 'display', string $mediaType = 'image', ?StorageInterface $storage = null): string
+    {
         if ($mediaType === 'youtube') {
             return 'https://www.youtube.com/embed/' . htmlspecialchars($filename);
         }
 
         $subdir = match ($mediaType) {
-            'pdf'   => 'pdfs',
+            'pdf' => 'pdfs',
             default => $variant,
         };
 
@@ -271,21 +288,24 @@ class MediaProcessor {
     /**
      * Return files in /uploads/ subdirectories that are not referenced in the database.
      */
-    public function orphanedFiles(): array {
-        $known    = $this->db->query("SELECT file_path FROM media")->fetchAll(\PDO::FETCH_COLUMN);
+    public function orphanedFiles(): array
+    {
+        $known = $this->db->query("SELECT file_path FROM media")->fetchAll(\PDO::FETCH_COLUMN);
         $knownSet = array_flip($known);
-        $orphans  = [];
-        foreach (['thumbnails','display','original','pdfs'] as $dir) {
+        $orphans = [];
+        foreach (['thumbnails', 'display', 'original', 'pdfs'] as $dir) {
             foreach (glob($this->uploadRoot . $dir . DIRECTORY_SEPARATOR . '*.*') ?: [] as $f) {
                 $base = basename($f);
-                if (!isset($knownSet[$base])) $orphans[] = "$dir/$base";
+                if (!isset($knownSet[$base]))
+                    $orphans[] = "$dir/$base";
             }
         }
         return $orphans;
     }
 
 
-    private function columnExists(string $table, string $column): bool {
+    private function columnExists(string $table, string $column): bool
+    {
         try {
             $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
             $stmt->execute([$column]);
@@ -297,15 +317,16 @@ class MediaProcessor {
 
     // ── Private GD helpers ───────────────────────────────────────────────────
 
-    private function saveVariant($src, int $srcW, int $srcH, string $folder, string $fn, int $targetW, bool $cropSquare): void {
+    private function saveVariant($src, int $srcW, int $srcH, string $folder, string $fn, int $targetW, bool $cropSquare): void
+    {
         $path = $this->uploadRoot . $folder . DIRECTORY_SEPARATOR . $fn;
         if ($cropSquare) {
             $img = $this->smartCropSquare($src, $srcW, $srcH, $targetW);
         } else {
             $ratio = min(1, $targetW / $srcW);
-            $newW  = (int) round($srcW * $ratio);
-            $newH  = (int) round($srcH * $ratio);
-            $img   = imagecreatetruecolor($newW, $newH);
+            $newW = (int) round($srcW * $ratio);
+            $newH = (int) round($srcH * $ratio);
+            $img = imagecreatetruecolor($newW, $newH);
             $this->preserveAlpha($img);
             imagecopyresampled($img, $src, 0, 0, 0, 0, $newW, $newH, $srcW, $srcH);
         }
@@ -323,15 +344,16 @@ class MediaProcessor {
         }
     }
 
-    private function smartCropSquare($src, int $srcW, int $srcH, int $size) {
-        $ratio   = max($size / $srcW, $size / $srcH);
+    private function smartCropSquare($src, int $srcW, int $srcH, int $size)
+    {
+        $ratio = max($size / $srcW, $size / $srcH);
         $scaledW = (int) round($srcW * $ratio);
         $scaledH = (int) round($srcH * $ratio);
-        $tmp     = imagecreatetruecolor($scaledW, $scaledH);
+        $tmp = imagecreatetruecolor($scaledW, $scaledH);
         $this->preserveAlpha($tmp);
         imagecopyresampled($tmp, $src, 0, 0, 0, 0, $scaledW, $scaledH, $srcW, $srcH);
-        $x   = (int)(($scaledW - $size) / 2);
-        $y   = (int)(($scaledH - $size) / 2);
+        $x = (int) (($scaledW - $size) / 2);
+        $y = (int) (($scaledH - $size) / 2);
         $dst = imagecreatetruecolor($size, $size);
         $this->preserveAlpha($dst);
         imagecopy($dst, $tmp, 0, 0, $x, $y, $size, $size);
@@ -339,18 +361,31 @@ class MediaProcessor {
         return $dst;
     }
 
-    private function preserveAlpha($img): void {
+    private function preserveAlpha($img): void
+    {
         imagealphablending($img, false);
         imagesavealpha($img, true);
         imagefilledrectangle($img, 0, 0, imagesx($img), imagesy($img), imagecolorallocatealpha($img, 255, 255, 255, 127));
     }
 
-    private function imageRuntimeError(): ?string {
+    private function imageRuntimeError(): ?string
+    {
         $required = [
-            'imagecreatefromjpeg', 'imagecreatefrompng', 'imagecreatefromgif', 'imagecreatefromwebp',
-            'imagecreatetruecolor', 'imagecopyresampled', 'imagecopy', 'imagewebp', 'imagedestroy',
-            'imagealphablending', 'imagesavealpha', 'imagefilledrectangle', 'imagecolorallocatealpha',
-            'imagesx', 'imagesy',
+            'imagecreatefromjpeg',
+            'imagecreatefrompng',
+            'imagecreatefromgif',
+            'imagecreatefromwebp',
+            'imagecreatetruecolor',
+            'imagecopyresampled',
+            'imagecopy',
+            'imagewebp',
+            'imagedestroy',
+            'imagealphablending',
+            'imagesavealpha',
+            'imagefilledrectangle',
+            'imagecolorallocatealpha',
+            'imagesx',
+            'imagesy',
         ];
 
         foreach ($required as $fn) {
@@ -362,38 +397,42 @@ class MediaProcessor {
         return null;
     }
 
-    private function gdLoad(string $path, string $mime) {
+    private function gdLoad(string $path, string $mime)
+    {
         return match ($mime) {
             'image/jpeg' => imagecreatefromjpeg($path),
-            'image/png'  => imagecreatefrompng($path),
-            'image/gif'  => imagecreatefromgif($path),
+            'image/png' => imagecreatefrompng($path),
+            'image/gif' => imagecreatefromgif($path),
             'image/webp' => imagecreatefromwebp($path),
-            default      => false,
+            default => false,
         };
     }
 
-    private function mimeExt(string $mime): string {
+    private function mimeExt(string $mime): string
+    {
         return match ($mime) {
             'image/jpeg' => 'jpg',
-            'image/png'  => 'png',
-            'image/gif'  => 'gif',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
             'image/webp' => 'webp',
-            default      => 'jpg',
+            default => 'jpg',
         };
     }
 
-    private function uploadError(int $code): string {
+    private function uploadError(int $code): string
+    {
         return match ($code) {
             UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'File exceeds the server size limit.',
-            UPLOAD_ERR_PARTIAL    => 'File was only partially uploaded.',
-            UPLOAD_ERR_NO_FILE    => 'No file was submitted.',
+            UPLOAD_ERR_PARTIAL => 'File was only partially uploaded.',
+            UPLOAD_ERR_NO_FILE => 'No file was submitted.',
             UPLOAD_ERR_NO_TMP_DIR => 'Server has no temp directory.',
             UPLOAD_ERR_CANT_WRITE => 'Server could not write to disk.',
-            default               => "Upload failed (error code {$code}).",
+            default => "Upload failed (error code {$code}).",
         };
     }
 
-    private function deleteFileIfExists(string $path): void {
+    private function deleteFileIfExists(string $path): void
+    {
         if (is_file($path)) {
             @unlink($path);
         }
