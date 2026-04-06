@@ -96,14 +96,30 @@ class CuratedCollectionsModule extends BaseModule
 
         foreach ($collections as $col) {
             $url = SITE_URL . '/collection.php?slug=' . urlencode($col['slug']);
-            echo '<a href="' . $url . '" class="group relative flex flex-col bg-white rounded-3xl p-8 border border-gray-200 dark:border-gray-700/50 hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-300 dark:hover:border-blue-500/50 transition-all duration-300 transform hover:-translate-y-1">';
-            echo '<div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 mb-6 group-hover:scale-110 transition-transform shadow-inner">';
-            echo '<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>';
+            $coverUrl = !empty($col['cover_image']) 
+                ? (isset($storage) ? $storage->url('display/' . $col['cover_image']) : SITE_URL . '/uploads/display/' . $col['cover_image'])
+                : null;
+
+            echo '<a href="' . $url . '" class="group relative flex flex-col bg-white rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-700/50 hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-300 dark:hover:border-blue-500/50 transition-all duration-500 transform hover:-translate-y-2">';
+            
+            // Image/Icon Container
+            echo '<div class="relative h-48 w-full bg-gray-50 flex items-center justify-center overflow-hidden">';
+            if ($coverUrl) {
+                echo '<img src="' . htmlspecialchars($coverUrl) . '" alt="' . htmlspecialchars($col['title']) . '" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">';
+                echo '<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>';
+            } else {
+                echo '<div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform shadow-inner">';
+                echo '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>';
+                echo '</div>';
+            }
             echo '</div>';
-            echo '<h3 class="text-xl font-bold text-gray-900  mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">' . htmlspecialchars($col['title']) . '</h3>';
-            echo '<p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-3 mb-4">' . htmlspecialchars(strip_tags($col['description'] ?? '')) . '</p>';
-            echo '<div class="mt-auto pt-4 flex items-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest group-hover:text-blue-500 transition-colors">';
-            echo 'Explore Items <svg class="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>';
+
+            echo '<div class="p-8 flex flex-col flex-grow">';
+            echo '<h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">' . htmlspecialchars($col['title']) . '</h3>';
+            echo '<p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-2 mb-6">' . htmlspecialchars(strip_tags($col['description'] ?? '')) . '</p>';
+            echo '<div class="mt-auto pt-4 flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest group-hover:translate-x-2 transition-transform duration-300">';
+            echo 'Explore Collection <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>';
+            echo '</div>';
             echo '</div>';
             echo '</a>';
         }

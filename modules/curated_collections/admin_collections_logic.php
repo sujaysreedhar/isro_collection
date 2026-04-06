@@ -16,16 +16,24 @@ if ($action === 'search_ajax') {
         exit;
     }
 
-    $where = "(title LIKE ? OR reg_number LIKE ?)";
-    $params = ['%' . $searchTerm . '%', '%' . $searchTerm . '%'];
+    $params = [];
+    if (str_starts_with($searchTerm, '#')) {
+        $tagQuery = ltrim($searchTerm, '#');
+        $where = "i.id IN (SELECT it.item_id FROM item_tag it JOIN tags t ON it.tag_id = t.id WHERE t.name LIKE ?)";
+        $params[] = '%' . $tagQuery . '%';
+    } else {
+        $where = "(i.title LIKE ? OR i.reg_number LIKE ?)";
+        $params[] = '%' . $searchTerm . '%';
+        $params[] = '%' . $searchTerm . '%';
+    }
     
     if ($excludeColId > 0) {
-        $where .= " AND id NOT IN (SELECT item_id FROM collection_items WHERE collection_id = ?)";
+        $where .= " AND i.id NOT IN (SELECT item_id FROM collection_items WHERE collection_id = ?)";
         $params[] = $excludeColId;
     }
 
-    // Search by title or reg number (admin search)
-    $stmt = $this->pdo->prepare("SELECT id, reg_number, title FROM items WHERE $where ORDER BY id DESC LIMIT $limit");
+    // Search by title, reg number, or tag
+    $stmt = $this->pdo->prepare("SELECT i.id, i.reg_number, i.title FROM items i WHERE $where ORDER BY i.id DESC LIMIT $limit");
     $stmt->execute($params);
     $items = $stmt->fetchAll();
     

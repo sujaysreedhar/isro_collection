@@ -70,27 +70,29 @@ if ($action === 'edit' || $action === 'add'):
 
             <?php if ($colId > 0): ?>
             <div id="items" class="bg-white p-6 rounded-xl border border-gray-200">
-                <h3 class="font-bold text-gray-900 mb-4">Items in this Collection</h3>
+                <h3 class="font-bold text-gray-900 mb-4 flex items-center justify-between">
+                    Items in this Collection
+                    <span class="text-[10px] text-gray-400 font-normal uppercase tracking-widest"><?= count($items) ?> items</span>
+                </h3>
                 <div id="collection-items-wrapper" class="space-y-2">
                     <?php if ($items): ?>
-                        <div class="divide-y border rounded-lg">
+                        <div class="divide-y border border-gray-100 rounded-xl overflow-hidden">
                         <?php foreach ($items as $item): ?>
-                            <div class="flex items-center justify-between p-3 hover:bg-gray-50">
+                            <div class="flex items-center justify-between p-3.5 hover:bg-gray-50 transition-colors group">
                                 <div class="min-w-0">
-                                    <p class="font-medium text-gray-900 truncate"><?= htmlspecialchars($item['title']) ?></p>
-                                    <p class="text-xs text-gray-500"><?= htmlspecialchars($item['reg_number']) ?></p>
+                                    <p class="font-bold text-gray-900 truncate text-sm group-hover:text-blue-600 transition-colors"><?= htmlspecialchars($item['title']) ?></p>
+                                    <p class="text-[10px] text-gray-400 font-mono tracking-tighter uppercase"><?= htmlspecialchars($item['reg_number']) ?></p>
                                 </div>
-                                <form method="POST" onsubmit="return confirm('Remove this item from collection?');">
-                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
-                                    <input type="hidden" name="remove_item" value="1">
-                                    <input type="hidden" name="item_id" value="<?= $item['id'] ?>">
-                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-semibold">Remove</button>
-                                </form>
+                                <div class="flex items-center gap-3">
+                                    <button type="button" onclick="removeItem(<?= $item['id'] ?>, this)" class="text-red-500 hover:text-red-700 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg hover:bg-red-50 transition-all">Remove</button>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <p class="text-sm text-gray-500 text-center py-6 bg-gray-50 rounded-lg border border-dashed">No items added yet.</p>
+                        <div class="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                            <p class="text-xs text-gray-500 font-medium tracking-wide">NO ARTIFACTS LINKED YET</p>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
