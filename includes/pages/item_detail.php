@@ -12,13 +12,8 @@ if ($id <= 0) {
     die("Item ID not provided or invalid.");
 }
 
-// 1. Fetch Item and Category
-$itemStmt = $pdo->prepare("
-    SELECT i.*, c.name AS category_name 
-    FROM items i
-    LEFT JOIN categories c ON i.category_id = c.id
-    WHERE i.id = :id
-");
+// 1. Fetch Item
+$itemStmt = $pdo->prepare("SELECT * FROM items WHERE id = :id");
 $itemStmt->execute([':id' => $id]);
 $item = $itemStmt->fetch();
 
@@ -26,6 +21,21 @@ if (!$item) {
     http_response_code(404);
     die("Item not found.");
 }
+
+// 1b. Fetch all Categories for this item
+$catStmt = $pdo->prepare("
+    SELECT c.id, c.name 
+    FROM categories c
+    INNER JOIN item_category ic ON c.id = ic.category_id
+    WHERE ic.item_id = :id
+    ORDER BY c.name ASC
+");
+$catStmt->execute([':id' => $id]);
+$itemCategories = $catStmt->fetchAll();
+
+// For backward compatibility with themes that use $item['category_name']
+$item['category_name'] = !empty($itemCategories) ? implode(', ', array_column($itemCategories, 'name')) : 'Uncategorized';
+$item['category_id']   = !empty($itemCategories) ? $itemCategories[0]['id'] : 0;
 
 // 1b. Increment View Count (once per session)
 try {
@@ -153,20 +163,27 @@ if (count($relatedItems) < 4) {
     $excludeIds = array_merge([$id], $manualIds);
     $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
     
-    $orderClause = $hasIsPrimary ? "is_primary DESC, upload_date ASC" : "upload_date ASC";
-    $autoStmt = $pdo->prepare("
-        SELECT id, title, reg_number, 
-               (SELECT file_path FROM media WHERE item_id = items.id AND media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as thumb
-        FROM items
-        WHERE category_id = ? AND id NOT IN ($placeholders)
-        ORDER BY id DESC
-        LIMIT " . (int)$limit
-    );
-    
-    $params = array_merge([$item['category_id'] ?? 0], $excludeIds);
-    $autoStmt->execute($params);
-    $autoResults = $autoStmt->fetchAll();
-    $relatedItems = array_merge($relatedItems, $autoResults);
+    // Get all category IDs for this item to find related ones
+    $catIds = array_column($itemCategories, 'id');
+    if (!empty($catIds)) {
+        $catPlaceholders = implode(',', array_fill(0, count($catIds), '?'));
+        
+        $orderClause = $hasIsPrimary ? "is_primary DESC, upload_date ASC" : "upload_date ASC";
+        $autoStmt = $pdo->prepare("
+            SELECT DISTINCT i.id, i.title, i.reg_number, 
+                   (SELECT file_path FROM media WHERE item_id = i.id AND media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as thumb
+            FROM items i
+            INNER JOIN item_category ic ON i.id = ic.item_id
+            WHERE ic.category_id IN ($catPlaceholders) AND i.id NOT IN ($placeholders)
+            ORDER BY i.id DESC
+            LIMIT " . (int)$limit
+        );
+        
+        $paramsArray = array_merge($catIds, $excludeIds);
+        $autoStmt->execute($paramsArray);
+        $autoResults = $autoStmt->fetchAll();
+        $relatedItems = array_merge($relatedItems, $autoResults);
+    }
 }
 
 ?>

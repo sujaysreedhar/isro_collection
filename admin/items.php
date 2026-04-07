@@ -2,8 +2,19 @@
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/layout.php';
 
+$categories = $pdo->query("SELECT id, name FROM categories ORDER BY name ASC")->fetchAll();
+
 echo renderAdminHeader("Manage Items");
 ?>
+
+<style>
+/* Override the layout max-width specifically for the items admin page */
+main > div.max-w-7xl {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+</style>
 
 <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
     <div>
@@ -11,6 +22,12 @@ echo renderAdminHeader("Manage Items");
         <p class="text-sm text-gray-500 mt-1">Server-side search · Toggle visibility · Bulk delete</p>
     </div>
     <div class="flex items-center gap-3">
+        <select id="category-filter" class="border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 text-gray-600 bg-white shadow-sm">
+            <option value="">All Categories</option>
+            <?php foreach ($categories as $cat): ?>
+                <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
         <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_items_list_actions'); } ?>
         <button id="bulk-delete-btn" onclick="openBulkDeleteModal()" 
                 class="hidden items-center px-4 py-2 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition">
@@ -117,9 +134,14 @@ $(document).ready(function() {
     dataTable = $('#items-table').DataTable({
         processing: true,
         serverSide: true,
+        autoWidth: false,
+        order: [],
         ajax: {
             url: AJAX_URL,
-            data: { action: 'datatable_items' }
+            data: function(d) {
+                d.action = 'datatable_items';
+                d.category_id = $('#category-filter').val();
+            }
         },
         columns: [
             { orderable: false, searchable: false, data: null, defaultContent: '' },
@@ -144,6 +166,11 @@ $(document).ready(function() {
         language: { processing: '<div class="text-gray-500 text-sm py-2">Loading...</div>' }
     });
     
+    // Reload data on category change
+    $('#category-filter').on('change', function() {
+        dataTable.ajax.reload();
+    });
+
     // Select / Deselect All
     $('#select-all').on('change', function() {
         const checked = $(this).is(':checked');

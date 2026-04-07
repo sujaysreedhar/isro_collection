@@ -5,15 +5,16 @@ require_once __DIR__ . '/layout.php';
 
 $mp = new MediaProcessor($pdo, $storage ?? null);
 
-function reIndexFiles(array $files): array {
+function reIndexFiles(array $files): array
+{
     $out = [];
     foreach ($files['name'] as $i => $name) {
         $out[] = [
-            'name'     => $files['name'][$i],
-            'type'     => $files['type'][$i],
+            'name' => $files['name'][$i],
+            'type' => $files['type'][$i],
             'tmp_name' => $files['tmp_name'][$i],
-            'error'    => $files['error'][$i],
-            'size'     => $files['size'][$i],
+            'error' => $files['error'][$i],
+            'size' => $files['size'][$i],
         ];
     }
     return $out;
@@ -27,22 +28,37 @@ try {
     $hasIsPrimary = false;
 }
 
-$id  = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $item = [
-    'reg_number' => '', 'title' => '', 'physical_description' => '',
-    'historical_significance' => '', 'production_date' => '', 'credit_line' => '', 'category_id' => '', 'allow_trade' => 1,
-    'material' => '', 'year_start' => '', 'year_end' => '',
+    'reg_number' => '',
+    'title' => '',
+    'physical_description' => '',
+    'historical_significance' => '',
+    'production_date' => '',
+    'credit_line' => '',
+    'category_id' => '',
+    'allow_trade' => 0,
+    'material' => '',
+    'year_start' => '',
+    'year_end' => '',
 ];
-$mediaList       = [];
+$mediaList = [];
 $linkedNarratives = [];
-$linkedTags      = [];
-$error   = '';
+$linkedTags = [];
+$linkedCategories = [];
+$error = '';
 $success = '';
+if (isset($_GET['success'])) {
+    $success = "Item saved successfully.";
+}
+if (isset($_GET['msg']) && $_GET['msg'] === 'created') {
+    $success = "Item created successfully. You can now add media and detailed metadata.";
+}
 
-$categories   = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
+$categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
 $allNarratives = $pdo->query("SELECT id, title FROM narratives ORDER BY title ASC")->fetchAll();
-$allTags       = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
-$allItems      = $pdo->query("SELECT id, reg_number, title FROM items ORDER BY title ASC")->fetchAll();
+$allTags = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
+$allItems = $pdo->query("SELECT id, reg_number, title FROM items ORDER BY title ASC")->fetchAll();
 $linkedRelated = [];
 
 if ($id > 0) {
@@ -60,12 +76,19 @@ if ($id > 0) {
         $tStmt = $pdo->prepare("SELECT tag_id FROM item_tag WHERE item_id = :id");
         $tStmt->execute([':id' => $id]);
         $linkedTags = $tStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $cStmt = $pdo->prepare("SELECT category_id FROM item_category WHERE item_id = :id");
+        $cStmt->execute([':id' => $id]);
+        $linkedCategories = $cStmt->fetchAll(PDO::FETCH_COLUMN);
+
         // Related items
         try {
             $rStmt = $pdo->prepare("SELECT related_item_id FROM item_related WHERE item_id = :id");
             $rStmt->execute([':id' => $id]);
             $linkedRelated = $rStmt->fetchAll(PDO::FETCH_COLUMN);
-        } catch (\PDOException) { $linkedRelated = []; }
+        } catch (\PDOException) {
+            $linkedRelated = [];
+        }
     } else {
         $error = "Item not found.";
         $id = 0;
@@ -121,192 +144,241 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $linkedTags = $tStmt->fetchAll(PDO::FETCH_COLUMN);
     } else {
 
-        $reg_number             = trim($_POST['reg_number'] ?? '');
-        $title                  = trim($_POST['title'] ?? '');
-        $physical_description   = trim($_POST['physical_description'] ?? '');
-        $historical_significance= trim($_POST['historical_significance'] ?? '');
-        
+        $reg_number = trim($_POST['reg_number'] ?? '');
+        $title = trim($_POST['title'] ?? '');
+        $physical_description = trim($_POST['physical_description'] ?? '');
+        $historical_significance = trim($_POST['historical_significance'] ?? '');
+
         // Clean up empty Quill artifacts (e.g., <p><br></p>)
         $cleanDescription = strip_tags($physical_description);
-        if (trim($cleanDescription) === '') $physical_description = '';
+        if (trim($cleanDescription) === '')
+            $physical_description = '';
         $cleanHist = strip_tags($historical_significance);
-        if (trim($cleanHist) === '') $historical_significance = '';
+        if (trim($cleanHist) === '')
+            $historical_significance = '';
 
-        $production_date        = trim($_POST['production_date'] ?? '');
-        $credit_line            = trim($_POST['credit_line'] ?? '');
-        $category_id            = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
-        $allow_trade            = isset($_POST['allow_trade']) ? 1 : 0;
-        $material               = trim($_POST['material'] ?? '');
-        $year_start             = trim($_POST['year_start'] ?? '') === '' ? null : (int) $_POST['year_start'];
-        $year_end               = trim($_POST['year_end'] ?? '') === '' ? null : (int) $_POST['year_end'];
+        $production_date = trim($_POST['production_date'] ?? '');
+        $credit_line = trim($_POST['credit_line'] ?? '');
+
+        $categoryIds = array_map('intval', (array) ($_POST['category_ids'] ?? []));
+        $primaryCategoryId = !empty($categoryIds) ? $categoryIds[0] : null;
+
+        $allow_trade = isset($_POST['allow_trade']) ? 1 : 0;
+        $material = trim($_POST['material'] ?? '');
+        $year_start = trim($_POST['year_start'] ?? '') === '' ? null : (int) $_POST['year_start'];
+        $year_end = trim($_POST['year_end'] ?? '') === '' ? null : (int) $_POST['year_end'];
 
         try {
             $pdo->beginTransaction();
 
-        if ($id > 0) {
-            $pdo->prepare("
+            if ($id > 0) {
+                $pdo->prepare("
                 UPDATE items SET reg_number=:reg, title=:title, physical_description=:desc,
                 historical_significance=:hist, production_date=:prod, credit_line=:cred, category_id=:cat, allow_trade=:trade,
                 material=:mat, year_start=:ys, year_end=:ye
                 WHERE id=:id
             ")->execute([
-                ':reg'=>$reg_number, ':title'=>$title, ':desc'=>$physical_description,
-                ':hist'=>$historical_significance, ':prod'=>$production_date, ':cred'=>$credit_line,
-                ':cat'=>$category_id, ':trade'=>$allow_trade, ':mat'=>$material, ':ys'=>$year_start, ':ye'=>$year_end, ':id'=>$id,
-            ]);
-            $success = "Item updated.";
-        } else {
-            $pdo->prepare("
+                            ':reg' => $reg_number,
+                            ':title' => $title,
+                            ':desc' => $physical_description,
+                            ':hist' => $historical_significance,
+                            ':prod' => $production_date,
+                            ':cred' => $credit_line,
+                            ':cat' => $primaryCategoryId,
+                            ':trade' => $allow_trade,
+                            ':mat' => $material,
+                            ':ys' => $year_start,
+                            ':ye' => $year_end,
+                            ':id' => $id,
+                        ]);
+                $success = "Item updated.";
+            } else {
+                $pdo->prepare("
                 INSERT INTO items (reg_number,title,physical_description,historical_significance,production_date,credit_line,category_id,allow_trade,material,year_start,year_end)
                 VALUES (:reg,:title,:desc,:hist,:prod,:cred,:cat,:trade,:mat,:ys,:ye)
             ")->execute([
-                ':reg'=>$reg_number, ':title'=>$title, ':desc'=>$physical_description,
-                ':hist'=>$historical_significance, ':prod'=>$production_date, ':cred'=>$credit_line, ':cat'=>$category_id, ':trade'=>$allow_trade,
-                ':mat'=>$material, ':ys'=>$year_start, ':ye'=>$year_end,
-            ]);
-            $id = (int) $pdo->lastInsertId();
-            $success = "Item created.";
-        }
-
-        // — Delete selected media (image/pdf/youtube) —
-        $deleteMediaIds = array_map('intval', (array) ($_POST['delete_media'] ?? []));
-        foreach (array_filter($deleteMediaIds) as $mediaId) {
-            $result = $mp->deleteMedia($mediaId, $id);
-            if (!$result['success']) {
-                throw new RuntimeException($result['message']);
+                            ':reg' => $reg_number,
+                            ':title' => $title,
+                            ':desc' => $physical_description,
+                            ':hist' => $historical_significance,
+                            ':prod' => $production_date,
+                            ':cred' => $credit_line,
+                            ':cat' => $primaryCategoryId,
+                            ':trade' => $allow_trade,
+                            ':mat' => $material,
+                            ':ys' => $year_start,
+                            ':ye' => $year_end,
+                        ]);
+                $id = (int) $pdo->lastInsertId();
+                $success = "Item created.";
             }
-        }
-        if (!empty($deleteMediaIds)) {
-            $success .= ' Selected media deleted.';
-        }
 
-        // — Images via MediaProcessor (Multiple Support) —
-        if (isset($_FILES['media_upload'])) {
-            $files = is_array($_FILES['media_upload']['name']) 
-                ? reIndexFiles($_FILES['media_upload']) 
-                : [$_FILES['media_upload']];
+            // — Delete selected media (image/pdf/youtube) —
+            $deleteMediaIds = array_map('intval', (array) ($_POST['delete_media'] ?? []));
+            foreach (array_filter($deleteMediaIds) as $mediaId) {
+                $result = $mp->deleteMedia($mediaId, $id);
+                if (!$result['success']) {
+                    throw new RuntimeException($result['message']);
+                }
+            }
+            if (!empty($deleteMediaIds)) {
+                $success .= ' Selected media deleted.';
+            }
 
-            $isFirstInBatch = true;
-            foreach ($files as $file) {
-                if ($file['error'] === UPLOAD_ERR_NO_FILE) continue;
+            // — Images via MediaProcessor (Multiple Support) —
+            if (isset($_FILES['media_upload'])) {
+                $files = is_array($_FILES['media_upload']['name'])
+                    ? reIndexFiles($_FILES['media_upload'])
+                    : [$_FILES['media_upload']];
 
-                $result = $mp->process(
-                    $file, $id,
-                    trim($_POST['media_caption'] ?? ''),
-                    $_POST['media_license'] ?? 'Public Domain',
-                    (isset($_POST['is_primary']) && $isFirstInBatch)
+                $isFirstInBatch = true;
+                foreach ($files as $file) {
+                    if ($file['error'] === UPLOAD_ERR_NO_FILE)
+                        continue;
+
+                    $result = $mp->process(
+                        $file,
+                        $id,
+                        trim($_POST['media_caption'] ?? ''),
+                        $_POST['media_license'] ?? 'Public Domain',
+                        (isset($_POST['is_primary']) && $isFirstInBatch)
+                    );
+
+                    if ($result['success']) {
+                        $success .= ' ' . $result['message'];
+                        $isFirstInBatch = false; // Only the first one is primary if checked
+                    } else {
+                        throw new RuntimeException($result['message']);
+                    }
+                }
+            }
+
+            // — PDF via MediaProcessor —
+            if (isset($_FILES['pdf_upload']) && $_FILES['pdf_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
+                $result = $mp->processPdf(
+                    $_FILES['pdf_upload'],
+                    $id,
+                    trim($_POST['pdf_caption'] ?? '')
                 );
-
                 if ($result['success']) {
                     $success .= ' ' . $result['message'];
-                    $isFirstInBatch = false; // Only the first one is primary if checked
                 } else {
                     throw new RuntimeException($result['message']);
                 }
             }
-        }
 
-        // — PDF via MediaProcessor —
-        if (isset($_FILES['pdf_upload']) && $_FILES['pdf_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
-            $result = $mp->processPdf(
-                $_FILES['pdf_upload'], $id,
-                trim($_POST['pdf_caption'] ?? '')
-            );
-            if ($result['success']) {
-                $success .= ' ' . $result['message'];
-            } else {
-                throw new RuntimeException($result['message']);
-            }
-        }
-
-        // — YouTube via MediaProcessor —
-        $ytUrl = trim($_POST['youtube_url'] ?? '');
-        if ($ytUrl !== '') {
-            $result = $mp->processYoutube($ytUrl, $id, trim($_POST['youtube_caption'] ?? ''));
-            if ($result['success']) {
-                $success .= ' ' . $result['message'];
-            } else {
-                throw new RuntimeException($result['message']);
-            }
-        }
-
-        // — Narrative pivot sync —
-        $pdo->prepare("DELETE FROM item_narrative WHERE item_id = :id")->execute([':id' => $id]);
-        $sel = array_map('intval', (array)($_POST['narratives'] ?? []));
-        if ($sel) {
-            $ls = $pdo->prepare("INSERT INTO item_narrative (item_id, narrative_id) VALUES (:i, :n)");
-            foreach (array_filter($sel) as $nid) { $ls->execute([':i' => $id, ':n' => $nid]); }
-        }
-
-        // — Tag pivot sync (auto-create new tags with hashtag support) —
-        $pdo->prepare("DELETE FROM item_tag WHERE item_id = :id")->execute([':id' => $id]);
-        $rawTags = (array)($_POST['tags'] ?? []);
-        foreach ($rawTags as $tagValue) {
-            $tagValue = trim($tagValue);
-            if ($tagValue === '') continue;
-
-            // Normalize: Remove leading hashtags if typed
-            $tagValue = ltrim($tagValue, '#');
-
-            $tagId = null;
-            if (is_numeric($tagValue)) {
-                // Check if this number is an actual existing tag ID
-                $checkId = $pdo->prepare("SELECT id FROM tags WHERE id = ?");
-                $checkId->execute([(int)$tagValue]);
-                $tagId = $checkId->fetchColumn();
+            // — YouTube via MediaProcessor —
+            $ytUrl = trim($_POST['youtube_url'] ?? '');
+            if ($ytUrl !== '') {
+                $result = $mp->processYoutube($ytUrl, $id, trim($_POST['youtube_caption'] ?? ''));
+                if ($result['success']) {
+                    $success .= ' ' . $result['message'];
+                } else {
+                    throw new RuntimeException($result['message']);
+                }
             }
 
-            if (!$tagId) {
-                // Not a known ID, so it's a tag name (new or existing)
-                $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower($tagValue));
-                $slug = trim($slug, '-');
-                
-                if ($slug === '') continue;
+            // — Narrative pivot sync —
+            $pdo->prepare("DELETE FROM item_narrative WHERE item_id = :id")->execute([':id' => $id]);
+            $sel = array_map('intval', (array) ($_POST['narratives'] ?? []));
+            if ($sel) {
+                $ls = $pdo->prepare("INSERT INTO item_narrative (item_id, narrative_id) VALUES (:i, :n)");
+                foreach (array_filter($sel) as $nid) {
+                    $ls->execute([':i' => $id, ':n' => $nid]);
+                }
+            }
 
-                $existCheck = $pdo->prepare("SELECT id FROM tags WHERE slug = :s");
-                $existCheck->execute([':s' => $slug]);
-                $tagId = $existCheck->fetchColumn();
+            // — Tag pivot sync (auto-create new tags with hashtag support) —
+            $pdo->prepare("DELETE FROM item_tag WHERE item_id = :id")->execute([':id' => $id]);
+            $rawTags = (array) ($_POST['tags'] ?? []);
+            foreach ($rawTags as $tagValue) {
+                $tagValue = trim($tagValue);
+                if ($tagValue === '')
+                    continue;
+
+                // Normalize: Remove leading hashtags if typed
+                $tagValue = ltrim($tagValue, '#');
+
+                $tagId = null;
+                if (is_numeric($tagValue)) {
+                    // Check if this number is an actual existing tag ID
+                    $checkId = $pdo->prepare("SELECT id FROM tags WHERE id = ?");
+                    $checkId->execute([(int) $tagValue]);
+                    $tagId = $checkId->fetchColumn();
+                }
 
                 if (!$tagId) {
-                    // Create new tag with nice capitalization
-                    $name = ucwords(strtolower($tagValue));
-                    $ins = $pdo->prepare("INSERT INTO tags (name, slug) VALUES (:n, :s)");
-                    $ins->execute([':n' => $name, ':s' => $slug]);
-                    $tagId = (int)$pdo->lastInsertId();
+                    // Not a known ID, so it's a tag name (new or existing)
+                    $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower($tagValue));
+                    $slug = trim($slug, '-');
+
+                    if ($slug === '')
+                        continue;
+
+                    $existCheck = $pdo->prepare("SELECT id FROM tags WHERE slug = :s");
+                    $existCheck->execute([':s' => $slug]);
+                    $tagId = $existCheck->fetchColumn();
+
+                    if (!$tagId) {
+                        // Create new tag with nice capitalization
+                        $name = ucwords(strtolower($tagValue));
+                        $ins = $pdo->prepare("INSERT INTO tags (name, slug) VALUES (:n, :s)");
+                        $ins->execute([':n' => $name, ':s' => $slug]);
+                        $tagId = (int) $pdo->lastInsertId();
+                    }
+                }
+
+                if ($tagId) {
+                    $pdo->prepare("INSERT IGNORE INTO item_tag (item_id, tag_id) VALUES (:i, :t)")
+                        ->execute([':i' => $id, ':t' => $tagId]);
                 }
             }
 
-            if ($tagId) {
-                $pdo->prepare("INSERT IGNORE INTO item_tag (item_id, tag_id) VALUES (:i, :t)")
-                    ->execute([':i' => $id, ':t' => $tagId]);
+            // — Category pivot sync —
+            try {
+                $pdo->prepare("DELETE FROM item_category WHERE item_id = :id")->execute([':id' => $id]);
+                if (!empty($categoryIds)) {
+                    $cs = $pdo->prepare("INSERT INTO item_category (item_id, category_id) VALUES (:i, :c)");
+                    foreach ($categoryIds as $cid) {
+                        $cs->execute([':i' => $id, ':c' => $cid]);
+                    }
+                }
+            } catch (\PDOException $e) {
+                error_log("Failed to save item categories: " . $e->getMessage());
             }
-        }
 
-        // — Related Items pivot sync —
-        try {
-            $pdo->prepare("DELETE FROM item_related WHERE item_id = :id")->execute([':id' => $id]);
-            $relatedIds = array_filter(array_map('intval', (array)($_POST['related_items'] ?? [])));
-            if ($relatedIds) {
-                $rsStmt = $pdo->prepare("INSERT IGNORE INTO item_related (item_id, related_item_id) VALUES (:i, :r)");
-                foreach ($relatedIds as $rid) {
-                    if ($rid !== $id) $rsStmt->execute([':i' => $id, ':r' => $rid]);
+            // — Related Items pivot sync —
+            try {
+                $pdo->prepare("DELETE FROM item_related WHERE item_id = :id")->execute([':id' => $id]);
+                $relatedIds = array_filter(array_map('intval', (array) ($_POST['related_items'] ?? [])));
+                if ($relatedIds) {
+                    $rsStmt = $pdo->prepare("INSERT IGNORE INTO item_related (item_id, related_item_id) VALUES (:i, :r)");
+                    foreach ($relatedIds as $rid) {
+                        if ($rid !== $id)
+                            $rsStmt->execute([':i' => $id, ':r' => $rid]);
+                    }
+                }
+            } catch (\PDOException $e) {
+                // Log it and possibly inform the user — if this fails, they might need to run update.sql
+                error_log("Failed to save related items: " . $e->getMessage());
+                if (str_contains($e->getMessage(), "doesn't exist")) {
+                    $error .= " / Warning: 'item_related' table not found. Please run the SQL in update.sql.";
                 }
             }
-        } catch (\PDOException $e) {
-            // Log it and possibly inform the user — if this fails, they might need to run update.sql
-            error_log("Failed to save related items: " . $e->getMessage());
-            if (str_contains($e->getMessage(), "doesn't exist")) {
-                $error .= " / Warning: 'item_related' table not found. Please run the SQL in update.sql.";
-            }
-        }
-
-            $pdo->commit();
 
             if (class_exists('HookRegistry')) {
                 HookRegistry::doAction('item_saved', $id);
             }
 
-        // Reload
+            $pdo->commit();
+
+            // If it was a new item or if we want to ensure the URL is correct, redirect.
+            if (!isset($_GET['id']) || (int) $_GET['id'] !== $id) {
+                header("Location: edit_item.php?id=" . $id . "&msg=created");
+                exit;
+            }
+
+            // Reload
             $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ?");
             $stmt->execute([$id]);
             $item = $stmt->fetch();
@@ -316,16 +388,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nStmt = $pdo->prepare("SELECT narrative_id FROM item_narrative WHERE item_id = :id");
             $nStmt->execute([':id' => $id]);
             $linkedNarratives = $nStmt->fetchAll(PDO::FETCH_COLUMN);
-            $tStmt = $pdo->prepare("SELECT tag_id FROM item_tag WHERE item_id = :id");
-            $tStmt->execute([':id' => $id]);
             $linkedTags = $tStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            $cStmt = $pdo->prepare("SELECT category_id FROM item_category WHERE item_id = :id");
+            $cStmt->execute([':id' => $id]);
+            $linkedCategories = $cStmt->fetchAll(PDO::FETCH_COLUMN);
+
             $allTags = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
             // Related items reload
             try {
                 $rStmt = $pdo->prepare("SELECT related_item_id FROM item_related WHERE item_id = :id");
                 $rStmt->execute([':id' => $id]);
                 $linkedRelated = $rStmt->fetchAll(PDO::FETCH_COLUMN);
-            } catch (\PDOException) { $linkedRelated = []; }
+            } catch (\PDOException) {
+                $linkedRelated = [];
+            }
 
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -354,23 +431,46 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
 <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 
+<!-- Cropper.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
 <style>
-.ts-control { border: 1px solid #d1d5db !important; border-radius: 6px !important; padding: 6px 8px !important; }
-.ts-control:focus-within { border-color: #111827 !important; box-shadow: 0 0 0 1px #111827 !important; }
-.ts-dropdown { border: 1px solid #d1d5db !important; border-radius: 6px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,.1) !important; }
+    .ts-control {
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        padding: 6px 8px !important;
+    }
+
+    .ts-control:focus-within {
+        border-color: #111827 !important;
+        box-shadow: 0 0 0 1px #111827 !important;
+    }
+
+    .ts-dropdown {
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1) !important;
+    }
 </style>
 
 <div class="mb-6 flex justify-between items-center">
     <div>
         <h1 class="text-2xl font-bold text-gray-900"><?= $id > 0 ? 'Edit Item' : 'New Item' ?></h1>
-        <?php if($id > 0): ?>
+        <?php if ($id > 0): ?>
             <p class="text-sm text-gray-500 mt-1">Reg: <strong><?= htmlspecialchars($item['reg_number']) ?></strong></p>
         <?php endif; ?>
     </div>
     <div class="flex items-center gap-4">
         <?php if ($id > 0): ?>
-            <a href="<?= SITE_URL ?>/item/<?= $id ?>" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all shadow-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            <a href="<?= SITE_URL ?>/item/<?= $id ?>" target="_blank"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
                 View This Item
             </a>
         <?php endif; ?>
@@ -379,17 +479,19 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
 </div>
 
 <?php if ($error): ?>
-<div class="mb-5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded"><?= htmlspecialchars($error) ?></div>
+    <div class="mb-5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 <?php if ($success): ?>
-<div class="mb-5 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded"><?= htmlspecialchars($success) ?></div>
+    <div class="mb-5 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded"><?= htmlspecialchars($success) ?>
+    </div>
 <?php endif; ?>
 
 <div class="flex flex-col xl:flex-row gap-8">
 
     <!-- MAIN FORM -->
     <div class="flex-1 min-w-0">
-        <form id="item-form" method="POST" enctype="multipart/form-data" class="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <form id="item-form" method="POST" enctype="multipart/form-data"
+            class="bg-white rounded-lg border border-gray-200 shadow-sm">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
 
             <!-- Metadata -->
@@ -400,51 +502,60 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                         <label class="label">Registration Number *</label>
-                        <input type="text" name="reg_number" list="reg_number_hints" value="<?= htmlspecialchars($item['reg_number'] ?? '') ?>" required class="input" autocomplete="off">
+                        <input type="text" name="reg_number" list="reg_number_hints"
+                            value="<?= htmlspecialchars($item['reg_number'] ?? '') ?>" required class="input"
+                            autocomplete="off">
                         <datalist id="reg_number_hints">
                             <?php foreach ($allItems as $ri): ?>
                                 <?php if (!empty($ri['reg_number'])): ?>
                                     <option value="<?= htmlspecialchars($ri['reg_number']) ?>">
-                                <?php endif; ?>
-                            <?php endforeach; ?>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
                         </datalist>
                     </div>
                     <div>
-                        <label class="label">Category *</label>
-                        <select name="category_id" required class="input">
-                            <option value="">Select a category</option>
+                        <label class="label">Categories *</label>
+                        <select id="category-select" name="category_ids[]" multiple required class="w-full">
                             <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['id'] ?>" <?= ($item['category_id'] == $cat['id']) ? 'selected' : '' ?>><?= htmlspecialchars($cat['name']) ?></option>
+                                <option value="<?= $cat['id'] ?>" <?= in_array($cat['id'], $linkedCategories) ? 'selected' : '' ?>><?= htmlspecialchars($cat['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
                 <div>
                     <label class="label">Title *</label>
-                    <input type="text" name="title" value="<?= htmlspecialchars($item['title'] ?? '') ?>" required class="input">
+                    <input type="text" name="title" value="<?= htmlspecialchars($item['title'] ?? '') ?>" required
+                        class="input">
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div>
                         <label class="label">Production Date (Text)</label>
-                        <input type="text" name="production_date" value="<?= htmlspecialchars($item['production_date'] ?? '') ?>" placeholder="e.g. Circa 1860" class="input">
+                        <input type="text" name="production_date"
+                            value="<?= htmlspecialchars($item['production_date'] ?? '') ?>"
+                            placeholder="e.g. Circa 1860" class="input">
                     </div>
                     <div>
                         <label class="label">Start Year</label>
-                        <input type="number" name="year_start" value="<?= htmlspecialchars($item['year_start'] ?? '') ?>" placeholder="e.g. 1860" class="input">
+                        <input type="number" name="year_start"
+                            value="<?= htmlspecialchars($item['year_start'] ?? '') ?>" placeholder="e.g. 1860"
+                            class="input">
                     </div>
                     <div>
                         <label class="label">End Year</label>
-                        <input type="number" name="year_end" value="<?= htmlspecialchars($item['year_end'] ?? '') ?>" placeholder="e.g. 1865" class="input">
+                        <input type="number" name="year_end" value="<?= htmlspecialchars($item['year_end'] ?? '') ?>"
+                            placeholder="e.g. 1865" class="input">
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                         <label class="label">Material</label>
-                        <input type="text" name="material" value="<?= htmlspecialchars($item['material'] ?? '') ?>" placeholder="e.g. Paper, Ink" class="input">
+                        <input type="text" name="material" value="<?= htmlspecialchars($item['material'] ?? '') ?>"
+                            placeholder="e.g. Paper, Ink" class="input">
                     </div>
                     <div>
                         <label class="label">Credit Line</label>
-                        <input type="text" name="credit_line" value="<?= htmlspecialchars($item['credit_line'] ?? '') ?>" class="input">
+                        <input type="text" name="credit_line"
+                            value="<?= htmlspecialchars($item['credit_line'] ?? '') ?>" class="input">
                     </div>
                 </div>
                 <div>
@@ -465,7 +576,8 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                         Linked Stories / Narratives
                         <span class="text-gray-400 font-normal">(search and tag multiple)</span>
                     </label>
-                    <select id="narrative-select" name="narratives[]" multiple placeholder="Search for a story…" class="w-full">
+                    <select id="narrative-select" name="narratives[]" multiple placeholder="Search for a story…"
+                        class="w-full">
                         <?php foreach ($allNarratives as $n): ?>
                             <option value="<?= $n['id'] ?>" <?= in_array($n['id'], $linkedNarratives) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($n['title']) ?>
@@ -480,7 +592,8 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                         Tags / Hashtags
                         <span class="text-gray-400 font-normal">(type to create new or select existing)</span>
                     </label>
-                    <select id="tag-select" name="tags[]" multiple placeholder="Add tags… e.g. steam, victorian" class="w-full">
+                    <select id="tag-select" name="tags[]" multiple placeholder="Add tags… e.g. steam, victorian"
+                        class="w-full">
                         <?php foreach ($allTags as $t): ?>
                             <option value="<?= $t['id'] ?>" <?= in_array($t['id'], $linkedTags) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($t['name']) ?>
@@ -488,33 +601,41 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                         <?php endforeach; ?>
                     </select>
                 </div>
-                
+
                 <!-- NEW MODULE HOOK: Inject additional fields -->
-                <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_item_edit_after_fields', $id, $item); } ?>
+                <?php if (class_exists('HookRegistry')) {
+                    HookRegistry::doAction('admin_item_edit_after_fields', $id, $item);
+                } ?>
 
                 <!-- Related Items Linker -->
                 <div>
                     <label class="label">
                         Related Items
-                        <span class="text-gray-400 font-normal">(shown as "You May Also Like" — leave empty to auto-suggest by category)</span>
+                        <span class="text-gray-400 font-normal">(shown as "You May Also Like" — leave empty to
+                            auto-suggest by category)</span>
                     </label>
-                    <select id="related-select" name="related_items[]" multiple placeholder="Search for an item…" class="w-full">
+                    <select id="related-select" name="related_items[]" multiple placeholder="Search for an item…"
+                        class="w-full">
                         <?php foreach ($allItems as $ri): ?>
-                            <?php if ($ri['id'] == $id) continue; ?>
+                            <?php if ($ri['id'] == $id)
+                                continue; ?>
                             <option value="<?= $ri['id'] ?>" <?= in_array($ri['id'], $linkedRelated) ? 'selected' : '' ?>>
                                 [<?= htmlspecialchars($ri['reg_number']) ?>] <?= htmlspecialchars($ri['title']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                
+
                 <!-- Trade Manager Enable/Disable -->
                 <div class="mt-4 border-t border-gray-200 pt-5">
                     <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" name="allow_trade" value="1" class="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900" <?= ($item['allow_trade'] ?? 1) ? 'checked' : '' ?>>
+                        <input type="checkbox" name="allow_trade" value="1"
+                            class="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                            <?= ($item['allow_trade'] ?? 0) ? 'checked' : '' ?>>
                         <div>
                             <span class="block text-sm font-medium text-gray-900">Allow Trade Requests</span>
-                            <span class="block text-sm text-gray-500">If checked, visitors can submit trade requests for this specific item.</span>
+                            <span class="block text-sm text-gray-500">If checked, visitors can submit trade requests for
+                                this specific item.</span>
                         </div>
                     </label>
                 </div>
@@ -525,54 +646,75 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                 <!-- Tab buttons -->
                 <div class="flex border-b border-gray-200 bg-gray-50" role="tablist">
                     <button type="button" onclick="showTab('tab-image')" id="btn-image"
-                            class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-gray-900 text-gray-900">🖼 Image</button>
+                        class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-gray-900 text-gray-900">🖼
+                        Image</button>
                     <button type="button" onclick="showTab('tab-pdf')" id="btn-pdf"
-                            class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">📄 PDF</button>
+                        class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">📄
+                        PDF</button>
                     <button type="button" onclick="showTab('tab-youtube')" id="btn-youtube"
-                            class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">▶ YouTube</button>
+                        class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">▶
+                        YouTube</button>
                 </div>
 
                 <!-- Image tab -->
                 <div id="tab-image" class="media-tab p-6 space-y-4">
-                    <p class="text-xs text-gray-400">JPG · PNG · WebP · max 5 MB → auto-converted to WebP in 3 sizes. <span class="text-blue-600">You can select multiple files.</span></p>
+                    <p class="text-xs text-gray-400">JPG · PNG · WebP · max 5 MB → auto-converted to WebP in 3 sizes.
+                        <span class="text-blue-600">You can select multiple files.</span></p>
                     <input type="file" name="media_upload[]" accept=".jpg,.jpeg,.png,.webp,.gif" multiple
-                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><label class="label">Caption</label><input type="text" name="media_caption" class="input"></div>
+                        <div><label class="label">Caption</label><input type="text" name="media_caption" class="input">
+                        </div>
                         <div>
                             <label class="label">License</label>
                             <select name="media_license" class="input">
-                                <option>Public Domain</option><option>CC BY 4.0</option><option>All Rights Reserved</option>
+                                <option>Public Domain</option>
+                                <option>CC BY 4.0</option>
+                                <option>All Rights Reserved</option>
                             </select>
                         </div>
                     </div>
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="is_primary" value="1" class="h-4 w-4 rounded border-gray-300">
-                        <span class="text-sm text-gray-700">Set as <strong>Primary Image</strong> <span class="text-gray-400">(shown in search results)</span></span>
+                        <span class="text-sm text-gray-700">Set as <strong>Primary Image</strong> <span
+                                class="text-gray-400">(shown in search results)</span></span>
+                    </label>
+                    <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                        <input type="checkbox" id="show-crop-check" class="h-4 w-4 rounded border-gray-300">
+                        <span class="text-sm font-medium text-blue-600">Show crop tool while upload</span>
                     </label>
                 </div>
 
                 <!-- PDF tab -->
                 <div id="tab-pdf" class="media-tab p-6 space-y-4 hidden">
-                    <p class="text-xs text-gray-400">Upload a PDF document — max 20 MB. Visitors will be able to view or download it on the item page.</p>
+                    <p class="text-xs text-gray-400">Upload a PDF document — max 20 MB. Visitors will be able to view or
+                        download it on the item page.</p>
                     <input type="file" name="pdf_upload" accept=".pdf,application/pdf"
-                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-red-100 file:text-red-700 hover:file:bg-red-200">
-                    <div><label class="label">Caption / Document Title</label><input type="text" name="pdf_caption" class="input" placeholder="e.g. Original auction catalogue, 1887"></div>
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-red-100 file:text-red-700 hover:file:bg-red-200">
+                    <div><label class="label">Caption / Document Title</label><input type="text" name="pdf_caption"
+                            class="input" placeholder="e.g. Original auction catalogue, 1887"></div>
                 </div>
 
                 <!-- YouTube tab -->
                 <div id="tab-youtube" class="media-tab p-6 space-y-4 hidden">
-                    <p class="text-xs text-gray-400">Paste any YouTube URL — standard, short (youtu.be), Shorts, or embed format.</p>
+                    <p class="text-xs text-gray-400">Paste any YouTube URL — standard, short (youtu.be), Shorts, or
+                        embed format.</p>
                     <div><label class="label">YouTube URL</label>
-                        <input type="url" name="youtube_url" class="input" placeholder="https://www.youtube.com/watch?v=..."></div>
+                        <input type="url" name="youtube_url" class="input"
+                            placeholder="https://www.youtube.com/watch?v=...">
+                    </div>
                     <div><label class="label">Caption</label>
-                        <input type="text" name="youtube_caption" class="input" placeholder="e.g. Museum documentary, 2022"></div>
+                        <input type="text" name="youtube_caption" class="input"
+                            placeholder="e.g. Museum documentary, 2022">
+                    </div>
                 </div>
             </div>
 
             <div class="p-6 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
-                <a href="items.php" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</a>
-                <button type="submit" class="px-5 py-2 text-sm font-medium rounded-md text-white bg-gray-900 hover:bg-gray-800">
+                <a href="items.php"
+                    class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</a>
+                <button type="submit"
+                    class="px-5 py-2 text-sm font-medium rounded-md text-white bg-gray-900 hover:bg-gray-800">
                     <?= $id > 0 ? 'Update Item' : 'Save Item' ?>
                 </button>
             </div>
@@ -581,162 +723,361 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
 
     <!-- MEDIA SIDEBAR -->
     <?php if ($id > 0): ?>
-    <div class="w-full xl:w-80 space-y-4 flex-shrink-0">
-        <h3 class="font-semibold text-gray-800">Attached Media <span class="text-gray-400 font-normal text-sm">(<?= count($mediaList) ?>)</span></h3>
-        <?php if ($mediaList): ?>
-            <?php foreach ($mediaList as $m): ?>
-            <?php $mType = $m['media_type'] ?? 'image'; ?>
-            <div class="bg-white border <?= !empty($m['is_primary']) ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200' ?> rounded-lg overflow-hidden shadow-sm">
-                <?php if (!empty($m['is_primary'])): ?>
-                    <div class="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 text-center tracking-widest">PRIMARY</div>
-                <?php endif; ?>
+        <div class="w-full xl:w-80 space-y-4 flex-shrink-0">
+            <h3 class="font-semibold text-gray-800">Attached Media <span
+                    class="text-gray-400 font-normal text-sm">(<?= count($mediaList) ?>)</span></h3>
+            <?php if ($mediaList): ?>
+                <?php foreach ($mediaList as $m): ?>
+                    <?php $mType = $m['media_type'] ?? 'image'; ?>
+                    <div
+                        class="bg-white border <?= !empty($m['is_primary']) ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200' ?> rounded-lg overflow-hidden shadow-sm">
+                        <?php if (!empty($m['is_primary'])): ?>
+                            <div class="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 text-center tracking-widest">PRIMARY
+                            </div>
+                        <?php endif; ?>
 
-                <?php if ($mType === 'youtube'): ?>
-                    <!-- YouTube preview -->
-                    <div class="relative h-36 bg-black">
-                        <img src="https://img.youtube.com/vi/<?= htmlspecialchars($m['file_path']) ?>/mqdefault.jpg"
-                             class="w-full h-full object-cover opacity-80">
-                        <div class="absolute inset-0 flex items-center justify-center">
-                            <span class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">▶ YouTube</span>
+                        <?php if ($mType === 'youtube'): ?>
+                            <!-- YouTube preview -->
+                            <div class="relative h-36 bg-black">
+                                <img src="https://img.youtube.com/vi/<?= htmlspecialchars($m['file_path']) ?>/mqdefault.jpg"
+                                    class="w-full h-full object-cover opacity-80">
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">▶ YouTube</span>
+                                </div>
+                            </div>
+                        <?php elseif ($mType === 'pdf'): ?>
+                            <!-- PDF preview -->
+                            <div class="h-36 bg-red-50 flex flex-col items-center justify-center gap-1">
+                                <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z">
+                                    </path>
+                                </svg>
+                                <span class="text-xs text-red-500 font-medium">PDF Document</span>
+                                <a href="<?= MediaProcessor::url($m['file_path'], 'display', 'pdf', $storage ?? null) ?>"
+                                    target="_blank" class="text-xs text-blue-600 hover:underline">Open PDF</a>
+                            </div>
+                        <?php else: ?>
+                            <!-- Image preview -->
+                            <div class="h-36 bg-gray-100">
+                                <img src="<?= MediaProcessor::url($m['file_path'], 'thumbnails', 'image', $storage ?? null) ?>"
+                                    onerror="this.src='<?= MediaProcessor::url($m['file_path'], 'display', 'image', $storage ?? null) ?>'"
+                                    class="object-cover w-full h-full" alt="thumbnail">
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="p-3 text-xs space-y-0.5 text-gray-500">
+                            <p class="font-mono break-all"><?= htmlspecialchars($m['file_path']) ?></p>
+                            <?php if (!empty($m['caption'])): ?>
+                                <p class="text-gray-700"><?= htmlspecialchars($m['caption']) ?></p><?php endif; ?>
+                            <?php if (!empty($m['dimensions'])): ?>
+                                <p>📐 <?= $m['dimensions'] ?></p><?php endif; ?>
+                            <?php if (!empty($m['file_size'])): ?>
+                                <p>💾 <?= round($m['file_size'] / 1024, 1) ?> KB</p><?php endif; ?>
+                            <?php if ($mType === 'youtube' && !empty($m['youtube_url'])): ?>
+                                <a href="<?= htmlspecialchars($m['youtube_url']) ?>" target="_blank"
+                                    class="text-blue-500 hover:underline">View on YouTube ↗</a>
+                            <?php endif; ?>
+
+                            <?php if ($hasIsPrimary && $mType === 'image' && empty($m['is_primary'])): ?>
+                                <form method="POST" class="mt-2">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+                                    <input type="hidden" name="action" value="make_primary">
+                                    <input type="hidden" name="primary_media_id" value="<?= (int) $m['id'] ?>">
+                                    <button type="submit"
+                                        class="w-full px-3 py-1.5 rounded border border-blue-200 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 transition">
+                                        Make Primary
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+
+                            <label class="mt-2 inline-flex items-center gap-2 text-red-600 cursor-pointer">
+                                <input type="checkbox" name="delete_media[]" value="<?= (int) $m['id'] ?>" form="item-form"
+                                    class="h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500">
+                                <span class="font-medium">Delete this media on save</span>
+                            </label>
                         </div>
                     </div>
-                <?php elseif ($mType === 'pdf'): ?>
-                    <!-- PDF preview -->
-                    <div class="h-36 bg-red-50 flex flex-col items-center justify-center gap-1">
-                        <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                        <span class="text-xs text-red-500 font-medium">PDF Document</span>
-                        <a href="<?= MediaProcessor::url($m['file_path'], 'display', 'pdf', $storage ?? null) ?>" target="_blank"
-                           class="text-xs text-blue-600 hover:underline">Open PDF</a>
-                    </div>
-                <?php else: ?>
-                    <!-- Image preview -->
-                    <div class="h-36 bg-gray-100">
-                        <img src="<?= MediaProcessor::url($m['file_path'], 'thumbnails', 'image', $storage ?? null) ?>"
-                             onerror="this.src='<?= MediaProcessor::url($m['file_path'], 'display', 'image', $storage ?? null) ?>'"
-                             class="object-cover w-full h-full" alt="thumbnail">
-                    </div>
-                <?php endif; ?>
+                <?php endforeach; ?>
 
-                <div class="p-3 text-xs space-y-0.5 text-gray-500">
-                    <p class="font-mono break-all"><?= htmlspecialchars($m['file_path']) ?></p>
-                    <?php if (!empty($m['caption'])): ?><p class="text-gray-700"><?= htmlspecialchars($m['caption']) ?></p><?php endif; ?>
-                    <?php if (!empty($m['dimensions'])): ?><p>📐 <?= $m['dimensions'] ?></p><?php endif; ?>
-                    <?php if (!empty($m['file_size'])): ?><p>💾 <?= round($m['file_size']/1024, 1) ?> KB</p><?php endif; ?>
-                    <?php if ($mType === 'youtube' && !empty($m['youtube_url'])): ?>
-                        <a href="<?= htmlspecialchars($m['youtube_url']) ?>" target="_blank" class="text-blue-500 hover:underline">View on YouTube ↗</a>
-                    <?php endif; ?>
-
-                    <?php if ($hasIsPrimary && $mType === 'image' && empty($m['is_primary'])): ?>
-                        <form method="POST" class="mt-2">
-                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
-                            <input type="hidden" name="action" value="make_primary">
-                            <input type="hidden" name="primary_media_id" value="<?= (int) $m['id'] ?>">
-                            <button type="submit" class="w-full px-3 py-1.5 rounded border border-blue-200 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 transition">
-                                Make Primary
-                            </button>
-                        </form>
-                    <?php endif; ?>
-
-                    <label class="mt-2 inline-flex items-center gap-2 text-red-600 cursor-pointer">
-                        <input type="checkbox" name="delete_media[]" value="<?= (int) $m['id'] ?>" form="item-form" class="h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500">
-                        <span class="font-medium">Delete this media on save</span>
-                    </label>
+            <?php else: ?>
+                <div class="border border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-gray-400">
+                    No images yet. Upload one using the form.
                 </div>
-            </div>
-            <?php endforeach; ?>
-
-        <?php else: ?>
-            <div class="border border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-gray-400">
-                No images yet. Upload one using the form.
-            </div>
-        <?php endif; ?>
-    </div>
+            <?php endif; ?>
+        </div>
     <?php endif; ?>
 </div>
 
 <!-- Reusable input styles -->
 <style>
-.label { display: block; font-size: .875rem; font-weight: 500; color: #374151; margin-bottom: .25rem; }
-.input { width: 100%; border: 1px solid #d1d5db; border-radius: .375rem; padding: .5rem .75rem; font-size: .875rem;
-         outline: none; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
-.input:focus { border-color: #111827; box-shadow: 0 0 0 1px #111827; }
+    .label {
+        display: block;
+        font-size: .875rem;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: .25rem;
+    }
+
+    .input {
+        width: 100%;
+        border: 1px solid #d1d5db;
+        border-radius: .375rem;
+        padding: .5rem .75rem;
+        font-size: .875rem;
+        outline: none;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
+    }
+
+    .input:focus {
+        border-color: #111827;
+        box-shadow: 0 0 0 1px #111827;
+    }
 </style>
 
 <script>
-new TomSelect('#narrative-select', {
-    plugins: ['remove_button'],
-    placeholder: 'Search for a story…',
-    maxOptions: 200,
-});
+    new TomSelect('#category-select', {
+        plugins: ['remove_button'],
+        placeholder: 'Select categories…',
+        maxOptions: 200,
+    });
 
-new TomSelect('#tag-select', {
-    plugins: ['remove_button', 'dropdown_input', 'restore_on_backspace'],
-    create: true,
-    persist: false,
-    placeholder: 'Add tags… e.g. #steam, victorian',
-    maxOptions: 200,
-    createFilter: function(input) { return input.trim().length >= 2; },
-    render: {
-        option_create: function(data, escape) {
-            return '<div class="create">Add <strong>' + escape(data.input) + '</strong>…</div>';
-        },
-        no_results: function(data, escape) {
-            return '<div class="no-results px-3 py-2 text-xs text-gray-500">No existing tags match "' + escape(data.input) + '"</div>';
+    new TomSelect('#narrative-select', {
+        plugins: ['remove_button'],
+        placeholder: 'Search for a story…',
+        maxOptions: 200,
+    });
+
+    new TomSelect('#tag-select', {
+        plugins: ['remove_button', 'dropdown_input', 'restore_on_backspace'],
+        create: true,
+        persist: false,
+        placeholder: 'Add tags… e.g. #steam, victorian',
+        maxOptions: 200,
+        createFilter: function (input) { return input.trim().length >= 2; },
+        render: {
+            option_create: function (data, escape) {
+                return '<div class="create">Add <strong>' + escape(data.input) + '</strong>…</div>';
+            },
+            no_results: function (data, escape) {
+                return '<div class="no-results px-3 py-2 text-xs text-gray-500">No existing tags match "' + escape(data.input) + '"</div>';
+            }
+        }
+    });
+
+    new TomSelect('#related-select', {
+        plugins: ['remove_button'],
+        placeholder: 'Search for an item…',
+        maxOptions: 500,
+    });
+
+    // Media upload tab switcher
+    function showTab(id) {
+        document.querySelectorAll('.media-tab').forEach(el => el.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+        const labels = { 'tab-image': 'btn-image', 'tab-pdf': 'btn-pdf', 'tab-youtube': 'btn-youtube' };
+        Object.values(labels).forEach(btn => {
+            document.getElementById(btn).classList.remove('border-gray-900', 'text-gray-900');
+            document.getElementById(btn).classList.add('border-transparent', 'text-gray-500');
+        });
+        const activeBtn = document.getElementById(labels[id]);
+        activeBtn.classList.remove('border-transparent', 'text-gray-500');
+        activeBtn.classList.add('border-gray-900', 'text-gray-900');
+    }
+
+    // ── Quill Editors ─────────────────────────────────────────────────────────
+    const toolbarOptions = [
+        ['bold', 'italic', 'underline'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['blockquote', 'link'],
+        ['clean']
+    ];
+
+    const quillDesc = new Quill('#editor-description', {
+        theme: 'snow',
+        placeholder: 'Describe the physical characteristics of the artifact…',
+        modules: { toolbar: toolbarOptions }
+    });
+
+    const quillHist = new Quill('#editor-significance', {
+        theme: 'snow',
+        placeholder: 'Describe the historical context and significance…',
+        modules: { toolbar: toolbarOptions }
+    });
+
+    // Pre-fill editors with saved HTML content
+    const savedDesc = <?= json_encode($item['physical_description'] ?? '') ?>;
+    const savedHist = <?= json_encode($item['historical_significance'] ?? '') ?>;
+    if (savedDesc) quillDesc.clipboard.dangerouslyPasteHTML(savedDesc);
+    if (savedHist) quillHist.clipboard.dangerouslyPasteHTML(savedHist);
+
+    // Before form submit, copy editor HTML into hidden inputs
+    document.getElementById('item-form').addEventListener('submit', function (e) {
+        document.getElementById('physical_description_input').value = quillDesc.root.innerHTML;
+        document.getElementById('historical_significance_input').value = quillHist.root.innerHTML;
+    });
+
+    // ── Cropper Logic ──────────────────────────────────────────────────────────
+    let cropper = null;
+    const cropModal = document.createElement('div');
+    cropModal.id = 'crop-modal';
+    cropModal.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-black/80 hidden p-4';
+    cropModal.innerHTML = `
+    <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="font-bold text-gray-900">Crop Image</h3>
+            <button type="button" onclick="closeCropModal()" class="text-gray-400 hover:text-gray-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+        </div>
+        <div class="flex-grow overflow-hidden bg-gray-100 flex items-center justify-center p-4">
+            <img id="crop-image-preview" src="" class="max-w-full max-h-full">
+        </div>
+        <div class="p-4 border-t flex justify-end gap-3 bg-gray-50">
+            <button type="button" onclick="closeCropModal()" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+            <button type="button" id="apply-crop-btn" class="px-6 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-500/30">Crop & Continue</button>
+        </div>
+    </div>
+`;
+    document.body.appendChild(cropModal);
+
+    let croppedBlobs = []; // Stores blobs for files that were cropped [index => blob]
+    let originalFiles = []; // Stores the original File objects from the input
+    const mediaInput = document.querySelector('input[name="media_upload[]"]');
+    const showCropCheck = document.getElementById('show-crop-check');
+    
+    function toggleMediaMultiple() {
+        if (showCropCheck.checked) {
+            mediaInput.removeAttribute('multiple');
+        } else {
+            mediaInput.setAttribute('multiple', 'multiple');
         }
     }
-});
+    showCropCheck.addEventListener('change', toggleMediaMultiple);
+    toggleMediaMultiple();
 
-new TomSelect('#related-select', {
-    plugins: ['remove_button'],
-    placeholder: 'Search for an item…',
-    maxOptions: 500,
-});
+    const cropPreviewContainer = document.createElement('div');
+    cropPreviewContainer.id = 'crop-preview-container';
+    cropPreviewContainer.className = 'mt-3 hidden';
+    mediaInput.parentNode.appendChild(cropPreviewContainer);
 
-// Media upload tab switcher
-function showTab(id) {
-    document.querySelectorAll('.media-tab').forEach(el => el.classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
-    const labels = { 'tab-image': 'btn-image', 'tab-pdf': 'btn-pdf', 'tab-youtube': 'btn-youtube' };
-    Object.values(labels).forEach(btn => {
-        document.getElementById(btn).classList.remove('border-gray-900', 'text-gray-900');
-        document.getElementById(btn).classList.add('border-transparent', 'text-gray-500');
+    mediaInput.addEventListener('change', function () {
+        originalFiles = Array.from(this.files);
+        croppedBlobs = []; // Reset crops on new selection
+        updateCropPreview();
+
+        if (!showCropCheck.checked || !this.files || this.files.length === 0) return;
+
+        // We only crop the first image for now
+        const file = this.files[0];
+        if (!file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            document.getElementById('crop-image-preview').src = e.target.result;
+            cropModal.classList.remove('hidden');
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(document.getElementById('crop-image-preview'), {
+                viewMode: 2,
+                autoCropArea: 1,
+            });
+        };
+        reader.readAsDataURL(file);
     });
-    const activeBtn = document.getElementById(labels[id]);
-    activeBtn.classList.remove('border-transparent', 'text-gray-500');
-    activeBtn.classList.add('border-gray-900', 'text-gray-900');
-}
 
-// ── Quill Editors ─────────────────────────────────────────────────────────
-const toolbarOptions = [
-    ['bold', 'italic', 'underline'],
-    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-    ['blockquote', 'link'],
-    ['clean']
-];
+    function closeCropModal() {
+        cropModal.classList.add('hidden');
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+    }
 
-const quillDesc = new Quill('#editor-description', {
-    theme: 'snow',
-    placeholder: 'Describe the physical characteristics of the artifact…',
-    modules: { toolbar: toolbarOptions }
-});
+    function updateCropPreview() {
+        cropPreviewContainer.innerHTML = '';
+        if (croppedBlobs[0]) {
+            const url = URL.createObjectURL(croppedBlobs[0]);
+            cropPreviewContainer.innerHTML = `
+            <div class="flex items-center gap-4 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                <div class="w-16 h-16 rounded-lg overflow-hidden border border-blue-200 flex-shrink-0">
+                    <img src="${url}" class="w-full h-full object-cover">
+                </div>
+                <div class="flex-grow">
+                    <p class="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Cropped Preview</p>
+                    <button type="button" onclick="removeCrop()" class="text-[10px] font-bold text-red-500 hover:text-red-700 uppercase tracking-widest">Remove Crop</button>
+                </div>
+            </div>
+        `;
+            cropPreviewContainer.classList.remove('hidden');
+        } else {
+            cropPreviewContainer.classList.add('hidden');
+        }
+    }
 
-const quillHist = new Quill('#editor-significance', {
-    theme: 'snow',
-    placeholder: 'Describe the historical context and significance…',
-    modules: { toolbar: toolbarOptions }
-});
+    function removeCrop() {
+        croppedBlobs = [];
+        updateCropPreview();
+    }
 
-// Pre-fill editors with saved HTML content
-const savedDesc = <?= json_encode($item['physical_description'] ?? '') ?>;
-const savedHist = <?= json_encode($item['historical_significance'] ?? '') ?>;
-if (savedDesc) quillDesc.clipboard.dangerouslyPasteHTML(savedDesc);
-if (savedHist) quillHist.clipboard.dangerouslyPasteHTML(savedHist);
+    document.getElementById('apply-crop-btn').addEventListener('click', function () {
+        if (!cropper) return;
 
-// Before form submit, copy editor HTML into hidden inputs
-document.getElementById('item-form').addEventListener('submit', function() {
-    document.getElementById('physical_description_input').value   = quillDesc.root.innerHTML;
-    document.getElementById('historical_significance_input').value = quillHist.root.innerHTML;
-});
+        const canvas = cropper.getCroppedCanvas({
+            maxWidth: 2048,
+            maxHeight: 2048
+        });
+
+        canvas.toBlob((blob) => {
+            croppedBlobs[0] = blob; // Mark the 1st file as cropped
+            closeCropModal();
+            updateCropPreview();
+        }, 'image/webp', 0.9);
+    });
+
+    // Intercept form submission to inject cropped blob and preserve others
+    document.getElementById('item-form').addEventListener('submit', function (e) {
+        if (croppedBlobs.length > 0 || originalFiles.length > 0) {
+            // If we have crops OR multiple files, we use AJAX to ensure form is correct
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            // Remove the original file input from formData
+            formData.delete('media_upload[]');
+
+            // Repopulate media_upload[]: use cropped blob if exists, else original file
+            originalFiles.forEach((file, index) => {
+                if (croppedBlobs[index]) {
+                    formData.append('media_upload[]', croppedBlobs[index], 'cropped_image_' + index + '.webp');
+                } else {
+                    formData.append('media_upload[]', file);
+                }
+            });
+
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Uploading...';
+
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    return response.text();
+                }
+            }).then(html => {
+                if (html) {
+                    // If it didn't redirect, just update the page content (might be an error)
+                    document.documentElement.innerHTML = html;
+                }
+            }).catch(err => {
+                console.error('Upload failed:', err);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                alert('Upload failed. Please try again.');
+            });
+        }
+    });
 </script>
 
 <?= renderAdminFooter(); ?>

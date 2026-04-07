@@ -13,12 +13,14 @@ require_once ThemeManager::getHeader();
     <nav class="flex text-xs font-semibold uppercase tracking-wider tc-text-muted mb-8" aria-label="Breadcrumb">
         <ol class="inline-flex items-center space-x-2">
             <li><a href="<?= SITE_URL ?>" class="tc-accent-text hover:underline transition-colors">Archive</a></li>
-            <?php if (!empty($item['category_name'])): ?>
+            <?php if (!empty($itemCategories)): ?>
+                <?php foreach ($itemCategories as $cat): ?>
                 <li class="flex items-center">
                     <span class="mx-2">/</span>
-                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $item['category_id'] ?>"
-                        class="tc-accent-text hover:underline transition-colors"><?= htmlspecialchars($item['category_name']) ?></a>
+                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $cat['id'] ?>"
+                        class="tc-accent-text hover:underline transition-colors"><?= htmlspecialchars($cat['name']) ?></a>
                 </li>
+                <?php endforeach; ?>
             <?php endif; ?>
             <li class="flex items-center tc-text">
                 <span class="mx-2">/</span>
@@ -171,12 +173,14 @@ require_once ThemeManager::getHeader();
                         <dd class="spec-value col-span-2 font-mono tc-accent-text">
                             <?= htmlspecialchars($item['reg_number']) ?></dd>
                     </div>
-                    <?php if (!empty($item['category_name'])): ?>
+                    <?php if (!empty($itemCategories)): ?>
                         <div class="p-5 grid grid-cols-3 gap-4">
-                            <dt class="spec-label col-span-1">Category</dt>
-                            <dd class="col-span-2">
-                                <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $item['category_id'] ?>"
-                                    class="spec-value tc-accent-text hover:underline"><?= htmlspecialchars($item['category_name']) ?></a>
+                            <dt class="spec-label col-span-1">Categories</dt>
+                            <dd class="col-span-2 flex flex-wrap gap-2">
+                                <?php foreach ($itemCategories as $idx => $cat): ?>
+                                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $cat['id'] ?>"
+                                        class="spec-value tc-accent-text hover:underline"><?= htmlspecialchars($cat['name']) ?></a><?= ($idx < count($itemCategories) - 1) ? ',' : '' ?>
+                                <?php endforeach; ?>
                             </dd>
                         </div>
                     <?php endif; ?>

@@ -32,9 +32,11 @@ require_once ThemeManager::getHeader();
             </a>
             <svg class="mx-2 h-4 w-4 text-slate-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
             <a href="<?= SITE_URL ?>/search.php" class="hover:text-modern-600 transition-colors">Collection</a>
-            <?php if (!empty($item['category_name'])): ?>
-                <svg class="mx-2 h-4 w-4 text-slate-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
-                <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= $item['category_id'] ?>" class="hover:text-modern-600 transition-colors"><?= htmlspecialchars($item['category_name']) ?></a>
+            <?php if (!empty($itemCategories)): ?>
+                <?php foreach ($itemCategories as $cat): ?>
+                    <svg class="mx-2 h-4 w-4 text-slate-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= $cat['id'] ?>" class="hover:text-modern-600 transition-colors"><?= htmlspecialchars($cat['name']) ?></a>
+                <?php endforeach; ?>
             <?php endif; ?>
             <svg class="mx-2 h-4 w-4 text-slate-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
             <span class="text-slate-900 truncate max-w-xs" aria-current="page"><?= htmlspecialchars($item['reg_number']) ?></span>

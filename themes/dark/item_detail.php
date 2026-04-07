@@ -10,13 +10,15 @@ require_once ThemeManager::getHeader();
             <nav class="flex text-sm text-gray-500 mb-8" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1 md:space-x-3">
                     <li class="inline-flex items-center"><a href="<?= SITE_URL ?>" class="hover:text-white">Collections</a></li>
-                    <?php if (!empty($item['category_name'])): ?>
-                    <li>
-                        <div class="flex items-center">
-                            <svg class="w-4 h-4 text-gray-600 mx-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
-                            <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int)$item['category_id'] ?>" class="hover:text-white"><?= htmlspecialchars($item['category_name']) ?></a>
-                        </div>
-                    </li>
+                    <?php if (!empty($itemCategories)): ?>
+                        <?php foreach ($itemCategories as $cat): ?>
+                        <li>
+                            <div class="flex items-center">
+                                <svg class="w-4 h-4 text-gray-600 mx-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
+                                <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int)$cat['id'] ?>" class="hover:text-white"><?= htmlspecialchars($cat['name']) ?></a>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
                     <?php endif; ?>
                     <li>
                         <div class="flex items-center">
@@ -107,11 +109,13 @@ require_once ThemeManager::getHeader();
                     <div class="border-t border-gray-700 pt-6 mb-10">
                         <h3 class="text-lg font-bold mb-4 text-white">Specifications</h3>
                         <dl class="divide-y divide-gray-700 text-sm">
-                            <?php if (!empty($item['category_name'])): ?>
+                            <?php if (!empty($itemCategories)): ?>
                             <div class="py-3 flex justify-between">
-                                <dt class="text-gray-500 font-medium w-1/3">Category</dt>
-                                <dd class="text-gray-200 w-2/3 text-right">
-                                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= htmlspecialchars($item['category_id']) ?>" class="text-purple-400 hover:text-purple-300 hover:underline"><?= htmlspecialchars($item['category_name']) ?></a>
+                                <dt class="text-gray-500 font-medium w-1/3">Categories</dt>
+                                <dd class="text-gray-200 w-2/3 text-right flex flex-wrap justify-end gap-x-2">
+                                    <?php foreach ($itemCategories as $idx => $cat): ?>
+                                        <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int)$cat['id'] ?>" class="text-purple-400 hover:text-purple-300 hover:underline"><?= htmlspecialchars($cat['name']) ?></a><?= ($idx < count($itemCategories) - 1) ? ',' : '' ?>
+                                    <?php endforeach; ?>
                                 </dd>
                             </div>
                             <?php endif; ?>

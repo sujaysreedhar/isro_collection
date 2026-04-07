@@ -136,7 +136,7 @@ class SearchEngine {
 
         if (!empty($categoryIds)) {
             $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-            $where[] = "i.category_id IN ({$placeholders})";
+            $joinSql .= " INNER JOIN item_category ic_filter ON i.id = ic_filter.item_id AND ic_filter.category_id IN ({$placeholders}) ";
             foreach ($categoryIds as $cid) $bindings[] = $cid;
         }
 
@@ -195,7 +195,8 @@ class SearchEngine {
         $orderClause = $hasIsPrimary ? "m.is_primary DESC, m.upload_date ASC" : "m.upload_date ASC";
 
         $sql = "SELECT DISTINCT i.*, "
-             . "(SELECT m.file_path FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY {$orderClause} LIMIT 1) AS preview_file_path "
+             . "(SELECT m.file_path FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY {$orderClause} LIMIT 1) AS preview_file_path, "
+             . "(SELECT GROUP_CONCAT(c.name SEPARATOR ', ') FROM categories c JOIN item_category ic ON c.id = ic.category_id WHERE ic.item_id = i.id) AS category_name "
              . "FROM items i ";
         $sql .= $baseParts['join'];
         if ($baseParts['where']) $sql .= " WHERE " . implode(" AND ", $baseParts['where']);
@@ -224,7 +225,7 @@ class SearchEngine {
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // ── 3. Category facet counts ─────────────────────────────────────
-        $facetSql = "SELECT c.id, c.name, COUNT(DISTINCT i.id) as facet_count FROM categories c LEFT JOIN items i ON c.id = i.category_id " . $baseParts['join'];
+        $facetSql = "SELECT c.id, c.name, COUNT(DISTINCT i.id) as facet_count FROM categories c INNER JOIN item_category ic ON c.id = ic.category_id INNER JOIN items i ON ic.item_id = i.id " . $baseParts['join'];
         if ($baseParts['where']) $facetSql .= " WHERE " . implode(" AND ", $baseParts['where']);
         $facetSql .= " GROUP BY c.id, c.name HAVING facet_count > 0 ORDER BY c.name ASC";
         

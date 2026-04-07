@@ -26,6 +26,8 @@ switch ($action) {
         // Total count of items (unfiltered)
         $totalRecords = (int) $pdo->query("SELECT COUNT(*) FROM items")->fetchColumn();
 
+        $categoryId = (int)($_GET['category_id'] ?? 0);
+
         // Base query
         $sql = "
             SELECT i.id, i.reg_number, i.title, i.production_date, i.is_visible, c.name AS category_name,
@@ -35,21 +37,51 @@ switch ($action) {
         ";
         $params = [];
         $totalFiltered = $totalRecords;
+        
+        $whereClauses = [];
+        
+        if ($categoryId > 0) {
+            $whereClauses[] = "i.id IN (SELECT item_id FROM item_category WHERE category_id = :cat)";
+            $params[':cat'] = $categoryId;
+        }
 
         if ($search !== '') {
-            $sql .= " WHERE (i.title LIKE :search1 OR i.reg_number LIKE :search2 OR c.name LIKE :search3)";
+            $whereClauses[] = "(i.title LIKE :search1 OR i.reg_number LIKE :search2 OR c.name LIKE :search3)";
             $params[':search1'] = '%' . $search . '%';
             $params[':search2'] = '%' . $search . '%';
             $params[':search3'] = '%' . $search . '%';
+        }
+        
+        if (!empty($whereClauses)) {
+            $whereSql = " WHERE " . implode(' AND ', $whereClauses);
+            $sql .= $whereSql;
 
             // Count filtered records
-            $countSql = "SELECT COUNT(*) FROM items i LEFT JOIN categories c ON i.category_id = c.id WHERE (i.title LIKE :search1 OR i.reg_number LIKE :search2 OR c.name LIKE :search3)";
+            $countSql = "SELECT COUNT(i.id) FROM items i LEFT JOIN categories c ON i.category_id = c.id" . $whereSql;
             $countStmt = $pdo->prepare($countSql);
             $countStmt->execute($params);
             $totalFiltered = (int) $countStmt->fetchColumn();
         }
 
-        $sql .= " ORDER BY i.id DESC LIMIT :limit OFFSET :offset";
+        $columnsMap = [
+            1 => 'i.reg_number',
+            2 => 'i.title',
+            3 => 'c.name',
+            4 => 'i.production_date',
+            5 => 'i.is_visible'
+        ];
+        
+        $orderColumnIndex = (int) ($_GET['order'][0]['column'] ?? -1);
+        
+        if (!isset($columnsMap[$orderColumnIndex])) {
+            $orderColSql = 'i.id';
+            $orderDir = 'DESC';
+        } else {
+            $orderColSql = $columnsMap[$orderColumnIndex];
+            $orderDir = strtolower($_GET['order'][0]['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+        }
+
+        $sql .= " ORDER BY " . $orderColSql . " " . $orderDir . " LIMIT :limit OFFSET :offset";
 
         $stmt = $pdo->prepare($sql);
         foreach ($params as $k => $v) {
@@ -185,9 +217,11 @@ switch ($action) {
         }
 
         // 3. Delete Relationships
+        $pdo->prepare("DELETE FROM item_category WHERE item_id IN ({$placeholders})")->execute($ids);
         $pdo->prepare("DELETE FROM item_tag WHERE item_id IN ({$placeholders})")->execute($ids);
         $pdo->prepare("DELETE FROM item_narrative WHERE item_id IN ({$placeholders})")->execute($ids);
-        $pdo->prepare("DELETE FROM item_related WHERE item_id IN ({$placeholders}) OR related_item_id IN ({$placeholders})")->execute($ids);
+        $pdo->prepare("DELETE FROM item_related WHERE item_id IN ({$placeholders})")->execute($ids);
+        $pdo->prepare("DELETE FROM item_related WHERE related_item_id IN ({$placeholders})")->execute($ids);
 
         // 4. Finally Delete Items
         $stmt = $pdo->prepare("DELETE FROM items WHERE id IN ({$placeholders})");
