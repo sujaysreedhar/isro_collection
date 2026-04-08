@@ -225,6 +225,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success .= ' Selected media deleted.';
             }
 
+            // — Update media licenses —
+            $updateLicenses = (array) ($_POST['update_media_license'] ?? []);
+            foreach ($updateLicenses as $mediaId => $newLicense) {
+                $newLicense = trim($newLicense);
+                if ($newLicense !== '') {
+                    $pdo->prepare("UPDATE media SET license_type = :l WHERE id = :id AND item_id = :itemId")
+                        ->execute([':l' => $newLicense, ':id' => (int)$mediaId, ':itemId' => $id]);
+                }
+            }
+
             // — Images via MediaProcessor (Multiple Support) —
             if (isset($_FILES['media_upload'])) {
                 $files = is_array($_FILES['media_upload']['name'])
@@ -777,6 +787,18 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                             <?php if ($mType === 'youtube' && !empty($m['youtube_url'])): ?>
                                 <a href="<?= htmlspecialchars($m['youtube_url']) ?>" target="_blank"
                                     class="text-blue-500 hover:underline">View on YouTube ↗</a>
+                            <?php elseif ($mType === 'image'): ?>
+                                <a href="<?= MediaProcessor::url($m['file_path'], 'display', 'image', $storage ?? null) ?>" target="_blank" data-lightbox="gallery" class="text-blue-500 hover:underline inline-block mt-1">View Image ↗</a>
+                                
+                                <div class="mt-2">
+                                    <label class="block text-gray-700 mb-1">License:</label>
+                                    <select name="update_media_license[<?= (int) $m['id'] ?>]" form="item-form" class="w-full border border-gray-300 rounded text-xs px-2 py-1 focus:ring-blue-500 focus:border-blue-500">
+                                        <?php $cLic = $m['license_type'] ?? 'Public Domain'; ?>
+                                        <option value="Public Domain" <?= $cLic === 'Public Domain' ? 'selected' : '' ?>>Public Domain</option>
+                                        <option value="CC BY 4.0" <?= $cLic === 'CC BY 4.0' ? 'selected' : '' ?>>CC BY 4.0</option>
+                                        <option value="All Rights Reserved" <?= $cLic === 'All Rights Reserved' ? 'selected' : '' ?>>All Rights Reserved</option>
+                                    </select>
+                                </div>
                             <?php endif; ?>
 
                             <?php if ($hasIsPrimary && $mType === 'image' && empty($m['is_primary'])): ?>
