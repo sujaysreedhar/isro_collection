@@ -117,7 +117,7 @@ if ($step === 5 && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 require_once $path;
                 $className = str_replace(' ', '', ucwords(str_replace('_', ' ', $slug))) . 'Module';
                 if (class_exists($className)) {
-                    $mod = new $className($pdo, __DIR__ . "/modules/$slug");
+                    $mod = new $className($pdo, $slug, []);
                     if (method_exists($mod, 'activate')) {
                         $mod->activate();
                     }

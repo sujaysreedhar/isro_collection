@@ -43,6 +43,14 @@ abstract class BaseModule {
         // Optional override
     }
 
+    /**
+     * Called when the module is fully deleted from the server.
+     * Use this to drop associated tables if requested.
+     */
+    public function uninstall() {
+        // Optional override
+    }
+
     public function getSlug(): string {
         return $this->slug;
     }

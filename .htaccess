@@ -17,6 +17,7 @@ RewriteRule ^api\.php$ modules/api_export/api.php [L,QSA]
 RewriteRule ^people\.php$ modules/people/people.php [L,QSA]
 RewriteRule ^person/([a-zA-Z0-9_-]+)/?$ modules/people/person.php?slug=$1 [L,QSA]
 
+
 # ─── Front Controller ───────────────────────────────────────────
 # Allow direct access to real files and directories
 RewriteCond %{REQUEST_FILENAME} !-f

@@ -58,6 +58,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $moduleManager->clearCache();
                 $success = "Module '$moduleSlug' disabled.";
             }
+        } elseif ($action === 'delete') {
+            if (in_array($moduleSlug, $activeModules)) {
+                $error = "Cannot delete an active module. Disable it first.";
+            } else {
+                $instance = $moduleManager->loadModule($moduleSlug);
+                $dropTables = isset($_POST['drop_tables']) && $_POST['drop_tables'] === '1';
+                
+                if ($dropTables && $instance && method_exists($instance, 'uninstall')) {
+                    $instance->uninstall();
+                }
+                
+                $dirPath = __DIR__ . "/../modules/$moduleSlug";
+                if (is_dir($dirPath)) {
+                    // Recursive directory deletion
+                    $files = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator($dirPath, RecursiveDirectoryIterator::SKIP_DOTS),
+                        RecursiveIteratorIterator::CHILD_FIRST
+                    );
+                    foreach ($files as $fileinfo) {
+                        $todo = ($fileinfo->isDir() ? 'rmdir' : 'unlink');
+                        $todo($fileinfo->getRealPath());
+                    }
+                    rmdir($dirPath);
+                    $moduleManager->clearCache();
+                    $success = "Module '$moduleSlug' permanently deleted.";
+                } else {
+                    $error = "Module directory not found.";
+                }
+            }
         }
     } else {
         $error = "Invalid module name.";
@@ -149,10 +178,20 @@ echo renderAdminHeader('Manage Modules');
                                     </button>
                                 </div>
                             <?php else: ?>
-                                <input type="hidden" name="action" value="enable">
-                                <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                    Enable
-                                </button>
+                                <div class="flex flex-col items-end gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <button type="submit" name="action" value="enable" class="inline-flex items-center px-4 py-2 border border-blue-600 shadow-sm text-xs font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition uppercase tracking-widest">
+                                            Enable
+                                        </button>
+                                        <button type="submit" name="action" value="delete" class="inline-flex items-center px-4 py-2 border border-red-600 shadow-sm text-xs font-bold rounded-lg text-white bg-red-600 hover:bg-red-700 transition uppercase tracking-widest" onclick="return confirm('You are about to permanently delete this module from the server. This cannot be undone. Are you sure?');">
+                                            Delete
+                                        </button>
+                                    </div>
+                                    <label class="flex items-center gap-2 cursor-pointer text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-md border border-red-100">
+                                        <input type="checkbox" name="drop_tables" value="1" class="w-3.5 h-3.5 text-red-600 rounded focus:ring-red-500">
+                                        <span>Drop Database Tables</span>
+                                    </label>
+                                </div>
                             <?php endif; ?>
                         </form>
                     </td>
