@@ -149,7 +149,7 @@ require_once ThemeManager::getHeader();
                             <div class="blog-image-wrapper">
                                 <img src="<?= SITE_URL ?>/uploads/<?= htmlspecialchars($post['featured_image']) ?>" 
                                      alt="<?= htmlspecialchars($post['title']) ?>" 
-                                     class="blog-image">
+                                     class="blog-image" loading="lazy">
                             </div>
                         <?php else: ?>
                             <div class="blog-image-wrapper">

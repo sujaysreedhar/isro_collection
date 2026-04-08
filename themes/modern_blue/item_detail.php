@@ -118,7 +118,7 @@ require_once ThemeManager::getHeader();
                             ?>
                             <button type="button" onclick="switchMedia('<?= htmlspecialchars($fullSrc) ?>', '<?= $m['media_type'] ?>', this)" 
                                     class="thumb-btn flex-shrink-0 relative w-20 h-20 rounded-xl overflow-hidden border-2 <?= $index === 0 ? 'border-modern-500 ring-2 ring-modern-200 ring-offset-1' : 'border-transparent hover:border-modern-300' ?> transition-all">
-                                <img src="<?= htmlspecialchars($thumbSrc) ?>" class="w-full h-full object-cover" alt="Thumbnail">
+                                <img src="<?= htmlspecialchars($thumbSrc) ?>" class="w-full h-full object-cover" alt="Thumbnail" loading="lazy">
                                 <?php if($isVid): ?>
                                     <div class="absolute inset-0 flex items-center justify-center bg-black/30">
                                         <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>

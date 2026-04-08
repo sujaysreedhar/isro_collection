@@ -346,6 +346,7 @@ Existing section keys: `overview`, `catalog`, `content`, `system`.
 | `admin_sidebar_links` | Filter | `admin/layout.php` | `$sections` (array) | Modify or extend the admin sidebar sections/links |
 | `route_request` | Filter | `includes/Router.php` | `$handled` (bool), `$uri` (string) | Handle a URL and return `true` to stop further routing |
 | `search_results` | Filter | `includes/SearchEngine.php` | `$results` (array), `$params` (array) | Append or modify search results (e.g., add module content) |
+| `admin_ajax_{action}` | Filter | `admin/ajax.php` | `$handled` (bool) | Intercept a custom AJAX request. Handle it and return `true` so the router cleanly exits. |
 
 ### Module Lifecycle Hooks
 
@@ -492,6 +493,28 @@ class HelloWorldModule extends BaseModule {
 ```
 
 After creating these files, go to **Admin → Modules** and click **Enable**. Done!
+
+---
+
+## 1.10 Creating Custom AJAX Endpoints
+
+Modules can register custom backend endpoints without modifying `admin/ajax.php`. The router delegates unrecognized `action` requests via the `admin_ajax_{action}` filter.
+
+```php
+public function boot() {
+    // Listens for: POST /admin/ajax.php with body { action: 'my_custom_action' }
+    HookRegistry::addFilter('admin_ajax_my_custom_action', function($handled) {
+        
+        // Output your JSON response
+        echo json_encode(['success' => true, 'message' => 'Hello from module!']);
+        
+        // Return true to tell the router it was handled successfully
+        return true; 
+    });
+}
+```
+
+If the filter returns `true`, the central `ajax.php` script cleanly `exit`s, preventing a `400 Unknown Action` fallback error.
 
 ---
 

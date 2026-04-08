@@ -196,7 +196,7 @@ require_once ThemeManager::getHeader();
                                 : SITE_URL . '/uploads/display/' . $item['file_path']; ?>
                             <img src="<?= htmlspecialchars($imgUrl) ?>"
                                  alt="<?= htmlspecialchars($item['title']) ?>"
-                                 class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500">
+                                 class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" loading="lazy">
                         <?php else: ?>
                             <div class="flex items-center justify-center h-full tc-text-muted">
                                 <svg class="w-12 h-12 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -256,7 +256,7 @@ require_once ThemeManager::getHeader();
             <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int)$cat['id'] ?>" class="group block">
                 <div class="relative aspect-video rounded-2xl overflow-hidden tc-border bg-tc-accent-bg/5 hover:shadow-xl transition-all duration-300">
                     <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($cat['image_path']) ?>" 
-                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="<?= htmlspecialchars($cat['name']) ?>">
+                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="<?= htmlspecialchars($cat['name']) ?>" loading="lazy">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                     <div class="absolute inset-0 p-6 flex flex-col justify-end">
                         <h4 class="text-white font-bold text-lg serif group-hover:tc-accent-text transition-colors"><?= htmlspecialchars($cat['name']) ?></h4>

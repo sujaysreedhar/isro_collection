@@ -50,7 +50,7 @@ require_once ThemeManager::getHeader();
                     
                     <div class="aspect-[4/5] bg-slate-50 relative overflow-hidden">
                         <?php if ($p['profile_image']): ?>
-                            <img src="<?= SITE_URL ?>/uploads/display/<?= htmlspecialchars($p['profile_image']) ?>" alt="<?= htmlspecialchars($p['name']) ?>" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700">
+                            <img src="<?= SITE_URL ?>/uploads/display/<?= htmlspecialchars($p['profile_image']) ?>" alt="<?= htmlspecialchars($p['name']) ?>" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700" loading="lazy">
                         <?php else: ?>
                             <div class="w-full h-full flex items-center justify-center text-slate-200">
                                 <svg class="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>

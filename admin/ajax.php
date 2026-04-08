@@ -507,6 +507,14 @@ switch ($action) {
         break;
 
     default:
+        // Give modules a chance to handle their own custom AJAX actions.
+        if (class_exists('HookRegistry')) {
+            $handled = HookRegistry::applyFilters('admin_ajax_' . $action, false);
+            if ($handled) {
+                exit; // A module processed the request and echoed its JSON.
+            }
+        }
+
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action.']);
 }

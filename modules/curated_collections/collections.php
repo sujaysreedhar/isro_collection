@@ -58,7 +58,7 @@ require_once ThemeManager::getHeader();
                     <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity z-10"></div>
                     <?php if (!empty($col['cover_image'])): ?>
                         <?php $coverUrl = isset($storage) ? $storage->url('display/' . $col['cover_image']) : SITE_URL . '/uploads/display/' . $col['cover_image']; ?>
-                        <img src="<?= htmlspecialchars($coverUrl) ?>" alt="<?= htmlspecialchars($col['title']) ?>" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700">
+                        <img src="<?= htmlspecialchars($coverUrl) ?>" alt="<?= htmlspecialchars($col['title']) ?>" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700" loading="lazy">
                     <?php else: ?>
                         <svg class="h-16 w-16 text-gray-300 group-hover:text-blue-500 group-hover:scale-110 transition-all duration-500 z-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>

@@ -74,7 +74,7 @@ require_once ThemeManager::getHeader();
                         ?>
                         <img src="<?= $thumbSrc ?>" class="gallery-thumbnail <?= $active ?>" data-full="<?= $fullSrc ?>"
                             data-caption="<?= htmlspecialchars($img['caption'] ?? '') ?>" onclick="switchImage(this)"
-                            alt="<?= $thumbAlt ?>">
+                            alt="<?= $thumbAlt ?>" loading="lazy">
                     <?php endforeach; ?>
                     
                     <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_gallery_thumbnails', $item); } ?>
@@ -265,7 +265,7 @@ require_once ThemeManager::getHeader();
                                 <?php if ($ri['thumb']): ?>
                                     <img src="<?= MediaProcessor::url($ri['thumb'], 'thumbnails', 'image', $storage ?? null) ?>"
                                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                        alt="<?= htmlspecialchars($ri['title']) ?>">
+                                        alt="<?= htmlspecialchars($ri['title']) ?>" loading="lazy">
                                 <?php else: ?>
                                     <div class="w-full h-full flex items-center justify-center bg-gray-100">
                                         <svg class="w-10 h-10 tc-text-muted opacity-30" fill="none" stroke="currentColor"
