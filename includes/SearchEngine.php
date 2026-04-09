@@ -140,6 +140,18 @@ class SearchEngine {
             foreach ($categoryIds as $cid) $bindings[] = $cid;
         }
 
+        // Add support for category slugs (clean URLs)
+        $categorySlug = $params['category'] ?? '';
+        $categorySlugs = (array)($params['category_slugs'] ?? []);
+        if (!empty($categorySlug)) $categorySlugs[] = $categorySlug;
+        
+        if (!empty($categorySlugs)) {
+            $placeholders = implode(',', array_fill(0, count($categorySlugs), '?'));
+            $joinSql .= " INNER JOIN item_category ic_slug_filter ON i.id = ic_slug_filter.item_id ";
+            $joinSql .= " INNER JOIN categories c_slug_filter ON ic_slug_filter.category_id = c_slug_filter.id AND c_slug_filter.slug IN ({$placeholders}) ";
+            foreach ($categorySlugs as $cs) $bindings[] = $cs;
+        }
+
         if (!empty($materials)) {
             $placeholders = implode(',', array_fill(0, count($materials), '?'));
             $where[] = "i.material IN ({$placeholders})";

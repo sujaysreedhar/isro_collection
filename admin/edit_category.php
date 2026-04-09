@@ -27,7 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('Invalid CSRF token.');
     }
     $name = trim($_POST['name'] ?? '');
+    $slug = trim($_POST['slug'] ?? '');
     $imagePath = $category['image_path'] ?? null;
+
+    if (empty($slug) && !empty($name)) {
+        $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name), '-'));
+    }
 
     // Handle Image Upload
     if (!empty($_FILES['category_image']['name'])) {
@@ -56,13 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($id > 0) {
                 // UPDATE
-                $stmt = $pdo->prepare("UPDATE categories SET name = :name, image_path = :image WHERE id = :id");
-                $stmt->execute([':name' => $name, ':image' => $imagePath, ':id' => $id]);
+                $stmt = $pdo->prepare("UPDATE categories SET name = :name, slug = :slug, image_path = :image WHERE id = :id");
+                $stmt->execute([':name' => $name, ':slug' => $slug, ':image' => $imagePath, ':id' => $id]);
                 $success = "Category updated successfully.";
             } else {
                 // INSERT
-                $stmt = $pdo->prepare("INSERT INTO categories (name, image_path) VALUES (:name, :image)");
-                $stmt->execute([':name' => $name, ':image' => $imagePath]);
+                $stmt = $pdo->prepare("INSERT INTO categories (name, slug, image_path) VALUES (:name, :slug, :image)");
+                $stmt->execute([':name' => $name, ':slug' => $slug, ':image' => $imagePath]);
             $id = $pdo->lastInsertId();
             $success = "Category created successfully.";
         }
@@ -70,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             HookRegistry::doAction('category_saved', $id);
         }
         $category['name'] = $name;
+        $category['slug'] = $slug;
         $category['image_path'] = $imagePath;
         } catch (\PDOException $e) {
             if ($e->getCode() == 23000) {
@@ -112,10 +118,18 @@ echo renderAdminHeader($id > 0 ? "Edit Category - " . htmlspecialchars($category
     <form method="POST" action="" enctype="multipart/form-data" class="bg-white rounded-lg border border-gray-200 shadow-sm">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
         <div class="p-6">
-            <div class="mb-6">
+            <div class="mb-4">
                 <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Category Name *</label>
                 <input type="text" id="name" name="name" value="<?= htmlspecialchars($category['name'] ?? '') ?>" required
                        class="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 shadow-sm sm:text-sm">
+            </div>
+
+            <div class="mb-6">
+                <label for="slug" class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
+                <input type="text" id="slug" name="slug" value="<?= htmlspecialchars($category['slug'] ?? '') ?>"
+                       placeholder="e.g. stamps-and-coins (auto-generated if empty)"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 shadow-sm sm:text-sm">
+                <p class="text-[10px] text-gray-400 mt-1 italic">Used for clean URLs like /category/stamps-and-coins</p>
             </div>
 
             <div>
@@ -133,6 +147,11 @@ echo renderAdminHeader($id > 0 ? "Edit Category - " . htmlspecialchars($category
                 </div>
                 <p class="text-xs text-gray-400 mt-2">Recommended: 400x400px (WebP, JPG, or PNG).</p>
             </div>
+            
+            <!-- SEO and Additional Stats -->
+            <?php if (class_exists('HookRegistry')) {
+                HookRegistry::doAction('admin_category_edit_after_fields', $id, $category);
+            } ?>
         </div>
 
         <div class="p-6 border-t border-gray-200 rounded-b-lg flex justify-end gap-3 bg-gray-50">

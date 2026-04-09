@@ -9,6 +9,7 @@ $searchEngine = new SearchEngine($pdo);
 $params = [
     'q'            => trim($_GET['q'] ?? ''),
     'category_ids' => array_values(array_filter(array_map('intval', (array)($_GET['category_ids'] ?? [])))),
+    'category'     => trim($_GET['category'] ?? ''),
     'materials'    => array_values(array_filter(array_map('trim', (array)($_GET['materials'] ?? [])))),
     'has_images'   => isset($_GET['has_images']) && $_GET['has_images'] === '1',
     'exact'        => isset($_GET['exact']) && $_GET['exact'] === '1',
