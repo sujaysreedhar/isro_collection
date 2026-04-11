@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build:css": "npx @tailwindcss/cli -i themes/default/src/input.css -o themes/default/dist/tailwind.css --minify",
-    "watch:css": "npx @tailwindcss/cli -i themes/default/src/input.css -o themes/default/dist/tailwind.css --watch"
+    "build:css": "npx @tailwindcss/cli -i themes/common/src/tailwind-shared.css -o themes/common/dist/tailwind.css --minify",
+    "watch:css": "npx @tailwindcss/cli -i themes/common/src/tailwind-shared.css -o themes/common/dist/tailwind.css --watch"
   },
   "repository": {
     "type": "git",

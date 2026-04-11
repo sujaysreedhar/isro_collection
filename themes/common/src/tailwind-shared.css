@@ -1,0 +1,33 @@
+/* themes/common/src/tailwind-shared.css — Global Tailwind v4 entry point */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* ── Custom Theme Configuration ───────────────────────────────────── */
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  
+  /* Admin sidebar colors (Shared across admin pages) */
+  --color-sidebar: #0f172a;
+  --color-sidebar-hover: #1e293b;
+  --color-sidebar-border: #1e293b;
+  --color-sidebar-muted: #64748b;
+  --color-sidebar-accent: #3b82f6;
+}
+
+/* ── Custom Utilities ─────────────────────────────────────────────── */
+@utility serif {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+@utility tc-header {
+  background-color: var(--tc-bg, #ffffff);
+  border-bottom: 1px solid var(--tc-border, #e5e7eb);
+}
+@utility tc-primary-text {
+  color: var(--tc-primary, #3b82f6);
+}
+@utility tc-text-muted {
+  color: var(--tc-text-muted, #64748b);
+}
+@utility shadow-premium {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+}
