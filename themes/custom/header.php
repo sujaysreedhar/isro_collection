@@ -46,8 +46,8 @@ $searchParams   = $searchParams   ?? ['q' => ''];
         <script type="application/ld+json"><?= $jsonLdJson ?></script>
     <?php endif; ?>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (pre-built shared) -->
+    <link rel="stylesheet" href="<?= SITE_URL ?>/themes/common/dist/tailwind.css">
 
     <!-- Custom theme stylesheet (CSS vars injected by Theme Studio via frontend_head) -->
     <?php echo AssetManager::renderStyles(['themes/custom/style.css']); ?>

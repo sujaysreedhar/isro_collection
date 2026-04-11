@@ -35,7 +35,7 @@ function renderAdminHeader($title) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title) ?> - Admin</title>
-    <link rel="stylesheet" href="<?= SITE_URL ?>/themes/default/dist/tailwind.css">
+    <link rel="stylesheet" href="<?= SITE_URL ?>/themes/common/dist/tailwind.css">
     <style>
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }

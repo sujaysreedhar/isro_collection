@@ -1,5 +1,6 @@
 /* themes/common/src/tailwind-shared.css — Global Tailwind v4 entry point */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ── Custom Theme Configuration ───────────────────────────────────── */
@@ -12,6 +13,40 @@
   --color-sidebar-border: #1e293b;
   --color-sidebar-muted: #64748b;
   --color-sidebar-accent: #3b82f6;
+
+  /* Dark theme colors */
+  --color-dark-50: #f9fafb;
+  --color-dark-100: #f3f4f6;
+  --color-dark-200: #e5e7eb;
+  --color-dark-300: #d1d5db;
+  --color-dark-400: #9ca3af;
+  --color-dark-500: #6b7280;
+  --color-dark-600: #4b5563;
+  --color-dark-700: #374151;
+  --color-dark-800: #1f2937;
+  --color-dark-900: #111827;
+
+  /* Glass theme colors */
+  --color-glass-50: #f5f3ff;
+  --color-glass-100: #ede9fe;
+  --color-glass-200: #ddd6fe;
+  --color-glass-300: #c4b5fd;
+  --color-glass-400: #a78bfa;
+  --color-glass-500: #8b5cf6;
+  --color-glass-600: #7c3aed;
+  --color-glass-700: #6d28d9;
+  --color-glass-800: #5b21b6;
+  --color-glass-900: #4c1d95;
+  --color-glass-950: #2e1065;
+
+  /* Modern theme colors */
+  --color-modern-50: #eff6ff;
+  --color-modern-100: #dbeafe;
+  --color-modern-500: #3b82f6;
+  --color-modern-600: #2563eb;
+  --color-modern-700: #1d4ed8;
+  --color-modern-900: #1e3a8a;
+  --color-modern-950: #172554;
 }
 
 /* ── Custom Utilities ─────────────────────────────────────────────── */
