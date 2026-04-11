@@ -29,10 +29,10 @@ class SitemapModule extends BaseModule {
         $this->addUrl(SITE_URL . '/');
 
         // Items
-        $stmt = $this->pdo->query("SELECT id, title, upload_date FROM items WHERE is_visible = 1");
+        $stmt = $this->pdo->query("SELECT i.id, i.title, (SELECT MAX(upload_date) FROM media m WHERE m.item_id = i.id) as last_mod FROM items i WHERE i.is_visible = 1");
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $slug = $this->slugify($row['title']);
-            $this->addUrl(SITE_URL . '/item/' . $row['id'] . '/' . $slug, $row['upload_date']);
+            $this->addUrl(SITE_URL . '/item/' . $row['id'] . '/' . $slug, $row['last_mod']);
         }
 
         // Categories (using slugs)
