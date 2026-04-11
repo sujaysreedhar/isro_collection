@@ -10,6 +10,7 @@ RewriteBase /collection/
 RewriteRule ^timeline\.php$ modules/timeline/timeline.php [L,QSA]
 RewriteRule ^gallery\.php$ modules/user_galleries/gallery.php [L,QSA]
 RewriteRule ^atlas\.php$ modules/postmark_atlas/atlas.php [L,QSA]
+RewriteRule ^route-planner\.php$ modules/postmark_atlas/route_planner.php [L,QSA]
 RewriteRule ^contact\.php$ modules/contact_us/contact.php [L,QSA]
 RewriteRule ^collections\.php$ modules/curated_collections/collections.php [L,QSA]
 RewriteRule ^collection\.php$ modules/curated_collections/collection.php [L,QSA]

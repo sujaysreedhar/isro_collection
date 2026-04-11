@@ -40,6 +40,13 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
                             class="atlas-filter-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full border transition-colors bg-white text-gray-500 border-gray-200 hover:bg-gray-50">
                         <span class="w-2.5 h-2.5 bg-gray-400 rounded-full"></span> Seeking
                     </button>
+                    <span class="hidden sm:inline text-gray-200 mx-1">|</span>
+                    <a href="<?= SITE_URL ?>/route-planner.php"
+                       class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full border transition-colors bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                       title="Plan a collection route between two locations">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                        Plan a Route
+                    </a>
                 </div>
             </div>
         </div>
