@@ -250,7 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $file,
                         $id,
                         trim($_POST['media_caption'] ?? ''),
-                        $_POST['media_license'] ?? 'Public Domain',
+                        $_POST['media_license'] ?? 'All Rights Reserved',
                         (isset($_POST['is_primary']) && $isFirstInBatch)
                     );
 
@@ -678,9 +678,9 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                         <div>
                             <label class="label">License</label>
                             <select name="media_license" class="input">
+                                <option>All Rights Reserved</option>
                                 <option>Public Domain</option>
                                 <option>CC BY 4.0</option>
-                                <option>All Rights Reserved</option>
                             </select>
                         </div>
                     </div>
@@ -793,7 +793,7 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                                 <div class="mt-2">
                                     <label class="block text-gray-700 mb-1">License:</label>
                                     <select name="update_media_license[<?= (int) $m['id'] ?>]" form="item-form" class="w-full border border-gray-300 rounded text-xs px-2 py-1 focus:ring-blue-500 focus:border-blue-500">
-                                        <?php $cLic = $m['license_type'] ?? 'Public Domain'; ?>
+                                        <?php $cLic = $m['license_type'] ?? 'All Rights Reserved'; ?>
                                         <option value="Public Domain" <?= $cLic === 'Public Domain' ? 'selected' : '' ?>>Public Domain</option>
                                         <option value="CC BY 4.0" <?= $cLic === 'CC BY 4.0' ? 'selected' : '' ?>>CC BY 4.0</option>
                                         <option value="All Rights Reserved" <?= $cLic === 'All Rights Reserved' ? 'selected' : '' ?>>All Rights Reserved</option>
@@ -878,8 +878,14 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
         maxOptions: 200,
         createFilter: function (input) { return input.trim().length >= 2; },
         render: {
+            option: function(data, escape) {
+                return '<div><span class="text-gray-400 mr-1">#</span>' + escape(data.text) + '</div>';
+            },
+            item: function(data, escape) {
+                return '<div><span class="text-gray-400 mr-1">#</span>' + escape(data.text) + '</div>';
+            },
             option_create: function (data, escape) {
-                return '<div class="create">Add <strong>' + escape(data.input) + '</strong>…</div>';
+                return '<div class="create">Add <strong>#' + escape(data.input.replace(/^#/, '')) + '</strong>…</div>';
             },
             no_results: function (data, escape) {
                 return '<div class="no-results px-3 py-2 text-xs text-gray-500">No existing tags match "' + escape(data.input) + '"</div>';
