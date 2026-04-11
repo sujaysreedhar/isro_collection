@@ -35,22 +35,8 @@ function renderAdminHeader($title) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title) ?> - Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-                    colors: {
-                        sidebar: { DEFAULT: '#0f172a', hover: '#1e293b', border: '#1e293b', muted: '#64748b', accent: '#3b82f6' }
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" href="<?= SITE_URL ?>/themes/default/dist/tailwind.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        body { font-family: 'Inter', sans-serif; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }

@@ -23,16 +23,21 @@ class Router {
         
         // 2. Fallback to core routes
         if ($uri === '') {
+            header('Cache-Control: public, max-age=60');
             require __DIR__ . '/pages/home.php';
         } elseif ($uri === 'search' || $uri === 'search.php') {
+            header('Cache-Control: public, max-age=60');
             require __DIR__ . '/pages/search.php';
         } elseif (preg_match('#^item/([0-9]+)(?:/[a-zA-Z0-9_-]+)?/?$#', $uri, $matches)) {
+            header('Cache-Control: public, max-age=300');
             $_GET['id'] = $matches[1];
             require __DIR__ . '/pages/item_detail.php';
         } elseif (preg_match('#^category/([a-zA-Z0-9_-]+)/?$#', $uri, $matches)) {
+            header('Cache-Control: public, max-age=60');
             $_GET['category'] = $matches[1];
             require __DIR__ . '/pages/search.php';
         } elseif (preg_match('#^tag/([a-zA-Z0-9_-]+)/?$#', $uri, $matches)) {
+            header('Cache-Control: public, max-age=60');
             $_GET['tag'] = $matches[1];
             require __DIR__ . '/pages/search.php';
         } elseif (preg_match('#^story/([0-9]+)/?$#', $uri, $matches)) {

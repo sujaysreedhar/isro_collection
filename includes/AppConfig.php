@@ -31,6 +31,13 @@ class AppConfig {
     }
 
     /**
+     * Set a single setting value at runtime (e.g. for schema feature flags).
+     */
+    public static function set(string $key, mixed $value): void {
+        self::$data[$key] = $value;
+    }
+
+    /**
      * Return the full settings array.
      */
     public static function all(): array {

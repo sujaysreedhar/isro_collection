@@ -1,0 +1,20 @@
+/* themes/default/src/input.css — Tailwind v4 entry point */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* ── Custom Theme Configuration ───────────────────────────────────── */
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  
+  /* Admin sidebar colors */
+  --color-sidebar: #0f172a;
+  --color-sidebar-hover: #1e293b;
+  --color-sidebar-border: #1e293b;
+  --color-sidebar-muted: #64748b;
+  --color-sidebar-accent: #3b82f6;
+}
+
+/* ── Custom Utilities ─────────────────────────────────────────────── */
+@utility serif {
+  font-family: Georgia, 'Times New Roman', serif;
+}

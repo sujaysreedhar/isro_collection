@@ -13,11 +13,7 @@ if (empty($q) || strlen($q) < 2) {
 try {
     $searchTerm = '%' . $q . '%';
 
-    $hasIsPrimary = false;
-    try {
-        $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
-        $hasIsPrimary = (bool) $columnStmt->fetch();
-    } catch (\PDOException $e) {}
+    $hasIsPrimary = AppConfig::get('media_has_is_primary', '0') === '1';
     $orderClause = $hasIsPrimary ? "m.is_primary DESC, m.upload_date ASC" : "m.upload_date ASC";
 
     // 1. Search items by title or reg_number

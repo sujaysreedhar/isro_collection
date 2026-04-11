@@ -54,8 +54,8 @@ $searchParams = $searchParams ?? ['q' => ''];
             </script>
     <?php endif; ?>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (pre-built) -->
+    <link rel="stylesheet" href="<?= SITE_URL ?>/themes/default/dist/tailwind.css">
     <?php echo AssetManager::renderStyles(['themes/default/style.css']); ?>
 
     <!-- Autocomplete JS -->

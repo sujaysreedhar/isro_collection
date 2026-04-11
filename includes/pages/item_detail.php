@@ -1,6 +1,5 @@
 <?php
 // Include database connection
-require_once __DIR__ . '/../../config/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 global $pdo;
 
@@ -47,13 +46,7 @@ try {
 } catch (\Exception $e) {}
 
 // 2. Fetch Media for the item — split by type
-$hasIsPrimary = false;
-try {
-    $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
-    $hasIsPrimary = (bool) $columnStmt->fetch();
-} catch (\PDOException) {
-    $hasIsPrimary = false;
-}
+$hasIsPrimary = AppConfig::get('media_has_is_primary', '0') === '1';
 
 $mediaStmt = $pdo->prepare("SELECT * FROM media WHERE item_id = :id ORDER BY " . ($hasIsPrimary ? "is_primary DESC, " : "") . "upload_date ASC");
 $mediaStmt->execute([':id' => $id]);

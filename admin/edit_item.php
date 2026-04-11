@@ -20,13 +20,7 @@ function reIndexFiles(array $files): array
     return $out;
 }
 
-$hasIsPrimary = false;
-try {
-    $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
-    $hasIsPrimary = (bool) $columnStmt->fetch();
-} catch (\PDOException) {
-    $hasIsPrimary = false;
-}
+$hasIsPrimary = AppConfig::get('media_has_is_primary', '0') === '1';
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $item = [

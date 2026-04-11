@@ -65,10 +65,13 @@ class SearchEngine {
         
         $bestMatch = $word;
         $shortestDist = -1;
+        $wordLen = strlen($word);
         foreach ($vocab as $v) {
+            // Length pre-filter: skip words that can't possibly be within edit distance
+            if (abs(strlen($v) - $wordLen) > 2) continue;
             $dist = levenshtein($word, $v);
             if ($dist === 0) return $v;
-            $maxDist = (strlen($word) > 5) ? 2 : 1;
+            $maxDist = ($wordLen > 5) ? 2 : 1;
             if ($dist <= $maxDist && ($dist < $shortestDist || $shortestDist < 0)) {
                 $bestMatch = $v;
                 $shortestDist = $dist;
@@ -198,12 +201,7 @@ class SearchEngine {
         $totalResults = (int)$countStmt->fetchColumn();
 
         // ── 2. Items query with pagination ───────────────────────────────
-        $hasIsPrimary = false;
-        try {
-            $columnStmt = $this->db->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
-            $hasIsPrimary = (bool) $columnStmt->fetch();
-        } catch (\PDOException $e) {}
-        
+        $hasIsPrimary = AppConfig::get('media_has_is_primary', '0') === '1';
         $orderClause = $hasIsPrimary ? "m.is_primary DESC, m.upload_date ASC" : "m.upload_date ASC";
 
         $sql = "SELECT DISTINCT i.*, "
@@ -286,8 +284,8 @@ class SearchEngine {
                 'materials'  => $materialFacets,
                 'has_images' => $hasImagesCount,
                 'tags'       => $tagFacets,
-                'year_min'   => $this->db->query("SELECT MIN(year_start) FROM items WHERE year_start IS NOT NULL")->fetchColumn(),
-                'year_max'   => $this->db->query("SELECT MAX(year_end) FROM items WHERE year_end IS NOT NULL")->fetchColumn(),
+                'year_min'   => AppConfig::get('year_range_min'),
+                'year_max'   => AppConfig::get('year_range_max'),
             ],
         ];
     }

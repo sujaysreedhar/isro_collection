@@ -32,3 +32,34 @@ UPDATE categories SET slug = LOWER(REPLACE(REPLACE(name, ' ', '-'), '&', 'and'))
 
 -- Make slug unique after population
 ALTER TABLE categories MODIFY COLUMN slug VARCHAR(255) NOT NULL UNIQUE;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Performance Optimization: Add missing indexes on hot JOIN/WHERE columns
+-- These fix full-table-scan issues on search, item detail, and image lookups.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- media.item_id — used by every correlated subquery for preview images
+CREATE INDEX IF NOT EXISTS idx_media_item_id ON media (item_id);
+
+-- media: compound index for the most common image lookup pattern
+CREATE INDEX IF NOT EXISTS idx_media_item_type ON media (item_id, media_type);
+
+-- media.is_primary — used for primary image ordering (if column exists)
+-- Safe: CREATE INDEX IF NOT EXISTS won't error if column is missing on old schemas
+CREATE INDEX IF NOT EXISTS idx_media_primary ON media (item_id, is_primary);
+
+-- item_tag.tag_id — used by tag facet counting in SearchEngine
+CREATE INDEX IF NOT EXISTS idx_item_tag_tag_id ON item_tag (tag_id);
+
+-- item_category indexes (the PK covers item_id lookups, this covers category_id lookups)
+CREATE INDEX IF NOT EXISTS idx_item_category_cat_id ON item_category (category_id);
+
+-- items.is_visible — used to filter public items on every frontend query
+CREATE INDEX IF NOT EXISTS idx_items_visible ON items (is_visible);
+
+-- items.year_start, year_end — used by date range facet
+CREATE INDEX IF NOT EXISTS idx_items_year_start ON items (year_start);
+CREATE INDEX IF NOT EXISTS idx_items_year_end ON items (year_end);
+
+-- items.category_id — legacy column still used in some queries
+CREATE INDEX IF NOT EXISTS idx_items_category_id ON items (category_id);

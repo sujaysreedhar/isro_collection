@@ -25,6 +25,38 @@ $appSettings = loadSettings($pdo);
 // Make settings available to classes without global injection
 AppConfig::load($appSettings);
 
+// ── Schema Feature Detection (run once, used everywhere) ─────────────────────
+// Replaces per-page SHOW COLUMNS queries that were running 5+ times per request.
+$hasIsPrimary = false;
+try {
+    $columnStmt = $pdo->query("SHOW COLUMNS FROM media LIKE 'is_primary'");
+    $hasIsPrimary = (bool) $columnStmt->fetch();
+} catch (\PDOException $e) {}
+AppConfig::set('media_has_is_primary', $hasIsPrimary ? '1' : '0');
+
+// ── Cached Year Range (for search facets) ────────────────────────────────────
+// These rarely change and were queried on every search request.
+$enableCache = ($appSettings['enable_cache'] ?? '1') === '1';
+$yearCacheFile = CACHE_DIR . '/year_range.json';
+$yearRange = null;
+if ($enableCache && file_exists($yearCacheFile)) {
+    $yearRange = json_decode(file_get_contents($yearCacheFile), true);
+}
+if (!$yearRange) {
+    try {
+        $yearRange = [
+            'min' => $pdo->query("SELECT MIN(year_start) FROM items WHERE year_start IS NOT NULL")->fetchColumn() ?: null,
+            'max' => $pdo->query("SELECT MAX(year_end) FROM items WHERE year_end IS NOT NULL")->fetchColumn() ?: null,
+        ];
+        if (!is_dir(CACHE_DIR)) mkdir(CACHE_DIR, 0755, true);
+        file_put_contents($yearCacheFile, json_encode($yearRange));
+    } catch (\PDOException $e) {
+        $yearRange = ['min' => null, 'max' => null];
+    }
+}
+AppConfig::set('year_range_min', $yearRange['min']);
+AppConfig::set('year_range_max', $yearRange['max']);
+
 // ── Debug Mode ───────────────────────────────────────────────────────────────
 if (($appSettings['debug_mode'] ?? '0') === '1') {
     ini_set('display_errors', 1);
