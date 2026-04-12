@@ -3,13 +3,17 @@ CREATE TABLE IF NOT EXISTS item_category (
     item_id INT(11) NOT NULL,
     category_id INT(11) NOT NULL,
     PRIMARY KEY (item_id, category_id),
-    CONSTRAINT fk_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
-    CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+    CONSTRAINT fk_item FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE,
+    CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
 );
 
 -- Migrate existing single category links to the pivot table
-INSERT IGNORE INTO item_category (item_id, category_id)
-SELECT id, category_id FROM items WHERE category_id IS NOT NULL;
+INSERT IGNORE INTO
+    item_category (item_id, category_id)
+SELECT id, category_id
+FROM items
+WHERE
+    category_id IS NOT NULL;
 
 -- Store SEO Meta overrides for items and categories
 CREATE TABLE IF NOT EXISTS seo_meta (
@@ -21,17 +25,29 @@ CREATE TABLE IF NOT EXISTS seo_meta (
     meta_keywords TEXT,
     canonical_url TEXT,
     UNIQUE INDEX idx_linked (linked_type, linked_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- Add slug to categories for clean URLs
 ALTER TABLE categories ADD COLUMN slug VARCHAR(255) AFTER name;
 
 -- Migrate existing categories to have slugs (lowercase, dash-separated)
 -- Note: This is a simple migration. Production environments might need more robust slugification.
-UPDATE categories SET slug = LOWER(REPLACE(REPLACE(name, ' ', '-'), '&', 'and')) WHERE slug IS NULL OR slug = '';
+UPDATE categories
+SET
+    slug = LOWER(
+        REPLACE (
+                REPLACE (name, ' ', '-'),
+                    '&',
+                    'and'
+            )
+    )
+WHERE
+    slug IS NULL
+    OR slug = '';
 
 -- Make slug unique after population
-ALTER TABLE categories MODIFY COLUMN slug VARCHAR(255) NOT NULL UNIQUE;
+ALTER TABLE categories
+MODIFY COLUMN slug VARCHAR(255) NOT NULL UNIQUE;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Performance Optimization: Add missing indexes on hot JOIN/WHERE columns
@@ -59,7 +75,30 @@ CREATE INDEX IF NOT EXISTS idx_items_visible ON items (is_visible);
 
 -- items.year_start, year_end — used by date range facet
 CREATE INDEX IF NOT EXISTS idx_items_year_start ON items (year_start);
+
 CREATE INDEX IF NOT EXISTS idx_items_year_end ON items (year_end);
 
 -- items.category_id — legacy column still used in some queries
 CREATE INDEX IF NOT EXISTS idx_items_category_id ON items (category_id);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+--RUN BELOW THIS Referential Integrity: Tags Management
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- Ensure item_tag associations are cleaned up when a tag is deleted
+-- Note: These commands may require manual execution depending on existing data integrity.
+ALTER TABLE item_tag MODIFY item_id INT NOT NULL;
+
+ALTER TABLE item_tag MODIFY tag_id INT NOT NULL;
+
+-- Remove orphaned entries to allow foreign key creation
+DELETE FROM item_tag WHERE tag_id NOT IN( SELECT id FROM tags );
+
+DELETE FROM item_tag WHERE item_id NOT IN( SELECT id FROM items );
+
+-- Add foreign keys (Note: If these fail, check for existing conflicting constraints)
+ALTER TABLE item_tag
+ADD CONSTRAINT fk_tag_item FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE;
+
+ALTER TABLE item_tag
+ADD CONSTRAINT fk_tag_tag FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE;
