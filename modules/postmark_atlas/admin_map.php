@@ -170,6 +170,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── Current Location ──────────────────────────────────────────────────────
     var userLocationMarker  = null;
     var userAccuracyCircle  = null;
+    var trackingInterval    = null;
+    var isTracking          = false;
+    var firstFix            = true;
 
     // Inject pulse animation CSS once
     (function () {
@@ -208,36 +211,21 @@ document.addEventListener('DOMContentLoaded', function () {
         popupAnchor:[0, -10]
     });
 
-    window.locateMe = function () {
-        var btn = document.getElementById('btn-locate');
-        if (!navigator.geolocation) {
-            alert('Geolocation is not supported by your browser.');
-            return;
-        }
 
-        btn.textContent = '⏳ Locating…';
-        btn.disabled    = true;
-
+    function doLocate() {
         navigator.geolocation.getCurrentPosition(
             function (pos) {
                 var lat = pos.coords.latitude;
                 var lng = pos.coords.longitude;
-                var acc = pos.coords.accuracy; // metres
+                var acc = pos.coords.accuracy;
 
-                // Remove previous location layer if any
                 if (userLocationMarker)  { map.removeLayer(userLocationMarker); }
                 if (userAccuracyCircle)  { map.removeLayer(userAccuracyCircle); }
 
-                // Accuracy ring
                 userAccuracyCircle = L.circle([lat, lng], {
-                    radius:      acc,
-                    color:       '#2563eb',
-                    fillColor:   '#2563eb',
-                    fillOpacity: 0.08,
-                    weight:      1.5
+                    radius: acc, color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.08, weight: 1.5
                 }).addTo(map);
 
-                // Blue dot marker
                 userLocationMarker = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 })
                     .addTo(map)
                     .bindPopup(
@@ -248,26 +236,61 @@ document.addEventListener('DOMContentLoaded', function () {
                         + '</span><br><span style="font-size:10px;color:#9ca3af;">Accuracy ±' + Math.round(acc) + ' m</span>'
                         + '</div>',
                         { maxWidth: 200 }
-                    )
-                    .openPopup();
+                    );
 
-                map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 1.2 });
-
-                btn.innerHTML = '📍 Locate Me';
-                btn.disabled  = false;
+                if (firstFix) {
+                    map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 1.2 });
+                    userLocationMarker.openPopup();
+                    firstFix = false;
+                } else {
+                    // Silent update — don't re-fly or reopen popup
+                    map.setView([lat, lng], map.getZoom(), { animate: true, duration: 0.5 });
+                }
             },
             function (err) {
-                var msgs = {
-                    1: 'Location access was denied. Please allow location in your browser settings.',
-                    2: 'Location unavailable. Check your device\'s GPS or network.',
-                    3: 'Location request timed out. Please try again.'
-                };
-                alert(msgs[err.code] || 'Could not get location: ' + err.message);
-                btn.innerHTML = '📍 Locate Me';
-                btn.disabled  = false;
+                // On error during live tracking, just skip this cycle silently
+                if (!isTracking) {
+                    var msgs = {
+                        1: 'Location access was denied.',
+                        2: 'Location unavailable.',
+                        3: 'Request timed out.'
+                    };
+                    alert(msgs[err.code] || 'Could not get location: ' + err.message);
+                    stopTracking();
+                }
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
+    }
+
+    function stopTracking() {
+        isTracking = false;
+        firstFix   = true;
+        clearInterval(trackingInterval);
+        trackingInterval = null;
+        if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
+        if (userAccuracyCircle) { map.removeLayer(userAccuracyCircle); userAccuracyCircle = null; }
+        var btn = document.getElementById('btn-locate');
+        if (btn) { btn.innerHTML = '📍 Locate Me'; btn.classList.remove('bg-red-600','border-red-600'); btn.classList.add('bg-blue-600','border-blue-600'); }
+    }
+
+    window.locateMe = function () {
+        var btn = document.getElementById('btn-locate');
+        if (!navigator.geolocation) { alert('Geolocation is not supported by your browser.'); return; }
+
+        if (isTracking) {
+            stopTracking();
+            return;
+        }
+
+        isTracking = true;
+        firstFix   = true;
+        btn.innerHTML = '⏹ Stop Tracking';
+        btn.classList.remove('bg-blue-600','border-blue-600');
+        btn.classList.add('bg-red-600','border-red-600');
+
+        doLocate();
+        trackingInterval = setInterval(doLocate, 10000);
     };
 });
 </script>

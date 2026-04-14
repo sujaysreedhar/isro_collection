@@ -100,6 +100,9 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
         // ── Current Location ─────────────────────────────────────────────────
         var userLocationMarker = null;
         var userAccuracyCircle = null;
+        var trackingInterval   = null;
+        var isTracking         = false;
+        var firstFix           = true;
 
         (function () {
             var style = document.createElement('style');
@@ -123,11 +126,7 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
             iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10]
         });
 
-        window.locateMe = function () {
-            var btn = document.getElementById('btn-locate');
-            if (!navigator.geolocation) { alert('Geolocation is not supported by your browser.'); return; }
-            btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="30 60"/></svg> Locating…';
-            btn.disabled = true;
+        function doLocate() {
             navigator.geolocation.getCurrentPosition(
                 function (pos) {
                     var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
@@ -142,19 +141,46 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
                             + '<br><span style="font-size:11px;color:#64748b;">' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '</span>'
                             + '<br><span style="font-size:10px;color:#94a3b8;">Accuracy &plusmn;' + Math.round(acc) + ' m</span></div>',
                             { maxWidth: 210, className: 'modern-popup' }
-                        ).openPopup();
-                    map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 1.2 });
-                    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg> Locate Me';
-                    btn.disabled = false;
+                        );
+                    if (firstFix) {
+                        map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 1.2 });
+                        userLocationMarker.openPopup();
+                        firstFix = false;
+                    } else {
+                        map.setView([lat, lng], map.getZoom(), { animate: true, duration: 0.5 });
+                    }
                 },
                 function (err) {
-                    var msgs = { 1: 'Location access denied.', 2: 'Location unavailable.', 3: 'Request timed out.' };
-                    alert(msgs[err.code] || 'Could not get location: ' + err.message);
-                    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg> Locate Me';
-                    btn.disabled = false;
+                    if (!isTracking) {
+                        var msgs = { 1: 'Location access denied.', 2: 'Location unavailable.', 3: 'Request timed out.' };
+                        alert(msgs[err.code] || 'Could not get location: ' + err.message);
+                        stopTracking();
+                    }
                 },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
+        }
+
+        var SVG_CROSSHAIR = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg>';
+
+        function stopTracking() {
+            isTracking = false; firstFix = true;
+            clearInterval(trackingInterval); trackingInterval = null;
+            if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
+            if (userAccuracyCircle) { map.removeLayer(userAccuracyCircle); userAccuracyCircle = null; }
+            var btn = document.getElementById('btn-locate');
+            if (btn) { btn.innerHTML = SVG_CROSSHAIR + ' Locate Me'; btn.style.background = '#2563eb'; btn.style.borderColor = '#2563eb'; btn.style.color = '#fff'; }
+        }
+
+        window.locateMe = function () {
+            var btn = document.getElementById('btn-locate');
+            if (!navigator.geolocation) { alert('Geolocation is not supported by your browser.'); return; }
+            if (isTracking) { stopTracking(); return; }
+            isTracking = true; firstFix = true;
+            btn.innerHTML = '&#x23F9; Stop Tracking';
+            btn.style.background = '#dc2626'; btn.style.borderColor = '#dc2626'; btn.style.color = '#fff';
+            doLocate();
+            trackingInterval = setInterval(doLocate, 10000);
         };
     });
     </script>
