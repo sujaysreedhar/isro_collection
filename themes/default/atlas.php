@@ -26,8 +26,8 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
                     <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 serif">Postmark Atlas</h1>
                     <p class="mt-1 text-lg text-gray-600">Explore the geographical footprint of our active collection.</p>
                 </div>
-                <!-- Filter buttons -->
-                <div class="flex items-center gap-2">
+                <!-- Filter buttons + Locate Me -->
+                <div class="flex flex-wrap items-center gap-2">
                     <button id="btn-all" onclick="setFilter('all')"
                             class="atlas-filter-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full border transition-colors bg-gray-900 text-white border-gray-900">
                         All
@@ -39,6 +39,11 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
                     <button id="btn-seeking" onclick="setFilter('seeking')"
                             class="atlas-filter-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full border transition-colors bg-white text-gray-500 border-gray-200 hover:bg-gray-50">
                         <span class="w-2.5 h-2.5 bg-gray-400 rounded-full"></span> Seeking
+                    </button>
+                    <button id="btn-locate" onclick="locateMe()" title="Show my current location on the map"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full border transition-colors bg-blue-600 text-white border-blue-600 hover:bg-blue-700">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg>
+                        Locate Me
                     </button>
                     <span class="hidden sm:inline text-gray-200 mx-1">|</span>
                     <a href="<?= SITE_URL ?>/route-planner.php"
@@ -141,6 +146,98 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
             });
             var active = document.getElementById('btn-' + f);
             if (active) { active.style.background = '#111827'; active.style.color = '#fff'; active.style.borderColor = '#111827'; }
+        };
+
+        // ── Current Location ─────────────────────────────────────────────────
+        var userLocationMarker = null;
+        var userAccuracyCircle = null;
+
+        // Pulse animation + blue dot styles
+        (function () {
+            var style = document.createElement('style');
+            style.textContent = [
+                '@keyframes atlasLocPulse {',
+                '  0%   { transform:scale(1);   opacity:1; }',
+                '  70%  { transform:scale(2.8); opacity:0; }',
+                '  100% { transform:scale(1);   opacity:0; }',
+                '}',
+                '.atlas-loc-dot {',
+                '  width:14px; height:14px; border-radius:50%;',
+                '  background:#2563eb; border:2.5px solid #fff;',
+                '  box-shadow:0 0 0 2px #2563eb55; position:relative;',
+                '}',
+                '.atlas-loc-dot::after {',
+                '  content:""; position:absolute; inset:-3px; border-radius:50%;',
+                '  background:#2563eb44;',
+                '  animation:atlasLocPulse 2s ease-out infinite;',
+                '}'
+            ].join('\n');
+            document.head.appendChild(style);
+        }());
+
+        var blueDotIcon = L.divIcon({
+            className: '',
+            html: '<div class="atlas-loc-dot"></div>',
+            iconSize:   [14, 14],
+            iconAnchor: [7,  7],
+            popupAnchor:[0, -10]
+        });
+
+        window.locateMe = function () {
+            var btn = document.getElementById('btn-locate');
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser.');
+                return;
+            }
+            btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="30 60"/></svg> Locating…';
+            btn.disabled = true;
+
+            navigator.geolocation.getCurrentPosition(
+                function (pos) {
+                    var lat = pos.coords.latitude;
+                    var lng = pos.coords.longitude;
+                    var acc = pos.coords.accuracy;
+
+                    if (userLocationMarker) { map.removeLayer(userLocationMarker); }
+                    if (userAccuracyCircle) { map.removeLayer(userAccuracyCircle); }
+
+                    // Accuracy ring
+                    userAccuracyCircle = L.circle([lat, lng], {
+                        radius: acc, color: '#2563eb', fillColor: '#2563eb',
+                        fillOpacity: 0.08, weight: 1.5
+                    }).addTo(map);
+
+                    // Blue dot marker
+                    userLocationMarker = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 })
+                        .addTo(map)
+                        .bindPopup(
+                            '<div style="font-family:Inter,sans-serif;text-align:center;">'
+                            + '<strong style="font-size:13px;">&#x1F4CD; You are here</strong>'
+                            + '<br><span style="font-size:11px;color:#6b7280;">'
+                            + lat.toFixed(5) + ', ' + lng.toFixed(5)
+                            + '</span><br><span style="font-size:10px;color:#9ca3af;">Accuracy &plusmn;' + Math.round(acc) + ' m</span>'
+                            + '</div>',
+                            { maxWidth: 210 }
+                        )
+                        .openPopup();
+
+                    map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 1.2 });
+
+                    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg> Locate Me';
+                    btn.disabled = false;
+                },
+                function (err) {
+                    var msgs = {
+                        1: 'Location access was denied. Please allow it in your browser settings.',
+                        2: 'Location unavailable. Check your GPS or network.',
+                        3: 'Location request timed out. Please try again.'
+                    };
+                    alert(msgs[err.code] || 'Could not get location: ' + err.message);
+                    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg> Locate Me';
+                    btn.disabled = false;
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
         };
     });
     </script>

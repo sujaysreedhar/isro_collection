@@ -301,6 +301,7 @@ switch ($action) {
             'theme_studio_hero_tagline',
             'theme_studio_hero_image',
             'theme_studio_footer_text',
+            'route_planner_google_maps_key',
         ];
         $settings = $_POST['settings'] ?? [];
         if (!is_array($settings)) {
@@ -506,6 +507,83 @@ switch ($action) {
         echo json_encode(['success' => true, 'deleted' => $deleted, 'message' => "$deleted file(s) deleted."]);
         break;
 
+    // ── Postmark Atlas: Update a single location's coordinates ───────────────
+    case 'update_postmark_coords':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            exit;
+        }
+        if (!verifyCsrfToken($csrfToken)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
+            exit;
+        }
+
+        $id  = (int) ($_POST['id'] ?? 0);
+        $lat = (float) ($_POST['latitude']  ?? 0);
+        $lng = (float) ($_POST['longitude'] ?? 0);
+
+        if ($id <= 0) {
+            echo json_encode(['success' => false, 'error' => 'Invalid location ID.']);
+            exit;
+        }
+        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180 || ($lat == 0 && $lng == 0)) {
+            echo json_encode(['success' => false, 'error' => 'Coordinates out of valid range.']);
+            exit;
+        }
+
+        // Respect is_locked — never overwrite manually-locked coordinates
+        $check = $pdo->prepare("SELECT is_locked FROM postmark_locations WHERE id = ?");
+        $check->execute([$id]);
+        $row = $check->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            echo json_encode(['success' => false, 'error' => 'Location not found.']);
+            exit;
+        }
+        if ((int) $row['is_locked'] === 1) {
+            echo json_encode(['success' => false, 'error' => 'Location is locked and cannot be updated automatically.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("UPDATE postmark_locations SET latitude = ?, longitude = ? WHERE id = ?");
+        if ($stmt->execute([$lat, $lng, $id])) {
+            echo json_encode(['success' => true, 'id' => $id, 'latitude' => $lat, 'longitude' => $lng]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Database update failed.']);
+        }
+        break;
+
+    // ── Postmark Atlas: Load locations by state (for Coordinate Validator) ───
+    case 'get_locations_by_state':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            exit;
+        }
+        if (!verifyCsrfToken($csrfToken)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
+            exit;
+        }
+
+        $state = trim($_POST['state'] ?? '');
+        if ($state === '') {
+            echo json_encode(['success' => false, 'error' => 'State is required.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT id, pin_code, post_office, ppc_name, district, state, latitude, longitude, is_acquired
+            FROM postmark_locations
+            WHERE state = ?
+            ORDER BY district ASC, post_office ASC
+        ");
+        $stmt->execute([$state]);
+        $locs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'locations' => $locs, 'count' => count($locs)]);
+        break;
+
     default:
         // Give modules a chance to handle their own custom AJAX actions.
         if (class_exists('HookRegistry')) {
@@ -518,3 +596,4 @@ switch ($action) {
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action.']);
 }
+

@@ -22,8 +22,8 @@ $csrfToken     = htmlspecialchars(ensureCsrfToken());
         <h2 class="text-2xl font-bold text-gray-900">Postmark Atlas</h2>
         <p class="text-sm text-gray-500 mt-0.5">Click a marker to view details or toggle acquired status.</p>
     </div>
-    <!-- Filter buttons -->
-    <div class="flex items-center gap-2">
+    <!-- Filter buttons + Locate Me -->
+    <div class="flex items-center gap-2 flex-wrap">
         <button id="btn-all" onclick="setFilter('all')"
                 class="map-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors bg-gray-900 text-white border-gray-900">
             All
@@ -35,6 +35,10 @@ $csrfToken     = htmlspecialchars(ensureCsrfToken());
         <button id="btn-seeking" onclick="setFilter('seeking')"
                 class="map-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors bg-white text-gray-500 border-gray-200 hover:bg-gray-50">
             <span class="w-2 h-2 bg-gray-400 rounded-full"></span> Seeking
+        </button>
+        <button id="btn-locate" onclick="locateMe()" title="Show my current location"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors bg-blue-600 text-white border-blue-600 hover:bg-blue-700">
+            📍 Locate Me
         </button>
     </div>
 </div>
@@ -161,6 +165,109 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(r => r.json())
             .then(data => { if (data.success) window.location.reload(); else alert('Error: ' + (data.error||'?')); })
             .catch(e  => alert('Network error: ' + e.message));
+    };
+
+    // ── Current Location ──────────────────────────────────────────────────────
+    var userLocationMarker  = null;
+    var userAccuracyCircle  = null;
+
+    // Inject pulse animation CSS once
+    (function () {
+        var style = document.createElement('style');
+        style.textContent = [
+            '@keyframes atlasLocationPulse {',
+            '  0%   { transform: scale(1);   opacity: 1; }',
+            '  70%  { transform: scale(2.8); opacity: 0; }',
+            '  100% { transform: scale(1);   opacity: 0; }',
+            '}',
+            '.atlas-location-dot {',
+            '  width: 14px; height: 14px;',
+            '  border-radius: 50%;',
+            '  background: #2563eb;',
+            '  border: 2.5px solid #fff;',
+            '  box-shadow: 0 0 0 2px #2563eb55;',
+            '  position: relative;',
+            '}',
+            '.atlas-location-dot::after {',
+            '  content: "";',
+            '  position: absolute;',
+            '  inset: -3px;',
+            '  border-radius: 50%;',
+            '  background: #2563eb44;',
+            '  animation: atlasLocationPulse 2s ease-out infinite;',
+            '}'
+        ].join('\n');
+        document.head.appendChild(style);
+    }());
+
+    var blueDotIcon = L.divIcon({
+        className: '',
+        html: '<div class="atlas-location-dot"></div>',
+        iconSize:   [14, 14],
+        iconAnchor: [7, 7],
+        popupAnchor:[0, -10]
+    });
+
+    window.locateMe = function () {
+        var btn = document.getElementById('btn-locate');
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser.');
+            return;
+        }
+
+        btn.textContent = '⏳ Locating…';
+        btn.disabled    = true;
+
+        navigator.geolocation.getCurrentPosition(
+            function (pos) {
+                var lat = pos.coords.latitude;
+                var lng = pos.coords.longitude;
+                var acc = pos.coords.accuracy; // metres
+
+                // Remove previous location layer if any
+                if (userLocationMarker)  { map.removeLayer(userLocationMarker); }
+                if (userAccuracyCircle)  { map.removeLayer(userAccuracyCircle); }
+
+                // Accuracy ring
+                userAccuracyCircle = L.circle([lat, lng], {
+                    radius:      acc,
+                    color:       '#2563eb',
+                    fillColor:   '#2563eb',
+                    fillOpacity: 0.08,
+                    weight:      1.5
+                }).addTo(map);
+
+                // Blue dot marker
+                userLocationMarker = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 })
+                    .addTo(map)
+                    .bindPopup(
+                        '<div style="font-family:Segoe UI,sans-serif;text-align:center;">'
+                        + '<strong style="font-size:13px;">📍 You are here</strong>'
+                        + '<br><span style="font-size:11px;color:#6b7280;">'
+                        + lat.toFixed(5) + ', ' + lng.toFixed(5)
+                        + '</span><br><span style="font-size:10px;color:#9ca3af;">Accuracy ±' + Math.round(acc) + ' m</span>'
+                        + '</div>',
+                        { maxWidth: 200 }
+                    )
+                    .openPopup();
+
+                map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 1.2 });
+
+                btn.innerHTML = '📍 Locate Me';
+                btn.disabled  = false;
+            },
+            function (err) {
+                var msgs = {
+                    1: 'Location access was denied. Please allow location in your browser settings.',
+                    2: 'Location unavailable. Check your device\'s GPS or network.',
+                    3: 'Location request timed out. Please try again.'
+                };
+                alert(msgs[err.code] || 'Could not get location: ' + err.message);
+                btn.innerHTML = '📍 Locate Me';
+                btn.disabled  = false;
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
     };
 });
 </script>

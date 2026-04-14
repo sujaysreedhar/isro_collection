@@ -21,15 +21,22 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
                 <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">Geo Atlas</h1>
                 <p class="mt-2 text-lg text-slate-500">Visualize our curated geographic collection footprint.</p>
             </div>
-            <div class="flex gap-4 text-xs font-semibold bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex items-center gap-2">
-                    <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png" class="h-6" alt="Green Marker">
-                    <span class="text-slate-700">Acquired</span>
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex gap-4 text-xs font-semibold bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png" class="h-6" alt="Green Marker">
+                        <span class="text-slate-700">Acquired</span>
+                    </div>
+                    <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
+                        <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png" class="h-6" alt="Grey Marker">
+                        <span class="text-slate-400">Seeking</span>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
-                    <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png" class="h-6" alt="Grey Marker">
-                    <span class="text-slate-400">Seeking</span>
-                </div>
+                <button id="btn-locate" onclick="locateMe()" title="Show my current location on the map"
+                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors bg-blue-600 text-white border-blue-600 hover:bg-blue-700 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg>
+                    Locate Me
+                </button>
             </div>
         </div>
         
@@ -89,13 +96,65 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
                  .addTo(map);
             }
         });
+
+        // ── Current Location ─────────────────────────────────────────────────
+        var userLocationMarker = null;
+        var userAccuracyCircle = null;
+
+        (function () {
+            var style = document.createElement('style');
+            style.textContent = [
+                '@keyframes atlasLocPulse {',
+                '  0%   { transform:scale(1);   opacity:1; }',
+                '  70%  { transform:scale(2.8); opacity:0; }',
+                '  100% { transform:scale(1);   opacity:0; }',
+                '}',
+                '.atlas-loc-dot { width:14px; height:14px; border-radius:50%; background:#2563eb; border:2.5px solid #fff; box-shadow:0 0 0 2px #2563eb55; position:relative; }',
+                '.atlas-loc-dot::after { content:""; position:absolute; inset:-3px; border-radius:50%; background:#2563eb44; animation:atlasLocPulse 2s ease-out infinite; }',
+                '.modern-popup .leaflet-popup-content-wrapper { border-radius:12px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); border:1px solid #e2e8f0; }',
+                '.modern-popup .leaflet-popup-tip { box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); }'
+            ].join('\n');
+            document.head.appendChild(style);
+        }());
+
+        var blueDotIcon = L.divIcon({
+            className: '',
+            html: '<div class="atlas-loc-dot"></div>',
+            iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10]
+        });
+
+        window.locateMe = function () {
+            var btn = document.getElementById('btn-locate');
+            if (!navigator.geolocation) { alert('Geolocation is not supported by your browser.'); return; }
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="30 60"/></svg> Locating…';
+            btn.disabled = true;
+            navigator.geolocation.getCurrentPosition(
+                function (pos) {
+                    var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
+                    if (userLocationMarker) map.removeLayer(userLocationMarker);
+                    if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
+                    userAccuracyCircle = L.circle([lat, lng], { radius: acc, color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.08, weight: 1.5 }).addTo(map);
+                    userLocationMarker = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 })
+                        .addTo(map)
+                        .bindPopup(
+                            '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;text-align:center;padding:4px;">'
+                            + '<strong style="font-size:13px;color:#0f172a;">&#x1F4CD; You are here</strong>'
+                            + '<br><span style="font-size:11px;color:#64748b;">' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '</span>'
+                            + '<br><span style="font-size:10px;color:#94a3b8;">Accuracy &plusmn;' + Math.round(acc) + ' m</span></div>',
+                            { maxWidth: 210, className: 'modern-popup' }
+                        ).openPopup();
+                    map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 1.2 });
+                    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg> Locate Me';
+                    btn.disabled = false;
+                },
+                function (err) {
+                    var msgs = { 1: 'Location access denied.', 2: 'Location unavailable.', 3: 'Request timed out.' };
+                    alert(msgs[err.code] || 'Could not get location: ' + err.message);
+                    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg> Locate Me';
+                    btn.disabled = false;
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        };
     });
-    
-    // Add custom popup styling dynamically
-    const style = document.createElement('style');
-    style.innerHTML = `
-        .modern-popup .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
-        .modern-popup .leaflet-popup-tip { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-    `;
-    document.head.appendChild(style);
     </script>

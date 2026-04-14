@@ -102,3 +102,9 @@ ADD CONSTRAINT fk_tag_item FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE
 
 ALTER TABLE item_tag
 ADD CONSTRAINT fk_tag_tag FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE;
+
+-- -------------------------------------------------------------------------------
+-- Route Planner Google Maps Integration
+-- -------------------------------------------------------------------------------
+INSERT INTO settings (setting_key, setting_value) VALUES ('route_planner_google_maps_key', '')
+ON DUPLICATE KEY UPDATE setting_value = IF(setting_value = '' OR setting_value IS NULL, '', setting_value);
