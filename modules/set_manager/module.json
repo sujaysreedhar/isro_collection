@@ -1,0 +1,7 @@
+{
+    "name": "Collection Checklist (Sets)",
+    "description": "Define and track collection sets with completion progress bars on the frontend.",
+    "version": "1.0",
+    "author": "Antigravity",
+    "admin_menu_priority": 30
+}

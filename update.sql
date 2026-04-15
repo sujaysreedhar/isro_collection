@@ -107,4 +107,35 @@ ADD CONSTRAINT fk_tag_tag FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CA
 -- Route Planner Google Maps Integration
 -- -------------------------------------------------------------------------------
 INSERT INTO settings (setting_key, setting_value) VALUES ('route_planner_google_maps_key', '')
-ON DUPLICATE KEY UPDATE setting_value = IF(setting_value = '' OR setting_value IS NULL, '', setting_value);
+
+-- -------------------------------------------------------------------------------
+-- Set Manager Module
+-- -------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS module_sets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    target_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS module_set_items (
+    set_id INT NOT NULL,
+    item_id INT NOT NULL,
+    PRIMARY KEY (set_id, item_id),
+    CONSTRAINT fk_set_id FOREIGN KEY (set_id) REFERENCES module_sets(id) ON DELETE CASCADE,
+    CONSTRAINT fk_set_item_id FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- -------------------------------------------------------------------------------
+-- Storage Labels Module
+-- -------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS module_storage (
+    item_id INT PRIMARY KEY,
+    album VARCHAR(100),
+    page_number VARCHAR(50),
+    box_id VARCHAR(100),
+    location_notes TEXT,
+    CONSTRAINT fk_storage_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

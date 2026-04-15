@@ -1,0 +1,7 @@
+{
+    "name": "Physical Storage & QR Labels",
+    "description": "Track the physical location of items and generate printable QR code labels.",
+    "version": "1.0",
+    "author": "Antigravity",
+    "admin_menu_priority": 35
+}
