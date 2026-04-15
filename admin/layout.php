@@ -26,7 +26,7 @@ if (!function_exists('renderAdminSidebarNav')) {
     }
 }
 
-function renderAdminHeader($title) {
+function renderAdminHeader($title, $wide = false) {
     ob_start();
 ?>
 <!DOCTYPE html>
@@ -248,8 +248,8 @@ function renderAdminHeader($title) {
         </header>
 
         <!-- Page Content -->
-        <main class="flex-1 overflow-y-auto p-4 md:p-8">
-            <div class="max-w-7xl mx-auto w-full">
+        <main class="flex-1 overflow-y-auto <?= $wide ? '' : 'p-4 md:p-8' ?>">
+            <div class="<?= $wide ? 'w-full' : 'max-w-7xl mx-auto w-full' ?>">
 <?php
     return ob_get_clean();
 }

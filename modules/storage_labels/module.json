@@ -3,5 +3,6 @@
     "description": "Track the physical location of items and generate printable QR code labels.",
     "version": "1.0",
     "author": "Antigravity",
-    "admin_menu_priority": 35
+    "admin_menu_priority": 35,
+    "wide_admin_page": true
 }
