@@ -6,9 +6,13 @@ class BlogModule extends BaseModule
 
     public function boot()
     {
-        HookRegistry::addAction('admin_menu', function () {
-            echo '<div class="pt-4 pb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Content</div>';
-            echo '<a href="' . SITE_URL . '/admin/module_page.php?m=blog" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Blog Posts</a>';
+        HookRegistry::addFilter('admin_sidebar_links', function ($sections) {
+            $sections['content']['links']['blog'] = [
+                'url'   => SITE_URL . '/admin/module_page.php?m=blog',
+                'label' => 'Blog Posts',
+                'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18V6a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 6v1.5m-6.75 3h.75m-.75 3h.75m-.75 3h.75M6.75 6.75h.75v.75h-.75v-.75zm0 3h.75v.75h-.75v-.75zm0 3h.75v.75h-.75v-.75z" />'
+            ];
+            return $sections;
         });
 
         HookRegistry::addFilter('frontend_nav_links', function ($links) {

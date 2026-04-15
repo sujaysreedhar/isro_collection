@@ -5,8 +5,13 @@ class TradeManagerModule extends BaseModule {
     
     public function boot() {
         // 2. Admin Menu
-        HookRegistry::addAction('admin_menu', function() {
-            echo '<a href="' . SITE_URL . '/admin/module_page.php?m=trade_manager&page=requests" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Trade Requests</a>';
+        HookRegistry::addFilter('admin_sidebar_links', function($sections) {
+            $sections['catalog']['links']['trade_manager'] = [
+                'url'   => SITE_URL . '/admin/module_page.php?m=trade_manager&page=requests',
+                'label' => 'Trade Requests',
+                'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />'
+            ];
+            return $sections;
         });
 
         HookRegistry::addAction('admin_page_trade_manager', function() {

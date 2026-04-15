@@ -7,12 +7,28 @@ class PostmarkAtlasModule extends BaseModule {
         // Ensure new columns exist on existing installations
         try { $this->runMigrations(); } catch (\Throwable $e) { /* table may not exist yet */ }
 
-        HookRegistry::addAction('admin_menu', function() {
-            echo '<div class="pt-4 pb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Postmark Atlas</div>';
-            echo '<a href="' . SITE_URL . '/admin/module_page.php?m=postmark_atlas&page=locations" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Locations Tracker</a>';
-            echo '<a href="' . SITE_URL . '/admin/module_page.php?m=postmark_atlas&page=map" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Atlas Map</a>';
-            echo '<a href="' . SITE_URL . '/admin/module_page.php?m=postmark_atlas&page=import" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Import KML</a>';
-            echo '<a href="' . SITE_URL . '/admin/module_page.php?m=postmark_atlas&page=validate" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Validate Coords</a>';
+        HookRegistry::addFilter('admin_sidebar_links', function($sections) {
+            $sections['atlas'] = [
+                'label' => 'Postmark Atlas',
+                'links' => [
+                    'atlas_locations' => [
+                        'url'   => SITE_URL . '/admin/module_page.php?m=postmark_atlas&page=locations',
+                        'label' => 'Locations Tracker',
+                        'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />'
+                    ],
+                    'atlas_map' => [
+                        'url'   => SITE_URL . '/admin/module_page.php?m=postmark_atlas&page=map',
+                        'label' => 'Atlas Map',
+                        'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-10.5v.15m0 4.5v.15m0 4.5v.15m0 4.5V21l-3.375-3.375L9 21l-3.375-3.375H3.75a1.125 1.125 0 01-1.125-1.125V4.875c0-.621.504-1.125 1.125-1.125h2.25l3.375 3.375L12.75 3.75h2.25c.621 0 1.125.504 1.125 1.125V18" />'
+                    ],
+                    'atlas_validate' => [
+                        'url'   => SITE_URL . '/admin/module_page.php?m=postmark_atlas&page=validate',
+                        'label' => 'Validate Coords',
+                        'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />'
+                    ],
+                ]
+            ];
+            return $sections;
         });
 
         HookRegistry::addFilter('frontend_nav_links', function($links) {

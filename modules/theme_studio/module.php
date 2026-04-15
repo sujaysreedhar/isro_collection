@@ -71,10 +71,13 @@ HookRegistry::addAction('deactivate_theme_studio', function () {
 });
 
 // ── Admin menu ────────────────────────────────────────────────────────────────
-HookRegistry::addAction('admin_menu', function () {
-    $url = SITE_URL . '/admin/module_page.php?m=theme_studio';
-    echo '<div class="pt-4 pb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Theme Studio</div>';
-    echo '<a href="' . $url . '" class="block px-3 py-2 rounded-md text-gray-300 hover:bg-gray-800 hover:text-white font-medium transition-colors">Customizer</a>';
+HookRegistry::addFilter('admin_sidebar_links', function ($sections) {
+    $sections['system']['links']['theme_studio'] = [
+        'url'   => SITE_URL . '/admin/module_page.php?m=theme_studio',
+        'label' => 'Theme Studio',
+        'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122l9.156-9.156a1.5 1.5 0 112.122 2.122l-9.156 9.156a1.5 1.5 0 11-2.122-2.122z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a1.5 1.5 0 10-2.122 2.122 1.5 1.5 0 002.122-2.122z" /><path stroke-linecap="round" stroke-linejoin="round" d="M14.674 11.729c.224-.224.53-.35.849-.35h2.122a1.5 1.5 0 110 3h-2.122a1.5 1.5 0 01-1.061-.439L12.333 12.5M15 15l-3-3M15 11l-3 3" />'
+    ];
+    return $sections;
 });
 
 // ── Admin page content ────────────────────────────────────────────────────────
