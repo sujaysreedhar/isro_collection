@@ -51,4 +51,19 @@ class LocalStorage implements StorageInterface {
     public function driverName(): string {
         return 'local';
     }
+
+    public function getTotalSize(): int {
+        $total = 0;
+        if (!is_dir($this->basePath)) return 0;
+        
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($this->basePath, RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            $total += $file->getSize();
+        }
+
+        return $total;
+    }
 }

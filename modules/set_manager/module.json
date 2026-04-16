@@ -1,7 +1,7 @@
 {
     "name": "Collection Checklist (Sets)",
-    "description": "Define and track collection sets with completion progress bars on the frontend.",
-    "version": "1.0",
+    "description": "Premium system to define, track, and share collection sets with curated checklists and progress bars.",
+    "version": "2.0",
     "author": "Antigravity",
     "admin_menu_priority": 30
 }

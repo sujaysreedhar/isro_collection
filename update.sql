@@ -106,7 +106,12 @@ ADD CONSTRAINT fk_tag_tag FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CA
 -- -------------------------------------------------------------------------------
 -- Route Planner Google Maps Integration
 -- -------------------------------------------------------------------------------
-INSERT INTO settings (setting_key, setting_value) VALUES ('route_planner_google_maps_key', '')
+INSERT INTO
+    settings (setting_key, setting_value)
+VALUES (
+        'route_planner_google_maps_key',
+        ''
+    )
 
 -- -------------------------------------------------------------------------------
 -- Set Manager Module
@@ -117,15 +122,15 @@ CREATE TABLE IF NOT EXISTS module_sets (
     description TEXT,
     target_count INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS module_set_items (
     set_id INT NOT NULL,
     item_id INT NOT NULL,
     PRIMARY KEY (set_id, item_id),
-    CONSTRAINT fk_set_id FOREIGN KEY (set_id) REFERENCES module_sets(id) ON DELETE CASCADE,
-    CONSTRAINT fk_set_item_id FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    CONSTRAINT fk_set_id FOREIGN KEY (set_id) REFERENCES module_sets (id) ON DELETE CASCADE,
+    CONSTRAINT fk_set_item_id FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- -------------------------------------------------------------------------------
 -- Storage Labels Module
@@ -136,6 +141,49 @@ CREATE TABLE IF NOT EXISTS module_storage (
     page_number VARCHAR(50),
     box_id VARCHAR(100),
     location_notes TEXT,
-    CONSTRAINT fk_storage_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    CONSTRAINT fk_storage_item FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
+-- -------------------------------------------------------------------------------
+-- Collection Checklist (Sets) - V2 Reimplementation
+-- -------------------------------------------------------------------------------
+
+-- Add metadata and visibility flags to sets
+ALTER TABLE module_sets
+ADD COLUMN IF NOT EXISTS slug VARCHAR(255) AFTER name;
+
+ALTER TABLE module_sets
+ADD COLUMN IF NOT EXISTS banner_image VARCHAR(255) AFTER description;
+
+ALTER TABLE module_sets
+ADD COLUMN IF NOT EXISTS is_public TINYINT(1) DEFAULT 1 AFTER target_count;
+
+ALTER TABLE module_sets
+ADD COLUMN IF NOT EXISTS is_featured TINYINT(1) DEFAULT 0 AFTER is_public;
+
+ALTER TABLE module_sets
+ADD COLUMN IF NOT EXISTS query_json TEXT AFTER is_featured;
+
+-- Create structure table to define the 'catalog' of a set (the checklist requirements)
+CREATE TABLE IF NOT EXISTS module_set_structure (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    set_id INT NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    description TEXT,
+    sort_order INT DEFAULT 0,
+    CONSTRAINT fk_structure_set FOREIGN KEY (set_id) REFERENCES module_sets (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- Link actual collection items to specific checklist requirements
+ALTER TABLE module_set_items
+ADD COLUMN IF NOT EXISTS structure_id INT NULL AFTER item_id;
+
+-- Ensure slugs are populated for existing sets
+UPDATE module_sets
+SET
+    slug = LOWER(
+        REPLACE (name, ' ', '-')
+    )
+WHERE
+    slug IS NULL
+    OR slug = '';

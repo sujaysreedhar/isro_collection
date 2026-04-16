@@ -95,6 +95,24 @@ class S3Storage implements StorageInterface {
         return 's3';
     }
 
+    public function getTotalSize(): int {
+        $total = 0;
+        try {
+            $objects = $this->client->getIterator('ListObjectsV2', [
+                'Bucket' => $this->bucket,
+                'Prefix' => $this->prefix
+            ]);
+
+            foreach ($objects as $object) {
+                $total += $object['Size'];
+            }
+        } catch (AwsException $e) {
+            error_log('S3Storage::getTotalSize failed: ' . $e->getMessage());
+        }
+
+        return $total;
+    }
+
     /**
      * Build the full S3 object key by prepending the configured prefix.
      */

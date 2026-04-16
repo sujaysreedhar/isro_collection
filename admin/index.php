@@ -26,6 +26,41 @@ $recentItems = $pdo->query("
     ORDER BY i.id DESC LIMIT 5
 ")->fetchAll();
 
+// Storage Usage with 10-minute cache
+$totalStorageSize = 0;
+$storageCacheKey = 'dashboard_storage_size';
+$storageCacheTimeKey = 'dashboard_storage_size_time';
+
+$cachedSize = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+$cachedSize->execute([$storageCacheKey]);
+$cachedSize = $cachedSize->fetchColumn();
+
+$cachedTime = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+$cachedTime->execute([$storageCacheTimeKey]);
+$cachedTime = (int)$cachedTime->fetchColumn();
+
+if ($cachedSize !== false && (time() - $cachedTime) < 600) {
+    $totalStorageSize = (int)$cachedSize;
+} else {
+    if (isset($storage) && $storage instanceof StorageInterface) {
+        $totalStorageSize = $storage->getTotalSize();
+        $upsert = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+        $upsert->execute([$storageCacheKey, $totalStorageSize, $totalStorageSize]);
+        $upsert->execute([$storageCacheTimeKey, time(), time()]);
+    }
+}
+
+function formatBytes($bytes, $precision = 2) {
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $bytes = max($bytes, 0);
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = min($pow, count($units) - 1);
+    $bytes /= pow(1024, $pow);
+    return round($bytes, $precision) . ' ' . $units[$pow];
+}
+
+$formattedStorage = formatBytes($totalStorageSize);
+
 echo renderAdminHeader("Dashboard");
 ?>
 
@@ -121,6 +156,33 @@ $healthChecks = [
                 <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16zm0 0l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Storage Usage Card (Secondary KPI row) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+    <div class="bg-slate-900 rounded-2xl p-6 relative overflow-hidden group shadow-xl shadow-slate-200">
+        <div class="absolute top-0 right-0 p-4 opacity-20 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-110 transition-transform text-white">
+            <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V7z"/><path d="M4 14a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4z"/></svg>
+        </div>
+        <div class="relative">
+            <p class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Storage Consumption</p>
+            <div class="flex items-baseline gap-2">
+                <h3 class="text-3xl font-black text-white"><?= $formattedStorage ?></h3>
+                <span class="text-xs font-bold text-slate-500 uppercase"><?= strtoupper($storageType) ?></span>
+            </div>
+            <div class="mt-4 w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 animate-pulse" style="width: 65%"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="md:col-span-3 bg-blue-50/50 rounded-2xl border border-blue-100 p-6 flex items-center justify-between">
+        <div>
+            <h4 class="text-sm font-bold text-blue-900 mb-1">Storage Management</h4>
+            <p class="text-xs text-blue-700/70 leading-relaxed">Your media assets are currently being served via <strong><?= $storageLabel ?></strong>. <br>Ensure regular backups of your <code>uploads/</code> directory if using local storage.</p>
+        </div>
+        <a href="<?= SITE_URL ?>/admin/settings.php" class="px-4 py-2 bg-white text-blue-600 text-xs font-black uppercase tracking-widest rounded-xl border border-blue-200 hover:bg-blue-600 hover:text-white transition-all">Configure</a>
     </div>
 </div>
 

@@ -45,4 +45,11 @@ interface StorageInterface {
      * Return a human-readable label for this storage backend.
      */
     public function driverName(): string;
+
+    /**
+     * Get the total size of all stored files in bytes.
+     * 
+     * @return int Total bytes
+     */
+    public function getTotalSize(): int;
 }
