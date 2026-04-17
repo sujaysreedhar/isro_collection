@@ -66,10 +66,12 @@ $moduleFrontends = [
     'postmark_atlas'     => ['label' => 'Postmark Atlas',  'url' => 'atlas.php',         'slug' => 'atlas',       'icon' => '📍'],
     'curated_collections'=> ['label' => 'Collections',     'url' => 'collections.php',   'slug' => 'collections', 'icon' => '📚'],
     'timeline'           => ['label' => 'Timeline',        'url' => 'timeline.php',      'slug' => 'timeline',    'icon' => '🕰️'],
-    'people'             => ['label' => 'People',          'url' => 'people.php',        'slug' => 'people',      'icon' => '👤'],
-    'blog'               => ['label' => 'Blog',            'url' => 'blog.php',          'slug' => 'blog',        'icon' => '📰'],
+    'people'             => ['label' => 'People',          'url' => 'people',            'slug' => 'people',      'icon' => '👤'],
+    'blog'               => ['label' => 'Blog',            'url' => 'blog',              'slug' => 'blog',        'icon' => '📰'],
     'contact_us'         => ['label' => 'Contact Us',      'url' => 'contact.php',       'slug' => 'contact',     'icon' => '✉️'],
     'api_export'         => ['label' => 'API Explorer',    'url' => 'api.php',           'slug' => 'api',         'icon' => '🔗'],
+    'exhibition_planner' => ['label' => 'Exhibitions',     'url' => 'exhibitions',       'slug' => 'exhibitions', 'icon' => '🏛️'],
+    'set_manager'        => ['label' => 'Checklists',      'url' => 'checklists',        'slug' => 'checklists',  'icon' => '☑️'],
 ];
 
 $availablePages = $builtinPages;
