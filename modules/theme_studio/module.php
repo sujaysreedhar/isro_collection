@@ -192,10 +192,9 @@ HookRegistry::addFilter('admin_ajax_theme_studio_upload_hero', function ($handle
     $current = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='theme_studio_hero_image'")->fetchColumn();
     if ($current && file_exists($brandingDir . '/' . $current)) @unlink($brandingDir . '/' . $current);
 
-    $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION)) ?: 'jpg';
-    $newName = 'hero_' . time() . '.' . $ext;
-    if (!move_uploaded_file($tmp, $brandingDir . '/' . $newName)) {
-        echo json_encode(['success' => false, 'error' => 'Failed to save file.']);
+    $newName = 'hero_' . time() . '.webp';
+    if (!MediaProcessor::optimizeImage($tmp, $brandingDir . '/' . $newName, 2000, 2000, 80)) {
+        echo json_encode(['success' => false, 'error' => 'Failed to optimize hero image.']);
         return true;
     }
     $pdo->prepare("INSERT INTO settings (setting_key,setting_value) VALUES ('theme_studio_hero_image',?) ON DUPLICATE KEY UPDATE setting_value=?")->execute([$newName, $newName]);

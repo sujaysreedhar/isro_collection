@@ -204,8 +204,8 @@ foreach ($fontPairs as $pair) {
         line-height: 0;
     }
 </style>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonweis/pickr@1.9.1/dist/themes/nano.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@simonweis/pickr@1.9.1/dist/pickr.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.9.1/dist/themes/nano.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.9.1/dist/pickr.min.js"></script>
 
 <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
     <div>
@@ -813,7 +813,9 @@ foreach ($fontPairs as $pair) {
         updatePreview(key, val);
     }
 
-    document.addEventListener('DOMContentLoaded', initPickrs);
+    // initPickrs is now called via the pickr script's onload attribute to avoid
+    // a race condition where DOMContentLoaded has already fired by the time
+    // the module content (and its inline scripts) are rendered.
 
     // Map setting key -> which preview elements to update and how
     const PREVIEW_MAP = {
@@ -978,11 +980,17 @@ foreach ($fontPairs as $pair) {
         }
     }
 
-    // ── Toast ─────────────────────────────────────────────────────────────────────
+    // Toast ─────────────────────────────────────────────────────────────────────
     function toast(ok, msg) {
         const el = document.getElementById(ok ? 'ts-toast' : 'ts-errtoast');
         el.textContent = msg;
         el.classList.remove('hidden');
         setTimeout(() => el.classList.add('hidden'), 3000);
     }
+
+    // Pickr is loaded synchronously above, so it is available now.
+    // We cannot use DOMContentLoaded (already fired) or onload on the script
+    // tag (initPickrs not yet defined when onload fires). Calling directly here
+    // is the correct approach.
+    initPickrs();
 </script>

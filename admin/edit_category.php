@@ -44,8 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $destDir = __DIR__ . '/../uploads/categories/';
             if (!is_dir($destDir)) mkdir($destDir, 0755, true);
 
-            $newName = 'cat_' . uniqid() . '.' . $ext;
-            if (move_uploaded_file($file['tmp_name'], $destDir . $newName)) {
+            $newName = 'cat_' . uniqid() . '.webp';
+            if (MediaProcessor::optimizeImage($file['tmp_name'], $destDir . $newName, 800, 800, 85)) {
                 // Delete old image if exists
                 if ($imagePath && file_exists($destDir . $imagePath)) {
                     unlink($destDir . $imagePath);

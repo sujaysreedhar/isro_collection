@@ -43,6 +43,72 @@ class MediaProcessor
 
     // ── Public: Image ────────────────────────────────────────────────────────
 
+    /**
+     * General purpose image optimization utility.
+     * Resizes proportionally to fit within $maxWidth/$maxHeight and saves as WebP.
+     */
+    public static function optimizeImage(string $srcPath, string $destPath, int $maxW = 1920, int $maxH = 1920, int $quality = 85, bool $cropSquare = false): bool
+    {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($srcPath);
+        $src = self::gdLoadStatic($srcPath, $mime);
+        if (!$src) return false;
+
+        $srcW = imagesx($src);
+        $srcH = imagesy($src);
+
+        if ($cropSquare) {
+            $img = self::smartCropSquareStatic($src, $srcW, $srcH, $maxW);
+        } else {
+            $ratio = min(1, $maxW / $srcW, $maxH / $srcH);
+            $newW = (int) round($srcW * $ratio);
+            $newH = (int) round($srcH * $ratio);
+            $img = imagecreatetruecolor($newW, $newH);
+            self::preserveAlphaStatic($img);
+            imagecopyresampled($img, $src, 0, 0, 0, 0, $newW, $newH, $srcW, $srcH);
+        }
+
+        $success = imagewebp($img, $destPath, $quality);
+        imagedestroy($img);
+        imagedestroy($src);
+        return $success;
+    }
+
+    private static function gdLoadStatic(string $path, string $mime)
+    {
+        return match ($mime) {
+            'image/jpeg' => imagecreatefromjpeg($path),
+            'image/png' => imagecreatefrompng($path),
+            'image/gif' => imagecreatefromgif($path),
+            'image/webp' => imagecreatefromwebp($path),
+            default => false,
+        };
+    }
+
+    private static function preserveAlphaStatic($img): void
+    {
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+        imagefilledrectangle($img, 0, 0, imagesx($img), imagesy($img), imagecolorallocatealpha($img, 255, 255, 255, 127));
+    }
+
+    private static function smartCropSquareStatic($src, int $srcW, int $srcH, int $size)
+    {
+        $ratio = max($size / $srcW, $size / $srcH);
+        $scaledW = (int) round($srcW * $ratio);
+        $scaledH = (int) round($srcH * $ratio);
+        $tmp = imagecreatetruecolor($scaledW, $scaledH);
+        self::preserveAlphaStatic($tmp);
+        imagecopyresampled($tmp, $src, 0, 0, 0, 0, $scaledW, $scaledH, $srcW, $srcH);
+        $x = (int) (($scaledW - $size) / 2);
+        $y = (int) (($scaledH - $size) / 2);
+        $dst = imagecreatetruecolor($size, $size);
+        self::preserveAlphaStatic($dst);
+        imagecopy($dst, $tmp, 0, 0, $x, $y, $size, $size);
+        imagedestroy($tmp);
+        return $dst;
+    }
+
     public function process(
         array $file,
         int $itemId,

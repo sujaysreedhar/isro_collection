@@ -55,8 +55,8 @@ require_once ThemeManager::getHeader();
                 <div class="absolute bottom-0 left-0 p-8 md:p-12 w-full">
                     <div class="max-w-4xl">
                         <span class="inline-block px-4 py-1.5 bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-full mb-6 shadow-lg shadow-blue-500/30">Curated Collection</span>
-                        <h1 class="text-4xl md:text-6xl font-extrabold text-white serif mb-6 leading-tight"><?= htmlspecialchars($collection['title']) ?></h1>
-                        <div class="prose prose-invert prose-lg max-w-none text-gray-200/90 leading-relaxed line-clamp-3 md:line-clamp-none">
+                        <h1 class="text-4xl md:text-6xl font-extrabold serif mb-6 leading-tight" style="color: #ffffff !important;"><?= htmlspecialchars($collection['title']) ?></h1>
+                        <div class="prose prose-invert prose-lg max-w-none leading-relaxed line-clamp-3 md:line-clamp-none" style="color: rgba(255,255,255,0.9) !important;">
                             <?= nl2br(htmlspecialchars($collection['description'])) ?>
                         </div>
                         

@@ -187,3 +187,40 @@ SET
 WHERE
     slug IS NULL
     OR slug = '';
+
+-- -------------------------------------------------------------------------------
+-- Navigation Menu Manager
+-- -------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS navigation_menus (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS navigation_menu_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    menu_id INT NOT NULL,
+    parent_id INT DEFAULT NULL,
+    label VARCHAR(255) NOT NULL,
+    url VARCHAR(255) NOT NULL,
+    slug VARCHAR(50) DEFAULT NULL,
+    target_blank TINYINT(1) DEFAULT 0,
+    sort_order INT DEFAULT 0,
+    is_visible TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_menu_id FOREIGN KEY (menu_id) REFERENCES navigation_menus (id) ON DELETE CASCADE,
+    INDEX idx_sort (sort_order)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+INSERT IGNORE INTO navigation_menus (name, slug) VALUES ('Main Header', 'header');
+INSERT IGNORE INTO navigation_menus (name, slug) VALUES ('Main Footer', 'footer');
+
+-- Seed default header links
+INSERT INTO navigation_menu_items (menu_id, label, url, slug, sort_order) 
+SELECT id, 'Explore Collections', 'search.php', 'explore', 1 FROM navigation_menus WHERE slug = 'header' 
+AND NOT EXISTS (SELECT 1 FROM navigation_menu_items WHERE menu_id = (SELECT id FROM navigation_menus WHERE slug = 'header'));
+
+INSERT INTO navigation_menu_items (menu_id, label, url, slug, sort_order) 
+SELECT id, 'Visual Gallery', 'gallery.php', 'gallery', 2 FROM navigation_menus WHERE slug = 'header' 
+AND (SELECT COUNT(*) FROM navigation_menu_items WHERE menu_id = (SELECT id FROM navigation_menus WHERE slug = 'header')) = 1;
