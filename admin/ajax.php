@@ -191,6 +191,11 @@ switch ($action) {
 
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
+        // Trigger hook before core deletion logic handles common media and DB records
+        if (class_exists('HookRegistry')) {
+            HookRegistry::doAction('before_bulk_delete', $ids);
+        }
+
         // 1. Fetch & Delete Media Files
         $mStmt = $pdo->prepare("SELECT file_path, media_type FROM media WHERE item_id IN ({$placeholders})");
         $mStmt->execute($ids);
@@ -205,16 +210,6 @@ switch ($action) {
         }
         $pdo->prepare("DELETE FROM media WHERE item_id IN ({$placeholders})")->execute($ids);
 
-        // 2. Fetch & Delete 360 Panoramas (Safely)
-        try {
-            $pStmt = $pdo->prepare("SELECT file_path FROM item_panoramics WHERE item_id IN ({$placeholders})");
-            $pStmt->execute($ids);
-            foreach ($pStmt->fetchAll() as $file) {
-                @unlink(__DIR__ . '/../uploads/panoramics/' . $file['file_path']);
-            }
-            $pdo->prepare("DELETE FROM item_panoramics WHERE item_id IN ({$placeholders})")->execute($ids);
-        } catch (\PDOException $e) {
-        }
 
         // 3. Delete Relationships
         $pdo->prepare("DELETE FROM item_category WHERE item_id IN ({$placeholders})")->execute($ids);
@@ -261,126 +256,6 @@ switch ($action) {
         echo json_encode(['results' => $stmt->fetchAll()]);
         break;
 
-    // ── Theme Studio: save settings ───────────────────────────────────────────
-    case 'theme_studio_save':
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            exit;
-        }
-        if (!verifyCsrfToken($csrfToken)) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
-            exit;
-        }
-        $allowed = [
-            'theme_studio_color_primary',
-            'theme_studio_color_accent',
-            'theme_studio_color_accent_dark',
-            'theme_studio_color_bg',
-            'theme_studio_color_hero_bg',
-            'theme_studio_color_surface',
-            'theme_studio_color_border',
-            'theme_studio_color_text',
-            'theme_studio_color_text_muted',
-            'theme_studio_color_footer_bg',
-            'theme_studio_color_footer_text',
-            'theme_studio_font_body',
-            'theme_studio_font_heading',
-            'theme_studio_border_radius',
-            'theme_studio_hero_style',
-            'theme_studio_hero_title',
-            'theme_studio_hero_text_color',
-            'theme_studio_hero_tagline_color',
-            'theme_studio_hero_accent_color',
-            'theme_studio_hero_overlay_color',
-            'theme_studio_hero_overlay_opacity',
-            'theme_studio_grid_cols',
-            'theme_studio_show_search',
-            'theme_studio_show_stats',
-            'theme_studio_featured_count',
-            'theme_studio_hero_tagline',
-            'theme_studio_hero_image',
-            'theme_studio_footer_text',
-            'route_planner_google_maps_key',
-        ];
-        $settings = $_POST['settings'] ?? [];
-        if (!is_array($settings)) {
-            echo json_encode(['success' => false, 'error' => 'Bad payload']);
-            exit;
-        }
-        $upsert = $pdo->prepare(
-            "INSERT INTO settings (setting_key, setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?"
-        );
-        foreach ($settings as $key => $val) {
-            if (!in_array($key, $allowed, true))
-                continue;
-            $val = trim((string) $val);
-            $upsert->execute([$key, $val, $val]);
-        }
-        echo json_encode(['success' => true]);
-        break;
-
-    // ── Theme Studio: upload hero image ──────────────────────────────────────
-    case 'theme_studio_upload_hero':
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            exit;
-        }
-        if (!verifyCsrfToken($csrfToken)) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
-            exit;
-        }
-        $brandingDir = __DIR__ . '/../uploads/branding';
-        if (!is_dir($brandingDir))
-            mkdir($brandingDir, 0755, true);
-        if (!isset($_FILES['hero_image_file']) || $_FILES['hero_image_file']['error'] !== UPLOAD_ERR_OK) {
-            echo json_encode(['success' => false, 'error' => 'No file or upload error.']);
-            exit;
-        }
-        $tmp = $_FILES['hero_image_file']['tmp_name'];
-        $orig = $_FILES['hero_image_file']['name'];
-        $mime = mime_content_type($tmp);
-        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'], true)) {
-            echo json_encode(['success' => false, 'error' => 'Invalid file type.']);
-            exit;
-        }
-        if ($_FILES['hero_image_file']['size'] > 5 * 1024 * 1024) {
-            echo json_encode(['success' => false, 'error' => 'File too large (max 5 MB).']);
-            exit;
-        }
-        $current = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='theme_studio_hero_image'")->fetchColumn();
-        if ($current && file_exists($brandingDir . '/' . $current))
-            @unlink($brandingDir . '/' . $current);
-        $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION)) ?: 'jpg';
-        $newName = 'hero_' . time() . '.' . $ext;
-        if (!move_uploaded_file($tmp, $brandingDir . '/' . $newName)) {
-            echo json_encode(['success' => false, 'error' => 'Failed to save file.']);
-            exit;
-        }
-        $pdo->prepare("INSERT INTO settings (setting_key,setting_value) VALUES ('theme_studio_hero_image',?) ON DUPLICATE KEY UPDATE setting_value=?")
-            ->execute([$newName, $newName]);
-        echo json_encode(['success' => true, 'filename' => $newName, 'url' => SITE_URL . '/uploads/branding/' . rawurlencode($newName)]);
-        break;
-
-    // ── Theme Studio: remove hero image ──────────────────────────────────────
-    case 'theme_studio_remove_hero':
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            exit;
-        }
-        if (!verifyCsrfToken($csrfToken)) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
-            exit;
-        }
-        $brandingDir = __DIR__ . '/../uploads/branding';
-        $current = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='theme_studio_hero_image'")->fetchColumn();
-        if ($current && file_exists($brandingDir . '/' . $current))
-            @unlink($brandingDir . '/' . $current);
-        $pdo->prepare("INSERT INTO settings (setting_key,setting_value) VALUES ('theme_studio_hero_image','') ON DUPLICATE KEY UPDATE setting_value=''")->execute();
-        echo json_encode(['success' => true]);
-        break;
 
     // ── Orphaned Media Scanner ───────────────────────────────────────────────
     case 'scan_orphans':
@@ -507,82 +382,6 @@ switch ($action) {
         echo json_encode(['success' => true, 'deleted' => $deleted, 'message' => "$deleted file(s) deleted."]);
         break;
 
-    // ── Postmark Atlas: Update a single location's coordinates ───────────────
-    case 'update_postmark_coords':
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            exit;
-        }
-        if (!verifyCsrfToken($csrfToken)) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
-            exit;
-        }
-
-        $id  = (int) ($_POST['id'] ?? 0);
-        $lat = (float) ($_POST['latitude']  ?? 0);
-        $lng = (float) ($_POST['longitude'] ?? 0);
-
-        if ($id <= 0) {
-            echo json_encode(['success' => false, 'error' => 'Invalid location ID.']);
-            exit;
-        }
-        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180 || ($lat == 0 && $lng == 0)) {
-            echo json_encode(['success' => false, 'error' => 'Coordinates out of valid range.']);
-            exit;
-        }
-
-        // Respect is_locked — never overwrite manually-locked coordinates
-        $check = $pdo->prepare("SELECT is_locked FROM postmark_locations WHERE id = ?");
-        $check->execute([$id]);
-        $row = $check->fetch(PDO::FETCH_ASSOC);
-
-        if (!$row) {
-            echo json_encode(['success' => false, 'error' => 'Location not found.']);
-            exit;
-        }
-        if ((int) $row['is_locked'] === 1) {
-            echo json_encode(['success' => false, 'error' => 'Location is locked and cannot be updated automatically.']);
-            exit;
-        }
-
-        $stmt = $pdo->prepare("UPDATE postmark_locations SET latitude = ?, longitude = ? WHERE id = ?");
-        if ($stmt->execute([$lat, $lng, $id])) {
-            echo json_encode(['success' => true, 'id' => $id, 'latitude' => $lat, 'longitude' => $lng]);
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Database update failed.']);
-        }
-        break;
-
-    // ── Postmark Atlas: Load locations by state (for Coordinate Validator) ───
-    case 'get_locations_by_state':
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            http_response_code(405);
-            exit;
-        }
-        if (!verifyCsrfToken($csrfToken)) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
-            exit;
-        }
-
-        $state = trim($_POST['state'] ?? '');
-        if ($state === '') {
-            echo json_encode(['success' => false, 'error' => 'State is required.']);
-            exit;
-        }
-
-        $stmt = $pdo->prepare("
-            SELECT id, pin_code, post_office, ppc_name, district, state, latitude, longitude, is_acquired
-            FROM postmark_locations
-            WHERE state = ?
-            ORDER BY district ASC, post_office ASC
-        ");
-        $stmt->execute([$state]);
-        $locs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        echo json_encode(['success' => true, 'locations' => $locs, 'count' => count($locs)]);
-        break;
 
     default:
         // Give modules a chance to handle their own custom AJAX actions.

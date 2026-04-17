@@ -516,6 +516,27 @@ public function boot() {
 
 If the filter returns `true`, the central `ajax.php` script cleanly `exit`s, preventing a `400 Unknown Action` fallback error.
 
+### Frontend AJAX
+The system also provides a central frontend AJAX handler at `SITE_URL/ajax.php`.
+
+```php
+// Listens for: POST /ajax.php with body { action: 'my_frontend_action' }
+HookRegistry::addFilter('frontend_ajax_my_frontend_action', function($handled) {
+    echo json_encode(['success' => true, 'message' => 'Hello from frontend!']);
+    return true; 
+});
+```
+
+### Deletion Lifecycle Hooks
+When items are deleted via the admin bulk action, modules can perform cleanup:
+
+```php
+// Triggered before core media and record deletion
+HookRegistry::addAction('before_bulk_delete', function($ids) {
+    // Delete module-specific records for these item IDs
+}, 10, 1);
+```
+
 ---
 
 # Part 2: Creating a Theme

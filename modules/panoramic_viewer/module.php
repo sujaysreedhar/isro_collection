@@ -17,6 +17,9 @@ class PanoramicViewerModule extends BaseModule
         // New Hooks per user request
         HookRegistry::addAction('item_card_badge', [$this, 'renderCardBadge'], 10, 1);
         HookRegistry::addAction('item_gallery_thumbnails', [$this, 'renderGalleryThumbnails'], 10, 1);
+        
+        // Cleanup on bulk delete
+        HookRegistry::addAction('before_bulk_delete', [$this, 'handleBulkDelete'], 10, 1);
     }
 
     public function activate()
@@ -178,5 +181,30 @@ class PanoramicViewerModule extends BaseModule
             ];
         }
         return $out;
+    }
+
+    public function handleBulkDelete($ids)
+    {
+        if (empty($ids)) return;
+        $pdo = $this->pdo;
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+        try {
+            $stmt = $pdo->prepare("SELECT file_path FROM item_panoramics WHERE item_id IN ($placeholders)");
+            $stmt->execute($ids);
+            $files = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            foreach ($files as $file) {
+                $filePath = ABSPATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'panoramics' . DIRECTORY_SEPARATOR . $file;
+                if (file_exists($filePath)) {
+                    @unlink($filePath);
+                }
+            }
+
+            $stmtDel = $pdo->prepare("DELETE FROM item_panoramics WHERE item_id IN ($placeholders)");
+            $stmtDel->execute($ids);
+        } catch (\PDOException $e) {
+            // Table might not exist or other DB error
+        }
     }
 }

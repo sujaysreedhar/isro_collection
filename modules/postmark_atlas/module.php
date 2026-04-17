@@ -4,6 +4,7 @@
 class PostmarkAtlasModule extends BaseModule {
 
     public function boot() {
+        parent::boot();
         // Ensure new columns exist on existing installations
         try { $this->runMigrations(); } catch (\Throwable $e) { /* table may not exist yet */ }
 
@@ -50,6 +51,83 @@ class PostmarkAtlasModule extends BaseModule {
             } else {
                 echo "<p>Unknown page.</p>";
             }
+        });
+    }
+
+    protected function registerHooks() {
+        $pdo = $this->pdo;
+
+        // AJAX: Update a single location's coordinates
+        HookRegistry::addFilter('admin_ajax_update_postmark_coords', function($handled) use ($pdo) {
+            $csrfToken = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+            if (!verifyCsrfToken($csrfToken)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
+                return true;
+            }
+
+            $id  = (int) ($_POST['id'] ?? 0);
+            $lat = (float) ($_POST['latitude']  ?? 0);
+            $lng = (float) ($_POST['longitude'] ?? 0);
+
+            if ($id <= 0) {
+                echo json_encode(['success' => false, 'error' => 'Invalid location ID.']);
+                return true;
+            }
+            if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180 || ($lat == 0 && $lng == 0)) {
+                echo json_encode(['success' => false, 'error' => 'Coordinates out of valid range.']);
+                return true;
+            }
+
+            // Respect is_locked — never overwrite manually-locked coordinates
+            $check = $pdo->prepare("SELECT is_locked FROM postmark_locations WHERE id = ?");
+            $check->execute([$id]);
+            $row = $check->fetch(PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                echo json_encode(['success' => false, 'error' => 'Location not found.']);
+                return true;
+            }
+            if ((int) $row['is_locked'] === 1) {
+                echo json_encode(['success' => false, 'error' => 'Location is locked and cannot be updated automatically.']);
+                return true;
+            }
+
+            $stmt = $pdo->prepare("UPDATE postmark_locations SET latitude = ?, longitude = ? WHERE id = ?");
+            if ($stmt->execute([$lat, $lng, $id])) {
+                echo json_encode(['success' => true, 'id' => $id, 'latitude' => $lat, 'longitude' => $lng]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Database update failed.']);
+            }
+            return true;
+        });
+
+        // AJAX: Load locations by state (for Coordinate Validator)
+        HookRegistry::addFilter('admin_ajax_get_locations_by_state', function($handled) use ($pdo) {
+            $csrfToken = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+            if (!verifyCsrfToken($csrfToken)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
+                return true;
+            }
+
+            $state = trim($_POST['state'] ?? '');
+            if ($state === '') {
+                echo json_encode(['success' => false, 'error' => 'State is required.']);
+                return true;
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT id, pin_code, post_office, ppc_name, district, state, latitude, longitude, is_acquired
+                FROM postmark_locations
+                WHERE state = ?
+                ORDER BY district ASC, post_office ASC
+            ");
+            $stmt->execute([$state]);
+            $locs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode(['success' => true, 'locations' => $locs, 'count' => count($locs)]);
+            return true;
         });
     }
 
