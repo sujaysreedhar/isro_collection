@@ -224,3 +224,76 @@ AND NOT EXISTS (SELECT 1 FROM navigation_menu_items WHERE menu_id = (SELECT id F
 INSERT INTO navigation_menu_items (menu_id, label, url, slug, sort_order) 
 SELECT id, 'Visual Gallery', 'gallery.php', 'gallery', 2 FROM navigation_menus WHERE slug = 'header' 
 AND (SELECT COUNT(*) FROM navigation_menu_items WHERE menu_id = (SELECT id FROM navigation_menus WHERE slug = 'header')) = 1;
+
+-- -------------------------------------------------------------------------------
+-- Thematic Taxonomy Module
+-- Add hierarchical collection themes and item-to-theme links for curated subjects
+-- such as Space, Postal History, Wildlife, and numismatic eras.
+-- -------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS module_themes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    parent_id INT NULL,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    sort_order INT DEFAULT 0,
+    is_public TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_module_themes_parent (parent_id),
+    INDEX idx_module_themes_public_sort (is_public, sort_order, name),
+    CONSTRAINT fk_module_themes_parent FOREIGN KEY (parent_id) REFERENCES module_themes (id) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS module_theme_item (
+    theme_id INT NOT NULL,
+    item_id INT NOT NULL,
+    PRIMARY KEY (theme_id, item_id),
+    INDEX idx_module_theme_item_item (item_id),
+    CONSTRAINT fk_module_theme_item_theme FOREIGN KEY (theme_id) REFERENCES module_themes (id) ON DELETE CASCADE,
+    CONSTRAINT fk_module_theme_item_item FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- Exhibition Planner: prevent duplicate item assignments inside the same exhibition
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_module_exhibition_page_item
+ON module_exhibition_items (page_id, item_id);
+
+-- Exhibition Planner: speed up ordered exhibition page rendering and admin sorting screens
+CREATE INDEX IF NOT EXISTS idx_module_exhibition_page_sort
+ON module_exhibition_items (page_id, sort_order, id);
+
+-- -------------------------------------------------------------------------------
+-- Backup Manager Module
+-- Seed the webhook token setting used by the /runback endpoint. The module will
+-- generate a secure value automatically if this setting is empty on activation.
+-- -------------------------------------------------------------------------------
+INSERT INTO settings (setting_key, setting_value)
+VALUES ('backup_manager_webhook_key', '')
+ON DUPLICATE KEY UPDATE setting_value = setting_value;
+
+-- -------------------------------------------------------------------------------
+-- Wishlist Module
+-- -------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS module_wishlist_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    theme_id INT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    image_url VARCHAR(255),
+    status ENUM('wanted', 'buying', 'collected') DEFAULT 'wanted',
+    priority INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_wishlist_theme (theme_id),
+    INDEX idx_wishlist_status (status)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS module_wishlist_stores (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    wishlist_item_id INT NOT NULL,
+    store_name VARCHAR(255),
+    store_url VARCHAR(255),
+    price VARCHAR(100),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_wishlist_item_store (wishlist_item_id),
+    CONSTRAINT fk_wishlist_item_store FOREIGN KEY (wishlist_item_id) REFERENCES module_wishlist_items(id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

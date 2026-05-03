@@ -1,0 +1,7 @@
+{
+    "name": "Wishlist",
+    "description": "Create and manage a collection wishlist with theme-wise grouping and store links.",
+    "version": "1.0.0",
+    "author": "Antigravity",
+    "admin_menu_priority": 40
+}

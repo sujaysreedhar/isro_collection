@@ -9,6 +9,11 @@ require_once __DIR__ . '/auth.php';
 
 header('Content-Type: application/json');
 
+// Central whitelist for settings keys that modules may persist through admin AJAX handlers.
+$GLOBALS['admin_settings_whitelist'] = [
+    'backup_manager_webhook_key',
+];
+
 // Validate we have an action parameter
 $action = $_REQUEST['action'] ?? '';
 

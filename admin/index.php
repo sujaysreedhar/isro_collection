@@ -2,31 +2,31 @@
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/layout.php';
 
-// Fetch KPIs
-$kpiItems   = $pdo->query("SELECT COUNT(id) FROM items")->fetchColumn();
-$kpiStories = $pdo->query("SELECT COUNT(id) FROM narratives")->fetchColumn();
-$kpiMedia   = $pdo->query("SELECT COUNT(id) FROM media")->fetchColumn();
+// Core KPIs
+$kpiItems = (int)$pdo->query("SELECT COUNT(id) FROM items")->fetchColumn();
+$kpiStories = (int)$pdo->query("SELECT COUNT(id) FROM narratives")->fetchColumn();
+$kpiMedia = (int)$pdo->query("SELECT COUNT(id) FROM media")->fetchColumn();
 
-// Data Health Report
-$itemsNoDesc    = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE physical_description IS NULL OR physical_description = ''")->fetchColumn();
+// Data quality checks
+$itemsNoDesc = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE physical_description IS NULL OR physical_description = ''")->fetchColumn();
 $itemsShortDesc = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE LENGTH(physical_description) < 50 AND LENGTH(physical_description) > 0")->fetchColumn();
-$itemsNoImage   = (int)$pdo->query("SELECT COUNT(*) FROM items i WHERE NOT EXISTS (SELECT 1 FROM media m WHERE m.item_id = i.id)")->fetchColumn();
-$itemsHidden    = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE is_visible = 0")->fetchColumn();
-
-// Orphaned files check via MediaProcessor
+$itemsNoImage = (int)$pdo->query("SELECT COUNT(*) FROM items i WHERE NOT EXISTS (SELECT 1 FROM media m WHERE m.item_id = i.id)")->fetchColumn();
+$itemsHidden = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE is_visible = 0")->fetchColumn();
 
 $mp = new MediaProcessor($pdo, $storage ?? null);
 $orphanedFiles = $mp->orphanedFiles();
+$orphanedFilesCount = count($orphanedFiles);
 
-// Fetch 5 most recent items for a quick overview
+// Recent activity
 $recentItems = $pdo->query("
-    SELECT i.id, i.reg_number, i.title, c.name as category_name 
+    SELECT i.id, i.reg_number, i.title, c.name AS category_name
     FROM items i
     LEFT JOIN categories c ON i.category_id = c.id
-    ORDER BY i.id DESC LIMIT 5
+    ORDER BY i.id DESC
+    LIMIT 5
 ")->fetchAll();
 
-// Storage Usage with 10-minute cache
+// Storage usage with 10-minute cache
 $totalStorageSize = 0;
 $storageCacheKey = 'dashboard_storage_size';
 $storageCacheTimeKey = 'dashboard_storage_size_time';
@@ -59,24 +59,16 @@ function formatBytes($bytes, $precision = 2) {
     return round($bytes, $precision) . ' ' . $units[$pow];
 }
 
+function dashboardPercent(int $count, int $total): int {
+    if ($total <= 0) {
+        return 0;
+    }
+
+    return (int)round(($count / $total) * 100);
+}
+
 $formattedStorage = formatBytes($totalStorageSize);
 
-echo renderAdminHeader("Dashboard");
-?>
-
-<div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-    <div>
-        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Overview</h1>
-        <p class="text-base text-slate-500 mt-1">Welcome back, <span class="font-medium text-slate-700"><?= htmlspecialchars($_SESSION['admin_username']) ?></span>. Here is the pulse of your archive.</p>
-    </div>
-    <div class="flex gap-3">
-        <a href="<?= SITE_URL ?>/admin/items.php" class="px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">Manage Items</a>
-        <a href="<?= SITE_URL ?>/admin/edit_item.php?id=0" class="px-4 py-2 bg-blue-600 border border-transparent text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">Add New Item</a>
-    </div>
-</div>
-
-<!-- System Health Monitor -->
-<?php
 $phpVersion = PHP_VERSION;
 $gdEnabled = extension_loaded('gd');
 $uploadsWritable = is_writable(__DIR__ . '/../uploads');
@@ -84,12 +76,19 @@ $dbHealthy = false;
 try {
     $pdo->query("SELECT 1");
     $dbHealthy = true;
-} catch (Exception $e) {}
+} catch (Exception $e) {
+    $dbHealthy = false;
+}
 
 $storageType = $appSettings['storage_driver'] ?? 'local';
-$storageStatus = ($storageType === 's3') ? (($storage instanceof S3Storage) ? 'ok' : 'error') : ($uploadsWritable ? 'ok' : 'error');
+$storageStatus = ($storageType === 's3')
+    ? (($storage instanceof S3Storage) ? 'ok' : 'error')
+    : ($uploadsWritable ? 'ok' : 'error');
 $storageLabel = ($storageType === 's3') ? 'S3 Storage' : 'Local Storage';
 $storageValue = ($storageType === 's3') ? ($appSettings['s3_bucket'] ?: 'Not Configured') : ($uploadsWritable ? 'Active' : 'Locked');
+$storageNote = ($storageType === 's3')
+    ? 'Media is served from your configured bucket. Confirm credentials and bucket policies if uploads stall.'
+    : 'Media is served locally. Keep regular backups of uploads/ and monitor disk space.';
 
 $healthChecks = [
     ['label' => 'PHP Version', 'value' => $phpVersion, 'status' => version_compare(PHP_VERSION, '7.4.0', '>=') ? 'ok' : 'warn'],
@@ -98,191 +97,404 @@ $healthChecks = [
     ['label' => 'Uploads Folder', 'value' => $uploadsWritable ? 'Writable' : 'Locked', 'status' => $uploadsWritable ? 'ok' : 'error'],
     ['label' => $storageLabel, 'value' => $storageValue, 'status' => $storageStatus],
 ];
+
+$statusStyles = [
+    'ok' => [
+        'dot' => 'bg-emerald-500',
+        'badge' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    ],
+    'warn' => [
+        'dot' => 'bg-amber-500',
+        'badge' => 'border-amber-200 bg-amber-50 text-amber-700',
+    ],
+    'error' => [
+        'dot' => 'bg-red-500',
+        'badge' => 'border-red-200 bg-red-50 text-red-700',
+    ],
+];
+
+$describedItems = max($kpiItems - $itemsNoDesc, 0);
+$itemsWithMedia = max($kpiItems - $itemsNoImage, 0);
+$visibleItems = max($kpiItems - $itemsHidden, 0);
+$wellDescribedItems = max($kpiItems - $itemsNoDesc - $itemsShortDesc, 0);
+
+$descriptionCoverage = dashboardPercent($describedItems, $kpiItems);
+$richDescriptionCoverage = dashboardPercent($wellDescribedItems, $kpiItems);
+$mediaCoverage = dashboardPercent($itemsWithMedia, $kpiItems);
+$visibilityCoverage = dashboardPercent($visibleItems, $kpiItems);
+
+$attentionItems = [
+    [
+        'label' => 'Missing descriptions',
+        'count' => $itemsNoDesc,
+        'summary' => 'Records without physical descriptions are harder to review and publish confidently.',
+        'href' => SITE_URL . '/admin/items.php',
+        'action' => 'Review items',
+        'tone' => 'amber',
+    ],
+    [
+        'label' => 'Short descriptions',
+        'count' => $itemsShortDesc,
+        'summary' => 'Brief descriptions may need richer context for catalog quality and search clarity.',
+        'href' => SITE_URL . '/admin/items.php',
+        'action' => 'Improve descriptions',
+        'tone' => 'amber',
+    ],
+    [
+        'label' => 'Items without media',
+        'count' => $itemsNoImage,
+        'summary' => 'Missing media makes the archive feel incomplete for both editors and visitors.',
+        'href' => SITE_URL . '/admin/items.php',
+        'action' => 'Attach media',
+        'tone' => 'red',
+    ],
+    [
+        'label' => 'Hidden items',
+        'count' => $itemsHidden,
+        'summary' => 'These records are excluded from public browsing until their visibility is restored.',
+        'href' => SITE_URL . '/admin/items.php',
+        'action' => 'Check visibility',
+        'tone' => 'slate',
+    ],
+    [
+        'label' => 'Orphaned uploads',
+        'count' => $orphanedFilesCount,
+        'summary' => 'Files without matching records can waste storage and complicate cleanup work.',
+        'href' => SITE_URL . '/admin/settings.php',
+        'action' => 'Inspect storage',
+        'tone' => 'red',
+    ],
+];
+
+usort($attentionItems, static function (array $a, array $b): int {
+    return $b['count'] <=> $a['count'];
+});
+
+$openIssuesCount = count(array_filter($attentionItems, static function (array $item): bool {
+    return $item['count'] > 0;
+}));
+
+$heroStats = [
+    [
+        'label' => 'Items',
+        'value' => number_format($kpiItems),
+        'context' => $descriptionCoverage . '% described',
+        'href' => SITE_URL . '/admin/items.php',
+    ],
+    [
+        'label' => 'Stories',
+        'value' => number_format($kpiStories),
+        'context' => 'Published narratives',
+        'href' => SITE_URL . '/admin/narratives.php',
+    ],
+    [
+        'label' => 'Media',
+        'value' => number_format($kpiMedia),
+        'context' => $mediaCoverage . '% item coverage',
+        'href' => SITE_URL . '/admin/items.php',
+    ],
+    [
+        'label' => 'Storage',
+        'value' => $formattedStorage,
+        'context' => strtoupper($storageType),
+        'href' => SITE_URL . '/admin/settings.php',
+    ],
+];
+
+$coverageCards = [
+    [
+        'label' => 'Description Coverage',
+        'value' => $descriptionCoverage . '%',
+        'count' => number_format($describedItems) . ' of ' . number_format($kpiItems) . ' items',
+        'detail' => $itemsNoDesc > 0
+            ? number_format($itemsNoDesc) . ' records still need descriptions.'
+            : 'Every item has a physical description.',
+        'barClass' => 'bg-amber-500',
+        'panelClass' => 'border-amber-200 bg-amber-50/70',
+    ],
+    [
+        'label' => 'Rich Description Quality',
+        'value' => $richDescriptionCoverage . '%',
+        'count' => number_format($wellDescribedItems) . ' items are beyond the short-description threshold',
+        'detail' => $itemsShortDesc > 0
+            ? number_format($itemsShortDesc) . ' records could use fuller context.'
+            : 'No short-description flags right now.',
+        'barClass' => 'bg-blue-600',
+        'panelClass' => 'border-blue-200 bg-blue-50/70',
+    ],
+    [
+        'label' => 'Media Coverage',
+        'value' => $mediaCoverage . '%',
+        'count' => number_format($itemsWithMedia) . ' of ' . number_format($kpiItems) . ' items',
+        'detail' => $itemsNoImage > 0
+            ? number_format($itemsNoImage) . ' records still need an image or attachment.'
+            : 'Every item has linked media.',
+        'barClass' => 'bg-emerald-500',
+        'panelClass' => 'border-emerald-200 bg-emerald-50/70',
+    ],
+    [
+        'label' => 'Public Visibility',
+        'value' => $visibilityCoverage . '%',
+        'count' => number_format($visibleItems) . ' currently visible',
+        'detail' => $itemsHidden > 0
+            ? number_format($itemsHidden) . ' items are hidden from the public site.'
+            : 'Everything is visible on the public site.',
+        'barClass' => 'bg-slate-700',
+        'panelClass' => 'border-slate-200 bg-slate-50/90',
+    ],
+];
+
+echo renderAdminHeader("Dashboard");
 ?>
-<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
-    <?php foreach ($healthChecks as $check): ?>
-    <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center shadow-sm">
-        <div class="w-2.5 h-2.5 rounded-full mr-3 <?= $check['status'] === 'ok' ? 'bg-emerald-500' : ($check['status'] === 'warn' ? 'bg-amber-500' : 'bg-red-500 shadow-sm shadow-red-500/50') ?>"></div>
-        <div class="min-w-0">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate"><?= $check['label'] ?></p>
-            <p class="text-sm font-bold text-slate-800 truncate" title="<?= htmlspecialchars($check['value']) ?>"><?= $check['value'] ?></p>
-        </div>
-    </div>
-    <?php endforeach; ?>
-</div>
 
-<!-- KPI Cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-    <div class="bg-white rounded-2xl shadow-sm shadow-slate-200/50 border border-slate-200 p-6 relative overflow-hidden group hover:shadow-md transition-shadow">
-        <div class="absolute top-0 right-0 p-4 opacity-10 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-110 transition-transform">
-            <svg class="w-24 h-24 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path></svg>
-        </div>
-        <div class="relative flex items-center justify-between">
-            <div>
-                <p class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">Total Items</p>
-                <p class="text-4xl font-black text-slate-900"><?= number_format((int)$kpiItems) ?></p>
-            </div>
-            <div class="w-14 h-14 bg-gradient-to-br from-blue-50 to-blue-100/50 text-blue-600 rounded-2xl flex items-center justify-center border border-blue-200/50 shadow-sm">
-                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-            </div>
-        </div>
+<div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+        <p class="text-xs font-bold uppercase tracking-[0.24em] text-blue-600">Dashboard</p>
+        <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Collection operations at a glance</h1>
+        <p class="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
+            Welcome back, <span class="font-semibold text-slate-800"><?= htmlspecialchars($_SESSION['admin_username']) ?></span>.
+            This view prioritizes the records that need attention first, then surfaces overall coverage and recent work.
+        </p>
     </div>
-    
-    <div class="bg-white rounded-2xl shadow-sm shadow-slate-200/50 border border-slate-200 p-6 relative overflow-hidden group hover:shadow-md transition-shadow">
-        <div class="absolute top-0 right-0 p-4 opacity-10 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-110 transition-transform">
-            <svg class="w-24 h-24 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-        </div>
-        <div class="relative flex items-center justify-between">
-            <div>
-                <p class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">Active Stories</p>
-                <p class="text-4xl font-black text-slate-900"><?= number_format((int)$kpiStories) ?></p>
-            </div>
-            <div class="w-14 h-14 bg-gradient-to-br from-emerald-50 to-emerald-100/50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200/50 shadow-sm">
-                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-            </div>
-        </div>
-    </div>
-    
-    <div class="bg-white rounded-2xl shadow-sm shadow-slate-200/50 border border-slate-200 p-6 relative overflow-hidden group hover:shadow-md transition-shadow">
-        <div class="absolute top-0 right-0 p-4 opacity-10 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-110 transition-transform">
-            <svg class="w-24 h-24 text-purple-600" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-        </div>
-        <div class="relative flex items-center justify-between">
-            <div>
-                <p class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">Media Files</p>
-                <p class="text-4xl font-black text-slate-900"><?= number_format((int)$kpiMedia) ?></p>
-            </div>
-            <div class="w-14 h-14 bg-gradient-to-br from-purple-50 to-purple-100/50 text-purple-600 rounded-2xl flex items-center justify-center border border-purple-200/50 shadow-sm">
-                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16zm0 0l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-            </div>
-        </div>
+    <div class="flex flex-wrap gap-3">
+        <a href="<?= SITE_URL ?>/admin/items.php" class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50">
+            Manage Items
+        </a>
+        <a href="<?= SITE_URL ?>/admin/narratives.php" class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50">
+            Review Stories
+        </a>
+        <a href="<?= SITE_URL ?>/admin/edit_item.php?id=0" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700">
+            Add New Item
+        </a>
     </div>
 </div>
 
-<!-- Storage Usage Card (Secondary KPI row) -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-    <div class="bg-slate-900 rounded-2xl p-6 relative overflow-hidden group shadow-xl shadow-slate-200">
-        <div class="absolute top-0 right-0 p-4 opacity-20 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-110 transition-transform text-white">
-            <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V7z"/><path d="M4 14a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4z"/></svg>
-        </div>
-        <div class="relative">
-            <p class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Storage Consumption</p>
-            <div class="flex items-baseline gap-2">
-                <h3 class="text-3xl font-black text-white"><?= $formattedStorage ?></h3>
-                <span class="text-xs font-bold text-slate-500 uppercase"><?= strtoupper($storageType) ?></span>
+<div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
+    <section class="lg:col-span-7 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+        <div class="border-b border-slate-100 bg-gradient-to-r from-slate-900 via-slate-900 to-blue-900 px-6 py-6 sm:px-8">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.22em] text-blue-200">Overview</p>
+                    <h2 class="mt-2 text-2xl font-bold tracking-tight text-white">Archive pulse</h2>
+                    <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
+                        Scan collection volume, story output, media footprint, and storage status before drilling into maintenance work.
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
+                        <?= $openIssuesCount > 0 ? number_format($openIssuesCount) . ' issue groups need review' : 'No open cleanup flags' ?>
+                    </span>
+                    <span class="inline-flex items-center rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-100">
+                        <?= $visibilityCoverage ?>% publicly visible
+                    </span>
+                </div>
             </div>
-            <div class="mt-4 w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-                <div class="h-full bg-blue-500 animate-pulse" style="width: 65%"></div>
-            </div>
         </div>
-    </div>
-    
-    <div class="md:col-span-3 bg-blue-50/50 rounded-2xl border border-blue-100 p-6 flex items-center justify-between">
-        <div>
-            <h4 class="text-sm font-bold text-blue-900 mb-1">Storage Management</h4>
-            <p class="text-xs text-blue-700/70 leading-relaxed">Your media assets are currently being served via <strong><?= $storageLabel ?></strong>. <br>Ensure regular backups of your <code>uploads/</code> directory if using local storage.</p>
-        </div>
-        <a href="<?= SITE_URL ?>/admin/settings.php" class="px-4 py-2 bg-white text-blue-600 text-xs font-black uppercase tracking-widest rounded-xl border border-blue-200 hover:bg-blue-600 hover:text-white transition-all">Configure</a>
-    </div>
-</div>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    
-    <!-- Left Column: Data Health -->
-    <div class="lg:col-span-1">
-        <div class="bg-white rounded-2xl shadow-sm shadow-slate-200/50 border border-slate-200 overflow-hidden h-full">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 class="text-base font-bold text-slate-900">Data Health Report</h3>
+        <div class="grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-4">
+            <?php foreach ($heroStats as $stat): ?>
+                <a href="<?= $stat['href'] ?>" class="group bg-white px-5 py-5 transition-colors hover:bg-slate-50">
+                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400"><?= htmlspecialchars($stat['label']) ?></p>
+                    <p class="mt-3 text-3xl font-black tracking-tight text-slate-900"><?= htmlspecialchars($stat['value']) ?></p>
+                    <p class="mt-2 text-sm text-slate-500 transition-colors group-hover:text-slate-700"><?= htmlspecialchars($stat['context']) ?></p>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    </section>
+
+    <section class="lg:col-span-5 rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+        <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[0.22em] text-red-500">Priority Queue</p>
+                <h2 class="mt-1 text-xl font-bold tracking-tight text-slate-900">Needs attention</h2>
             </div>
-            <div class="divide-y divide-slate-100">
-                <!-- Data issues check -->
-                <?php 
-                    $healthItems = [
-                        ['label' => 'No Description', 'count' => $itemsNoDesc, 'alert' => true, 'color' => 'amber'],
-                        ['label' => 'Short Description', 'count' => $itemsShortDesc, 'alert' => true, 'color' => 'amber'],
-                        ['label' => 'No Media Attached', 'count' => $itemsNoImage, 'alert' => true, 'color' => 'red'],
-                        ['label' => 'Hidden from Public', 'count' => $itemsHidden, 'alert' => false, 'color' => 'slate'],
-                        ['label' => 'Orphaned Uploads', 'count' => count($orphanedFiles), 'alert' => true, 'color' => 'red'],
-                    ];
-                ?>
-                <?php foreach($healthItems as $hi): ?>
-                <div class="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                    <div class="flex items-center space-x-3">
-                        <?php if ($hi['count'] > 0 && $hi['alert']): ?>
-                            <span class="w-2.5 h-2.5 rounded-full bg-<?= $hi['color'] ?>-500 shadow-sm shadow-<?= $hi['color'] ?>-500/50 flex-shrink-0 animate-pulse"></span>
-                        <?php elseif ($hi['count'] > 0 && !$hi['alert']): ?>
-                            <span class="w-2.5 h-2.5 rounded-full bg-slate-400 flex-shrink-0"></span>
-                        <?php else: ?>
-                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
-                        <?php endif; ?>
-                        <p class="text-sm font-medium text-slate-700"><?= $hi['label'] ?></p>
+            <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                <?= number_format($openIssuesCount) ?> active
+            </span>
+        </div>
+
+        <div class="divide-y divide-slate-100">
+            <?php
+            $visibleAttentionItems = array_slice($attentionItems, 0, 4);
+            foreach ($visibleAttentionItems as $item):
+                $count = (int)$item['count'];
+                $countClass = 'text-slate-500';
+                $chipClass = 'border-slate-200 bg-slate-50 text-slate-600';
+
+                if ($item['tone'] === 'red' && $count > 0) {
+                    $countClass = 'text-red-600';
+                    $chipClass = 'border-red-200 bg-red-50 text-red-700';
+                } elseif ($item['tone'] === 'amber' && $count > 0) {
+                    $countClass = 'text-amber-600';
+                    $chipClass = 'border-amber-200 bg-amber-50 text-amber-700';
+                }
+            ?>
+                <div class="px-6 py-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900"><?= htmlspecialchars($item['label']) ?></p>
+                            <p class="mt-1 text-sm leading-relaxed text-slate-500"><?= htmlspecialchars($item['summary']) ?></p>
+                        </div>
+                        <span class="inline-flex min-w-[3.25rem] items-center justify-center rounded-full border px-3 py-1 text-sm font-bold <?= $chipClass ?>">
+                            <?= number_format($count) ?>
+                        </span>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <span class="text-base font-bold <?= $hi['count'] > 0 && $hi['alert'] ? 'text-'.$hi['color'].'-600' : 'text-slate-500' ?>"><?= $hi['count'] ?></span>
+                    <div class="mt-4 flex items-center justify-between">
+                        <span class="text-sm font-semibold <?= $countClass ?>">
+                            <?= $count > 0 ? 'Action recommended' : 'All clear' ?>
+                        </span>
+                        <a href="<?= $item['href'] ?>" class="text-sm font-semibold text-blue-600 transition-colors hover:text-blue-800">
+                            <?= htmlspecialchars($item['action']) ?> &rarr;
+                        </a>
                     </div>
                 </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+</div>
+
+<div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
+    <section class="lg:col-span-7 rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+        <div class="border-b border-slate-100 px-6 py-5">
+            <p class="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">Coverage Snapshot</p>
+            <h2 class="mt-1 text-xl font-bold tracking-tight text-slate-900">Where the archive stands</h2>
+            <p class="mt-2 text-sm leading-relaxed text-slate-500">
+                These ratios make it easier to spot completeness gaps without reading through raw counts one by one.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
+            <?php foreach ($coverageCards as $card): ?>
+                <div class="rounded-2xl border p-5 <?= $card['panelClass'] ?>">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500"><?= htmlspecialchars($card['label']) ?></p>
+                            <p class="mt-2 text-3xl font-black tracking-tight text-slate-900"><?= htmlspecialchars($card['value']) ?></p>
+                        </div>
+                        <span class="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600">
+                            <?= htmlspecialchars($card['count']) ?>
+                        </span>
+                    </div>
+                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/80">
+                        <div class="h-full rounded-full <?= $card['barClass'] ?>" style="width: <?= (int)rtrim($card['value'], '%') ?>%"></div>
+                    </div>
+                    <p class="mt-4 text-sm leading-relaxed text-slate-600"><?= htmlspecialchars($card['detail']) ?></p>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+
+    <section class="lg:col-span-5 rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+        <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">Recent Activity</p>
+                <h2 class="mt-1 text-xl font-bold tracking-tight text-slate-900">Recently added items</h2>
+            </div>
+            <a href="<?= SITE_URL ?>/admin/items.php" class="text-sm font-semibold text-blue-600 transition-colors hover:text-blue-800">
+                View all
+            </a>
+        </div>
+
+        <?php if (count($recentItems) > 0): ?>
+            <div class="divide-y divide-slate-100">
+                <?php foreach ($recentItems as $item): ?>
+                    <div class="flex items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-slate-50">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-semibold text-slate-900"><?= htmlspecialchars($item['title']) ?></p>
+                            <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                <span class="font-mono font-semibold text-slate-400"><?= htmlspecialchars($item['reg_number']) ?></span>
+                                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-600">
+                                    <?= htmlspecialchars($item['category_name'] ?? 'Uncategorized') ?>
+                                </span>
+                            </div>
+                        </div>
+                        <a href="<?= SITE_URL ?>/admin/edit_item.php?id=<?= $item['id'] ?>" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                            Edit
+                        </a>
+                    </div>
                 <?php endforeach; ?>
             </div>
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 text-center">
-                <a href="<?= SITE_URL ?>/admin/items.php" class="text-xs font-bold text-blue-600 hover:text-blue-800 uppercase tracking-widest transition-colors">Review Catalog &rarr;</a>
+        <?php else: ?>
+            <div class="px-6 py-14 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                    </svg>
+                </div>
+                <p class="mt-4 text-sm font-semibold text-slate-700">No items have been added yet.</p>
+                <p class="mt-1 text-sm text-slate-500">Start the archive by creating the first collection record.</p>
+                <a href="<?= SITE_URL ?>/admin/edit_item.php?id=0" class="mt-4 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                    Add the first item
+                </a>
             </div>
-        </div>
-    </div>
+        <?php endif; ?>
+    </section>
+</div>
 
-    <!-- Right Column: Recent Activity -->
-    <div class="lg:col-span-2">
-        <div class="bg-white rounded-2xl shadow-sm shadow-slate-200/50 border border-slate-200 overflow-hidden h-full">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 class="text-base font-bold text-slate-900">Recently Added</h3>
-                <a href="<?= SITE_URL ?>/admin/items.php" class="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">View All</a>
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+    <section class="lg:col-span-7 rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+        <div class="border-b border-slate-100 px-6 py-5">
+            <p class="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">System Status</p>
+            <h2 class="mt-1 text-xl font-bold tracking-tight text-slate-900">Operational readiness</h2>
+            <p class="mt-2 text-sm leading-relaxed text-slate-500">
+                Core services are grouped here so you can confirm the admin stack is healthy without leaving the dashboard.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-5">
+            <?php foreach ($healthChecks as $check): ?>
+                <?php $styles = $statusStyles[$check['status']] ?? $statusStyles['ok']; ?>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="h-2.5 w-2.5 rounded-full <?= $styles['dot'] ?>"></span>
+                        <span class="rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] <?= $styles['badge'] ?>">
+                            <?= htmlspecialchars($check['status']) ?>
+                        </span>
+                    </div>
+                    <p class="mt-4 text-xs font-bold uppercase tracking-[0.16em] text-slate-400"><?= htmlspecialchars($check['label']) ?></p>
+                    <p class="mt-2 text-sm font-semibold text-slate-900" title="<?= htmlspecialchars($check['value']) ?>">
+                        <?= htmlspecialchars($check['value']) ?>
+                    </p>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+
+    <section class="lg:col-span-5 rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+        <div class="border-b border-slate-100 px-6 py-5">
+            <p class="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">Storage</p>
+            <h2 class="mt-1 text-xl font-bold tracking-tight text-slate-900">Media footprint</h2>
+        </div>
+
+        <div class="p-6">
+            <div class="rounded-3xl bg-slate-900 px-6 py-6 text-white shadow-lg shadow-slate-200/70">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.22em] text-blue-300">Current usage</p>
+                        <p class="mt-3 text-4xl font-black tracking-tight"><?= htmlspecialchars($formattedStorage) ?></p>
+                        <p class="mt-2 text-sm text-slate-300"><?= htmlspecialchars($storageLabel) ?> is active.</p>
+                    </div>
+                    <span class="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
+                        <?= strtoupper(htmlspecialchars($storageType)) ?>
+                    </span>
+                </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm text-slate-600">
-                    <thead class="bg-white text-slate-400 uppercase font-bold text-[11px] tracking-wider border-b border-slate-100">
-                        <tr>
-                            <th class="px-6 py-4">Item Details</th>
-                            <th class="px-6 py-4 hidden sm:table-cell">Category</th>
-                            <th class="px-6 py-4 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <?php if (count($recentItems) > 0): ?>
-                            <?php foreach ($recentItems as $item): ?>
-                            <tr class="hover:bg-slate-50 transition-colors group">
-                                <td class="px-6 py-4 font-medium text-slate-900">
-                                    <div class="flex flex-col">
-                                        <span class="text-base"><?= htmlspecialchars($item['title']) ?></span>
-                                        <span class="text-xs font-bold text-slate-400 font-mono mt-0.5"><?= htmlspecialchars($item['reg_number']) ?></span>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 hidden sm:table-cell align-middle">
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                                        <?= htmlspecialchars($item['category_name'] ?? 'Uncategorized') ?>
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-right whitespace-nowrap align-middle">
-                                    <a href="<?= SITE_URL ?>/admin/edit_item.php?id=<?= $item['id'] ?>" class="inline-flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all border border-transparent hover:border-blue-100">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                    </a>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="3" class="px-6 py-12 text-center">
-                                    <div class="flex flex-col items-center justify-center text-slate-400">
-                                        <svg class="w-12 h-12 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
-                                        <span class="font-medium text-sm text-slate-500">No items found in the archive.</span>
-                                        <a href="<?= SITE_URL ?>/admin/edit_item.php?id=0" class="mt-2 text-sm text-blue-600 hover:underline">Add the first item</a>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+
+            <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <p class="text-sm font-semibold text-slate-900">Storage guidance</p>
+                <p class="mt-2 text-sm leading-relaxed text-slate-600"><?= htmlspecialchars($storageNote) ?></p>
+            </div>
+
+            <div class="mt-5 flex flex-wrap gap-3">
+                <a href="<?= SITE_URL ?>/admin/settings.php" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                    Open Storage Settings
+                </a>
+                <a href="<?= SITE_URL ?>" target="_blank" class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+                    View Live Site
+                </a>
             </div>
         </div>
-    </div>
+    </section>
 </div>
 
 <?= renderAdminFooter(); ?>

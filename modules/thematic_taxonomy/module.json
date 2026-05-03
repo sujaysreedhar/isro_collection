@@ -1,0 +1,8 @@
+{
+    "name": "Thematic Taxonomy",
+    "description": "Adds hierarchical collection themes so items can be browsed by curated subjects like Space, Wildlife, or Postal History.",
+    "version": "1.0.0",
+    "author": "Codex",
+    "admin_menu_priority": 32,
+    "wide_admin_page": true
+}

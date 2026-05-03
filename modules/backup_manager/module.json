@@ -1,0 +1,7 @@
+{
+  "name": "Backup Manager",
+  "description": "Creates protected 3-part backups and exposes a token-protected /runback webhook.",
+  "version": "1.0.0",
+  "author": "Codex",
+  "admin_menu_priority": 90
+}
