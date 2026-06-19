@@ -134,6 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Filter Logic
+$filterSearch = trim($_GET['search'] ?? '');
 $filterState = $_GET['state'] ?? '';
 $filterStatus = $_GET['status'] ?? '';
 $filterMissingCoords = $_GET['missing_coords'] ?? '';
@@ -141,6 +142,12 @@ $filterLinked = $_GET['linked'] ?? '';
 
 $whereClauses = [];
 $params = [];
+
+if ($filterSearch !== '') {
+    $whereClauses[] = "(post_office LIKE ? OR pin_code LIKE ?)";
+    $params[] = '%' . $filterSearch . '%';
+    $params[] = '%' . $filterSearch . '%';
+}
 
 if ($filterState !== '') {
     $whereClauses[] = "state = ?";
@@ -228,6 +235,11 @@ $acquiredCount = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE is_a
     <form method="GET" class="flex flex-wrap gap-4 items-end">
         <input type="hidden" name="m" value="postmark_atlas">
         <input type="hidden" name="page" value="locations">
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <input type="text" name="search" value="<?= htmlspecialchars($filterSearch) ?>" placeholder="PO name or PIN..." class="block w-full border border-gray-300 rounded-md py-2 px-3 text-sm">
+        </div>
 
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">State</label>

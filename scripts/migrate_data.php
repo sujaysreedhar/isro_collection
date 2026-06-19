@@ -9,8 +9,25 @@ set_time_limit(0);
 require_once __DIR__ . '/../config/config.php';
 
 $sourceUrl = "https://postcardcollection.sujaysreedhar.com/";
-$itemsCategory = 10; // ID for "Postal Cancellations"
 $uploadDir = __DIR__ . '/../uploads/originals/';
+
+// Ensure the category exists and get its ID
+$catStmt = $pdo->prepare("SELECT id FROM categories WHERE name = 'Postal Cancellations'");
+$catStmt->execute();
+$itemsCategory = $catStmt->fetchColumn();
+
+if (!$itemsCategory) {
+    // Check if 'slug' column exists to avoid errors on old schemas
+    $hasSlug = $pdo->query("SHOW COLUMNS FROM categories LIKE 'slug'")->fetch();
+    if ($hasSlug) {
+        $pdo->prepare("INSERT INTO categories (name, slug) VALUES ('Postal Cancellations', 'postal-cancellations')")->execute();
+    } else {
+        $pdo->prepare("INSERT INTO categories (name) VALUES ('Postal Cancellations')")->execute();
+    }
+    $itemsCategory = $pdo->lastInsertId();
+}
+
+echo "Using Category ID: $itemsCategory for 'Postal Cancellations'\n";
 
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0777, true);

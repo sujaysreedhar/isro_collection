@@ -297,3 +297,6 @@ CREATE TABLE IF NOT EXISTS module_wishlist_stores (
     INDEX idx_wishlist_item_store (wishlist_item_id),
     CONSTRAINT fk_wishlist_item_store FOREIGN KEY (wishlist_item_id) REFERENCES module_wishlist_items(id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- Add 'Postal Cancellations' category for the migration script
+INSERT IGNORE INTO categories (name, slug) VALUES ('Postal Cancellations', 'postal-cancellations');

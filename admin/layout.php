@@ -289,8 +289,10 @@ document.addEventListener('DOMContentLoaded', function() {
             let isMatch = false;
             
             if (mParam && linkMParam) {
-                // If we are on a module page, exactly match the ?m= parameter
-                isMatch = (mParam === linkMParam && path.endsWith(url.pathname.split('/').pop()));
+                // If we are on a module page, match the ?m= parameter and the ?page= parameter
+                const pageParam = urlParams.get('page');
+                const linkPageParam = url.searchParams.get('page');
+                isMatch = (mParam === linkMParam && pageParam === linkPageParam && path.endsWith(url.pathname.split('/').pop()));
             } else if (!mParam && !linkMParam) {
                 // Not on a module page, match the path exactly
                 isMatch = path.endsWith(url.pathname.split('/').pop());

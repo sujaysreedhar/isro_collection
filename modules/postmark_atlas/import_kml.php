@@ -150,25 +150,29 @@ if ($step === 'prepare') {
             $exactMatch = false;
             $legacyEmptyMatch = null;
 
+            // 1. Check if this PIN + PPC Name combination is already in the database
             foreach ($dbRows as $dbRow) {
-                // Must match PO string (case-insensitive for safety)
-                if (strcasecmp($dbRow['post_office'], $po) !== 0) continue;
-
                 if (strcasecmp((string)$dbRow['ppc_name'], $name) === 0) {
                     $exactMatch = true;
                     break;
                 }
-
-                if (empty($dbRow['ppc_name']) && !in_array($dbRow['id'], $claimedIdsForUpdate)) {
-                    $legacyEmptyMatch = $dbRow;
-                }
             }
 
             if ($exactMatch) {
-                // Already perfectly synced in DB. Check next HTML row.
+                // Already present in database — do not touch it
                 continue;
-            } else if ($legacyEmptyMatch && $name && !$legacyEmptyMatch['is_locked']) {
-                // Found an existing row with same PIN+PO but empty PPC name
+            }
+
+            // 2. Since it is not in the database, check if we can update an existing empty ppc_name row
+            foreach ($dbRows as $dbRow) {
+                if (empty($dbRow['ppc_name']) && strcasecmp($dbRow['post_office'], $po) === 0 && !in_array($dbRow['id'], $claimedIdsForUpdate)) {
+                    $legacyEmptyMatch = $dbRow;
+                    break;
+                }
+            }
+
+            if ($legacyEmptyMatch && !$legacyEmptyMatch['is_locked']) {
+                // Found an existing row with same PIN + PO but empty PPC name — update it
                 $claimedIdsForUpdate[] = $legacyEmptyMatch['id'];
                 $plan['update_name'][] = [
                     'id'          => $legacyEmptyMatch['id'],
@@ -178,10 +182,7 @@ if ($step === 'prepare') {
                     'new_name'    => $name,
                 ];
             } else {
-                // Either no PIN+PO matched, OR the PIN+PO matched but all its DB rows 
-                // already have a DIFFERENT ppc_name! This means it's a multi-PPC post office (like Kolkata GPO).
-                // Or we already claimed the empty legacy row for a previous iteration.
-                // It must be a new record!
+                // No existing matching row or empty row to update — insert it as a new location
                 $plan['insert_new'][] = [
                     'pin'         => $pin,
                     'post_office' => $po,

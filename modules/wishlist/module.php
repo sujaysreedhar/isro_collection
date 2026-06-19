@@ -43,6 +43,16 @@ class WishlistModule extends BaseModule {
             $this->ajaxMigrate();
             return true;
         });
+
+        HookRegistry::addFilter('admin_ajax_wishlist_bulk_add', function ($handled) {
+            $this->ajaxBulkAdd();
+            return true;
+        });
+
+        HookRegistry::addFilter('admin_ajax_wishlist_export', function ($handled) {
+            $this->ajaxExport();
+            return true;
+        });
     }
 
     public function activate() {
@@ -94,9 +104,15 @@ class WishlistModule extends BaseModule {
         $description = $_POST['description'] ?? '';
         $status = $_POST['status'] ?? 'wanted';
         $priority = (int)($_POST['priority'] ?? 0);
+        $imageUrl = null;
 
-        $stmt = $this->pdo->prepare("INSERT INTO module_wishlist_items (name, theme_id, description, status, priority) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $themeId, $description, $status, $priority]);
+        // Handle Image Upload
+        if (!empty($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $imageUrl = $this->handleImageUpload($_FILES['image']);
+        }
+
+        $stmt = $this->pdo->prepare("INSERT INTO module_wishlist_items (name, theme_id, description, status, priority, image_url) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $themeId, $description, $status, $priority, $imageUrl]);
         $itemId = $this->pdo->lastInsertId();
 
         // Handle stores
@@ -129,8 +145,14 @@ class WishlistModule extends BaseModule {
         $status = $_POST['status'] ?? 'wanted';
         $priority = (int)($_POST['priority'] ?? 0);
 
-        $stmt = $this->pdo->prepare("UPDATE module_wishlist_items SET name = ?, theme_id = ?, description = ?, status = ?, priority = ? WHERE id = ?");
-        $stmt->execute([$name, $themeId, $description, $status, $priority, $id]);
+        // Handle Image Upload
+        $imageUrl = $_POST['existing_image'] ?? null;
+        if (!empty($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $imageUrl = $this->handleImageUpload($_FILES['image']);
+        }
+
+        $stmt = $this->pdo->prepare("UPDATE module_wishlist_items SET name = ?, theme_id = ?, description = ?, status = ?, priority = ?, image_url = ? WHERE id = ?");
+        $stmt->execute([$name, $themeId, $description, $status, $priority, $imageUrl, $id]);
 
         // Sync stores
         $this->pdo->prepare("DELETE FROM module_wishlist_stores WHERE wishlist_item_id = ?")->execute([$id]);
@@ -219,5 +241,142 @@ class WishlistModule extends BaseModule {
             $this->pdo->rollBack();
             echo json_encode(['success' => false, 'message' => 'Migration failed: ' . $e->getMessage()]);
         }
+    }
+
+    private function ajaxBulkAdd() {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
+        $items = $_POST['items'] ?? [];
+        if (!is_array($items) || empty($items)) {
+            echo json_encode(['success' => false, 'message' => 'No items provided']);
+            return;
+        }
+
+        $themeId = !empty($_POST['theme_id']) ? (int)$_POST['theme_id'] : null;
+        $status = $_POST['status'] ?? 'wanted';
+
+        try {
+            $this->pdo->beginTransaction();
+            $stmt = $this->pdo->prepare("INSERT INTO module_wishlist_items (name, theme_id, status) VALUES (?, ?, ?)");
+            foreach ($items as $name) {
+                $name = trim($name);
+                if (!$name) continue;
+                $stmt->execute([$name, $themeId, $status]);
+            }
+            $this->pdo->commit();
+            echo json_encode(['success' => true]);
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Bulk add failed: ' . $e->getMessage()]);
+        }
+    }
+
+    private function ajaxExport() {
+        // Fetch all items with stores
+        $items = $this->pdo->query("SELECT * FROM module_wishlist_items ORDER BY theme_id, priority DESC")->fetchAll(PDO::FETCH_ASSOC);
+        
+        $filename = "wishlist_export_" . date('Y-m-d') . ".csv";
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        
+        $output = fopen('php://output', 'w');
+        fputcsv($output, ['Name', 'Theme', 'Status', 'Priority', 'Description', 'Stores & Prices']);
+        
+        // Map themes
+        $themeMap = [];
+        try {
+            $themes = $this->pdo->query("SELECT id, name FROM module_themes")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($themes as $t) $themeMap[$t['id']] = $t['name'];
+        } catch (Exception $e) {}
+
+        foreach ($items as $item) {
+            $stmt = $this->pdo->prepare("SELECT store_name, price, store_url FROM module_wishlist_stores WHERE wishlist_item_id = ?");
+            $stmt->execute([$item['id']]);
+            $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $storeStrings = [];
+            foreach ($stores as $s) {
+                $storeStrings[] = "{$s['store_name']}: {$s['price']} ({$s['store_url']})";
+            }
+            
+            fputcsv($output, [
+                $item['name'],
+                $themeMap[$item['theme_id'] ?? 0] ?? 'Uncategorized',
+                $item['status'],
+                $item['priority'],
+                $item['description'],
+                implode(' | ', $storeStrings)
+            ]);
+        }
+        
+        fclose($output);
+        exit;
+    }
+
+    private function handleImageUpload($file) {
+        $uploadDir = ABSPATH . '/uploads/originals/';
+        $thumbDir = ABSPATH . '/uploads/thumbnails/';
+        
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        if (!is_dir($thumbDir)) mkdir($thumbDir, 0755, true);
+
+        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $fileName = 'wish_' . uniqid() . '.' . $ext;
+        $targetPath = $uploadDir . $fileName;
+
+        if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+            // Simple thumbnail creation if GD is available
+            if (extension_loaded('gd')) {
+                $this->createThumbnail($targetPath, $thumbDir . $fileName);
+            }
+            return $fileName;
+        }
+        return null;
+    }
+
+    private function createThumbnail($src, $dest, $size = 300) {
+        $info = getimagesize($src);
+        if (!$info) return;
+        $mime = $info['mime'];
+
+        switch ($mime) {
+            case 'image/jpeg': $img = imagecreatefromjpeg($src); break;
+            case 'image/png': $img = imagecreatefrompng($src); break;
+            case 'image/webp': $img = imagecreatefromwebp($src); break;
+            case 'image/gif': $img = imagecreatefromgif($src); break;
+            default: return;
+        }
+
+        $w = imagesx($img);
+        $h = imagesy($img);
+        $ratio = max($size / $w, $size / $h);
+        $newW = (int)($w * $ratio);
+        $newH = (int)($h * $ratio);
+
+        $tmp = imagecreatetruecolor($newW, $newH);
+        imagealphablending($tmp, false);
+        imagesavealpha($tmp, true);
+        imagecopyresampled($tmp, $img, 0, 0, 0, 0, $newW, $newH, $w, $h);
+
+        $final = imagecreatetruecolor($size, $size);
+        imagealphablending($final, false);
+        imagesavealpha($final, true);
+        $x = (int)(($newW - $size) / 2);
+        $y = (int)(($newH - $size) / 2);
+        imagecopy($final, $tmp, 0, 0, $x, $y, $size, $size);
+
+        switch ($mime) {
+            case 'image/jpeg': imagejpeg($final, $dest, 85); break;
+            case 'image/png': imagepng($final, $dest, 8); break;
+            case 'image/webp': imagewebp($final, $dest, 85); break;
+            case 'image/gif': imagegif($final, $dest); break;
+        }
+
+        imagedestroy($img);
+        imagedestroy($tmp);
+        imagedestroy($final);
     }
 }
