@@ -44,9 +44,13 @@ require_once ThemeManager::getHeader();
                     ?>
                     <figure class="w-full h-full flex items-center justify-center">
                         <img id="main-viewer" src="<?= $displaySrc ?>" alt="<?= $imageAlt ?>"
-                            data-caption="<?= htmlspecialchars($primaryMedia['caption'] ?? '') ?>" class="max-h-[680px] w-auto transition-opacity duration-300">
+                            data-caption="<?= htmlspecialchars($primaryMedia['caption'] ?? '') ?>" class="max-h-[680px] w-auto transition-opacity duration-300 mv-zoomable" style="cursor: zoom-in;">
                         <figcaption class="sr-only"><?= $imageAlt ?></figcaption>
                     </figure>
+                    <span class="mv-zoom-hint" aria-hidden="true">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 8v6M8 11h6m5 0a8 8 0 11-16 0 8 8 0 0116 0z"/></svg>
+                        Click to zoom
+                    </span>
                 <?php else: ?>
                     <img id="main-viewer" style="display:none;" />
                     <div class="flex flex-col items-center justify-center h-80 tc-text-muted">
@@ -73,6 +77,7 @@ require_once ThemeManager::getHeader();
                         $thumbAlt = htmlspecialchars($item['title'] . ' - View ' . ($i + 1));
                         ?>
                         <img src="<?= $thumbSrc ?>" class="gallery-thumbnail <?= $active ?>" data-full="<?= $fullSrc ?>"
+                            data-mv-index="<?= $i ?>"
                             data-caption="<?= htmlspecialchars($img['caption'] ?? '') ?>" onclick="switchImage(this)"
                             alt="<?= $thumbAlt ?>" loading="lazy">
                     <?php endforeach; ?>
@@ -301,6 +306,8 @@ require_once ThemeManager::getHeader();
             panoContainer.classList.add('hidden');
         }
 
+        if (el.dataset.mvIndex !== undefined) window.__mvCurrent = parseInt(el.dataset.mvIndex, 10) || 0;
+
         if (main) {
             const itemAlt = <?= json_encode($item['title'] . ' — Registration: ' . $item['reg_number']) ?>;
             main.style.display = 'block';
@@ -324,6 +331,159 @@ require_once ThemeManager::getHeader();
         }
     }
 </script>
+
+<?php
+// Full-resolution set for the zoom lightbox
+$zoomImages = [];
+foreach ($imageMedia as $img) {
+    // Mirror the thumbnail loop 1:1 so lightbox indices stay aligned with data-mv-index.
+    $fp = $img['file_path'] ?? '';
+    $zoomImages[] = [
+        'full'    => MediaProcessor::url($fp, 'originals', 'image', $storage ?? null),
+        'display' => MediaProcessor::url($fp, 'display', 'image', $storage ?? null),
+        'caption' => $img['caption'] ?? '',
+        'alt'     => trim($item['title'] . ' — ' . $item['reg_number']),
+    ];
+}
+?>
+<?php if (!empty($zoomImages)): ?>
+<!-- ── Zoom lightbox ───────────────────────────────────────────────────── -->
+<style>
+    .main-image-container .mv-zoom-hint {
+        position: absolute; bottom: .75rem; right: .75rem; z-index: 5;
+        display: inline-flex; align-items: center; gap: .3rem;
+        background: rgba(17,24,39,.78); color: #fff;
+        font-size: .72rem; font-weight: 600; letter-spacing: .02em;
+        padding: .28rem .6rem; border-radius: 999px;
+        opacity: 0; transition: opacity .18s ease; pointer-events: none;
+    }
+    .main-image-container:hover .mv-zoom-hint { opacity: 1; }
+    .mv-lightbox {
+        position: fixed; inset: 0; z-index: 100;
+        background: rgba(15,17,21,.94);
+        display: none; align-items: center; justify-content: center;
+        overscroll-behavior: contain;
+    }
+    .mv-lightbox.open { display: flex; }
+    .mv-lightbox-img {
+        max-width: 94vw; max-height: 90vh; object-fit: contain;
+        cursor: zoom-in; transition: transform .12s ease-out;
+        transform: scale(1); user-select: none; -webkit-user-drag: none;
+    }
+    .mv-lightbox-img.zoomed { cursor: zoom-out; transition: none; }
+    .mv-lb-btn {
+        position: absolute; top: 50%; transform: translateY(-50%);
+        width: 48px; height: 48px; border-radius: 999px; border: none;
+        background: rgba(255,255,255,.12); color: #fff; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: background .15s ease;
+    }
+    .mv-lb-btn:hover { background: rgba(255,255,255,.25); }
+    .mv-lb-prev { left: 1.25rem; } .mv-lb-next { right: 1.25rem; }
+    .mv-lb-close { top: 1.1rem; right: 1.25rem; transform: none; }
+    .mv-lb-counter {
+        position: absolute; bottom: 1.1rem; left: 50%; transform: translateX(-50%);
+        color: #e5e7eb; font-size: .8rem; letter-spacing: .03em;
+        background: rgba(0,0,0,.4); padding: .3rem .8rem; border-radius: 999px;
+    }
+    @media (max-width: 640px) {
+        .mv-lb-prev { left: .4rem; } .mv-lb-next { right: .4rem; }
+        .mv-lb-btn { width: 42px; height: 42px; }
+    }
+</style>
+
+<div class="mv-lightbox" id="mvLightbox" aria-modal="true" role="dialog" aria-label="Image viewer">
+    <button type="button" class="mv-lb-btn mv-lb-close" id="mvClose" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <button type="button" class="mv-lb-btn mv-lb-prev" id="mvPrev" aria-label="Previous image">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <img class="mv-lightbox-img" id="mvLightboxImg" src="" alt="">
+    <button type="button" class="mv-lb-btn mv-lb-next" id="mvNext" aria-label="Next image">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </button>
+    <div class="mv-lb-counter" id="mvCounter"></div>
+</div>
+
+<script>
+(function () {
+    var images = <?= json_encode($zoomImages, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    if (!images.length) return;
+    if (typeof window.__mvCurrent !== 'number') window.__mvCurrent = 0;
+    var single = images.length < 2;
+
+    var lb      = document.getElementById('mvLightbox');
+    var lbImg   = document.getElementById('mvLightboxImg');
+    var counter = document.getElementById('mvCounter');
+    var prevBtn = document.getElementById('mvPrev');
+    var nextBtn = document.getElementById('mvNext');
+    var mainImg = document.getElementById('main-viewer');
+
+    function resetZoom() {
+        lbImg.classList.remove('zoomed');
+        lbImg.style.transform = 'scale(1)';
+        lbImg.style.transformOrigin = 'center center';
+    }
+    function render() {
+        var g = images[window.__mvCurrent] || images[0];
+        resetZoom();
+        lbImg.onerror = function () { lbImg.onerror = null; lbImg.src = g.display; };
+        lbImg.src = g.full || g.display;
+        lbImg.alt = g.alt || '';
+        counter.textContent = single ? '' : (window.__mvCurrent + 1) + ' / ' + images.length;
+    }
+    function open() {
+        if (window.__mvCurrent < 0 || window.__mvCurrent >= images.length) window.__mvCurrent = 0;
+        render();
+        lb.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+    function close() {
+        lb.classList.remove('open');
+        document.body.style.overflow = '';
+        resetZoom();
+    }
+    function step(delta) {
+        window.__mvCurrent = (window.__mvCurrent + delta + images.length) % images.length;
+        // keep the inline main viewer in sync with the lightbox
+        var t = document.querySelector('.gallery-thumbnail[data-mv-index="' + window.__mvCurrent + '"]');
+        if (t && typeof switchImage === 'function') switchImage(t);
+        render();
+    }
+
+    if (mainImg) mainImg.addEventListener('click', open);
+    document.getElementById('mvClose').addEventListener('click', close);
+    prevBtn.addEventListener('click', function (e) { e.stopPropagation(); step(-1); });
+    nextBtn.addEventListener('click', function (e) { e.stopPropagation(); step(1); });
+    if (single) { prevBtn.style.display = 'none'; nextBtn.style.display = 'none'; }
+    lb.addEventListener('click', function (e) { if (e.target === lb) close(); });
+
+    lbImg.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (lbImg.classList.contains('zoomed')) { resetZoom(); return; }
+        lbImg.classList.add('zoomed');
+        applyZoom(e);
+    });
+    function applyZoom(e) {
+        var r = lbImg.getBoundingClientRect();
+        var x = ((e.clientX - r.left) / r.width) * 100;
+        var y = ((e.clientY - r.top) / r.height) * 100;
+        lbImg.style.transformOrigin = x + '% ' + y + '%';
+        lbImg.style.transform = 'scale(2.6)';
+    }
+    lbImg.addEventListener('mousemove', function (e) {
+        if (lbImg.classList.contains('zoomed')) applyZoom(e);
+    });
+    document.addEventListener('keydown', function (e) {
+        if (!lb.classList.contains('open')) return;
+        if (e.key === 'Escape') close();
+        else if (e.key === 'ArrowLeft' && !single) step(-1);
+        else if (e.key === 'ArrowRight' && !single) step(1);
+    });
+})();
+</script>
+<?php endif; ?>
 
 <?php
 if (class_exists('HookRegistry')) {

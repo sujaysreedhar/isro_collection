@@ -1,0 +1,8 @@
+{
+    "name": "Variants",
+    "description": "Group items that are variants of the same thing (e.g. the same cancellation from different years, or one coin from different mints) so they share a page and can be switched between.",
+    "version": "1.0.0",
+    "author": "Antigravity",
+    "admin_menu_priority": 34,
+    "wide_admin_page": true
+}

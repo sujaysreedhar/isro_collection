@@ -1,0 +1,14 @@
+# Block all web access to maintenance/diagnostic scripts.
+# These files are meant to be run from the CLI only. Serving them over
+# HTTP would expose admin resets, DB inspectors, and installers publicly.
+
+# Apache 2.4+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+# Apache 2.2 and older
+<IfModule !mod_authz_core.c>
+    Order Allow,Deny
+    Deny from all
+</IfModule>

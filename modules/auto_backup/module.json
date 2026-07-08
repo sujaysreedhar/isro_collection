@@ -1,0 +1,7 @@
+{
+  "name": "Auto Backup",
+  "description": "Automatically backs up the database daily and uploaded files every 7 days upon visiting the admin panel, keeping the last 5 updates.",
+  "version": "1.0.0",
+  "author": "Antigravity",
+  "admin_menu_priority": 95
+}

@@ -75,10 +75,14 @@ if ($id > 0) {
         $cStmt->execute([':id' => $id]);
         $linkedCategories = $cStmt->fetchAll(PDO::FETCH_COLUMN);
 
-        // Related items
+        // Related items — symmetric: links pointing to OR from this item
         try {
-            $rStmt = $pdo->prepare("SELECT related_item_id FROM item_related WHERE item_id = :id");
-            $rStmt->execute([':id' => $id]);
+            $rStmt = $pdo->prepare(
+                "SELECT related_item_id AS rid FROM item_related WHERE item_id = :id
+                 UNION
+                 SELECT item_id AS rid FROM item_related WHERE related_item_id = :id2"
+            );
+            $rStmt->execute([':id' => $id, ':id2' => $id]);
             $linkedRelated = $rStmt->fetchAll(PDO::FETCH_COLUMN);
         } catch (\PDOException) {
             $linkedRelated = [];
@@ -352,8 +356,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // — Related Items pivot sync —
+            // Links are symmetric, so clear this item's rows in BOTH directions
+            // before re-inserting; this lets a link be removed from either side.
             try {
-                $pdo->prepare("DELETE FROM item_related WHERE item_id = :id")->execute([':id' => $id]);
+                $pdo->prepare("DELETE FROM item_related WHERE item_id = :id OR related_item_id = :id2")
+                    ->execute([':id' => $id, ':id2' => $id]);
                 $relatedIds = array_filter(array_map('intval', (array) ($_POST['related_items'] ?? [])));
                 if ($relatedIds) {
                     $rsStmt = $pdo->prepare("INSERT IGNORE INTO item_related (item_id, related_item_id) VALUES (:i, :r)");
@@ -399,10 +406,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $linkedCategories = $cStmt->fetchAll(PDO::FETCH_COLUMN);
 
             $allTags = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
-            // Related items reload
+            // Related items reload — symmetric (both directions)
             try {
-                $rStmt = $pdo->prepare("SELECT related_item_id FROM item_related WHERE item_id = :id");
-                $rStmt->execute([':id' => $id]);
+                $rStmt = $pdo->prepare(
+                    "SELECT related_item_id AS rid FROM item_related WHERE item_id = :id
+                     UNION
+                     SELECT item_id AS rid FROM item_related WHERE related_item_id = :id2"
+                );
+                $rStmt->execute([':id' => $id, ':id2' => $id]);
                 $linkedRelated = $rStmt->fetchAll(PDO::FETCH_COLUMN);
             } catch (\PDOException) {
                 $linkedRelated = [];

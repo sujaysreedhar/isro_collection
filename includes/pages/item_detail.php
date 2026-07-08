@@ -142,10 +142,12 @@ try {
         SELECT i.id, i.title, i.reg_number, 
                (SELECT file_path FROM media WHERE item_id = i.id AND media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as thumb
         FROM items i
-        JOIN item_related r ON i.id = r.related_item_id
-        WHERE r.item_id = :id
+        JOIN item_related r
+          ON (i.id = r.related_item_id AND r.item_id = :id)
+          OR (i.id = r.item_id AND r.related_item_id = :id2)
+        WHERE i.id <> :id3
     ");
-    $manualStmt->execute([':id' => $id]);
+    $manualStmt->execute([':id' => $id, ':id2' => $id, ':id3' => $id]);
     $relatedItems = $manualStmt->fetchAll();
     $manualIds = array_column($relatedItems, 'id');
 } catch (\Exception $e) {}

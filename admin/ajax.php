@@ -12,6 +12,9 @@ header('Content-Type: application/json');
 // Central whitelist for settings keys that modules may persist through admin AJAX handlers.
 $GLOBALS['admin_settings_whitelist'] = [
     'backup_manager_webhook_key',
+    'auto_backup_enabled',
+    'auto_backup_last_db_run',
+    'auto_backup_last_media_run',
 ];
 
 // Validate we have an action parameter
