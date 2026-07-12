@@ -3,6 +3,11 @@
 // doorways along a straight spine. Loaded as an ES module; imports Three.js
 // from the page import map (self-hosted).
 import * as THREE from 'three';
+import { buildMuseumLayout } from './layouts.js';
+import { isInsideWalkable, resolveWalkMove } from './controls.js';
+import { addFloorRect, addWallSegment, disposeScene } from './scene.js';
+import { artworkDimensions } from './artwork.js';
+import { escapeMuseumHtml, setPanelVisibility, showFallbackUI } from './ui.js';
 
 const CFG = window.MUSEUM_CONFIG || {};
 
@@ -68,12 +73,17 @@ scene.background = new THREE.Color(theme.fog);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 250);
 camera.rotation.order = 'YXZ';
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = theme.exposure || 1.15;
+let renderer = null;
+try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = theme.exposure || 1.15;
+} catch (error) {
+    showWebglFallback();
+}
 
 const raycaster = new THREE.Raycaster();
 const loader = new THREE.TextureLoader();
@@ -82,9 +92,10 @@ loader.crossOrigin = 'anonymous';
 const artMeshes = [];   // meshes that can be inspected
 const records   = [];   // per-artwork streaming records
 const walkRects = [];   // walkable floor rectangles (rooms + doorways)
-const fixtureZs = [];   // ceiling fixture Z positions (all at x=0)
+const fixturePoints = []; // ceiling fixture positions
 const poolLights = [];  // reusable point lights, repositioned to nearest fixtures
 let roomDefs = [];      // {items, z0, z1, first, last}
+let layoutDef = null;
 let TOTAL_L = 8;        // spine length, set once rooms are chunked
 let placeholderTex = null;
 
@@ -94,18 +105,20 @@ let isLocked = false;
 let panelOpen = false;
 const move = { forward: false, back: false, left: false, right: false };
 
-// ── Boot ─────────────────────────────────────────────────────────────────────
-init();
 
 async function init() {
-    let items = [];
-    try {
-        const res = await fetch(CFG.dataUrl, { credentials: 'same-origin' });
-        const data = await res.json();
-        if (data && data.success) items = data.items || [];
-    } catch (e) {
-        statusEl.textContent = 'Could not load exhibition data.';
-        return;
+    if (!renderer) return;
+    let items = Array.isArray(CFG.items) ? CFG.items : [];
+    if (!items.length) {
+        try {
+            const res = await fetch(CFG.dataUrl, { credentials: 'same-origin' });
+            const data = await res.json();
+            if (data && data.success) items = data.items || [];
+        } catch (e) {
+            statusEl.textContent = 'Could not load exhibition data.';
+            showWebglFallback();
+            return;
+        }
     }
 
     if (!items.length) {
@@ -116,20 +129,19 @@ async function init() {
     }
 
     placeholderTex = makePlaceholderTexture();
-    roomDefs = chunkRooms(items);
+    layoutDef = buildMuseumLayout(CFG.layout || 'grand_hall', items.length);
     buildShell();
     buildLighting();
-    camera.position.set(0, EYE_H, 1.2);
+    resetPosition();
 
     statusEl.textContent = 'Hanging the collection…';
-    roomDefs.forEach((room) => {
-        room.items.forEach((item, j) => buildArtwork(item, j, room));
-    });
+    items.forEach((item, index) => buildArtwork(item, index, layoutDef.slots[index]));
     barFill.style.width = '100%';
 
     updateLights(true);
     bindControls();
     window.addEventListener('resize', onResize);
+    window.addEventListener('beforeunload', disposeMuseum);
     animate();
 
     // Placeholders are up instantly; full-res streams in by proximity.
@@ -153,6 +165,60 @@ function chunkRooms(items) {
 
 // ── Shell geometry (floor, walls, doorways, trim, fixtures) ──────────────────
 function buildShell() {
+    const wallMat = new THREE.MeshStandardMaterial({ color: theme.wall, roughness: .92 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: theme.floor, roughness: .78, metalness: .04 });
+    const ceilingMat = new THREE.MeshStandardMaterial({ color: theme.ceiling, roughness: 1 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: theme.trim, roughness: .65, metalness: .12 });
+    const bounds = layoutDef.bounds;
+    TOTAL_L = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ);
+    scene.fog = new THREE.Fog(theme.fog, theme.fogNear || 16, Math.min(TOTAL_L * 1.55, 145));
+
+    layoutDef.floorRects.forEach(rect => {
+        const width = rect.x1 - rect.x0, length = rect.z1 - rect.z0;
+        const cx = (rect.x0 + rect.x1) / 2, cz = (rect.z0 + rect.z1) / 2;
+        addFloorRect(scene, rect, 0, floorMat, false);
+        addFloorRect(scene, rect, WALL_H, ceilingMat, true);
+    });
+
+    layoutDef.walls.forEach(wall => {
+        const dx = wall.x2 - wall.x1, dz = wall.z2 - wall.z1;
+        const length = Math.hypot(dx, dz);
+        const mesh = addWallSegment(scene, wall, WALL_H, WALL_T, wallMat);
+        const trim = new THREE.Mesh(new THREE.BoxGeometry(length, .16, WALL_T + .04), trimMat);
+        trim.position.set(mesh.position.x, .09, mesh.position.z); trim.rotation.y = mesh.rotation.y; scene.add(trim);
+    });
+
+    layoutDef.walkRects.forEach(rect => walkRects.push(rect));
+    layoutDef.fixtures.forEach(point => {
+        const fixture = new THREE.Mesh(
+            new THREE.CircleGeometry(.58, 20),
+            new THREE.MeshBasicMaterial({ color: theme.fixture, toneMapped: false })
+        );
+        fixture.rotation.x = Math.PI / 2; fixture.position.set(point.x, WALL_H - .025, point.z); scene.add(fixture);
+        fixturePoints.push(point);
+    });
+    buildFocalPoints();
+    placeBanner(CFG.title || '', bounds.maxZ - .12);
+}
+
+function buildFocalPoints() {
+    const stone = new THREE.MeshStandardMaterial({ color: theme.trim, roughness: .72 });
+    for (const point of layoutDef.focalPoints || []) {
+        if (point.type === 'courtyard') {
+            const bed = new THREE.Mesh(new THREE.BoxGeometry(point.width, .34, point.length), new THREE.MeshStandardMaterial({ color: 0x263d35, roughness: 1 }));
+            bed.position.set(point.x, .17, point.z); scene.add(bed);
+            const sculpture = new THREE.Mesh(new THREE.IcosahedronGeometry(1.25, 1), new THREE.MeshStandardMaterial({ color: theme.frame, roughness: .35, metalness: .45 }));
+            sculpture.position.set(point.x, 1.45, point.z); scene.add(sculpture);
+        } else {
+            const plinth = new THREE.Mesh(new THREE.CylinderGeometry(.85, 1.05, 1.05, 32), stone);
+            plinth.position.set(point.x, .525, point.z); scene.add(plinth);
+            const object = new THREE.Mesh(new THREE.TorusKnotGeometry(.48, .14, 80, 12), new THREE.MeshStandardMaterial({ color: theme.frame, metalness: .55, roughness: .3 }));
+            object.position.set(point.x, 1.55, point.z); scene.add(object);
+        }
+    }
+}
+
+function buildShellLegacy() {
     scene.fog = new THREE.Fog(theme.fog, theme.fogNear || 16, Math.min(TOTAL_L * 1.3, 120));
 
     const midZ = TOTAL_L / 2;
@@ -306,16 +372,16 @@ function buildLighting() {
 let lightTick = 0;
 function updateLights(force) {
     if (!force && (++lightTick % 20) !== 0) return;
-    if (!fixtureZs.length) return;
-    const cz = camera.position.z;
-    const nearest = fixtureZs
-        .map((z) => ({ z, d: Math.abs(z - cz) }))
+    if (!fixturePoints.length) return;
+    const cx = camera.position.x, cz = camera.position.z;
+    const nearest = fixturePoints
+        .map((point) => ({ ...point, d: Math.hypot(point.x - cx, point.z - cz) }))
         .sort((a, b) => a.d - b.d)
         .slice(0, LIGHT_POOL);
     poolLights.forEach((lamp, i) => {
         if (nearest[i]) {
             lamp.visible = true;
-            lamp.position.set(0, WALL_H - 0.5, nearest[i].z);
+            lamp.position.set(nearest[i].x, WALL_H - 0.5, nearest[i].z);
         } else {
             lamp.visible = false;
         }
@@ -380,7 +446,28 @@ function placeSign(title, sub, z) {
 }
 
 // ── Artworks (placeholder now, full-res streamed by proximity) ───────────────
-function buildArtwork(item, j, room) {
+function buildArtwork(item, index, slot) {
+    if (!slot) return;
+    const ratio = item.ratio || null;
+    const dims = artworkDims(ratio || DEFAULT_RATIO);
+    const holder = new THREE.Group();
+    holder.position.set(slot.x, EYE_H, slot.z);
+    holder.rotation.y = slot.rotY;
+
+    const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(dims.w + .2, dims.h + .2, ART_DEPTH),
+        new THREE.MeshStandardMaterial({ color: theme.frame, roughness: .52, metalness: .25 })
+    );
+    holder.add(frame);
+    const art = new THREE.Mesh(new THREE.PlaneGeometry(dims.w, dims.h), new THREE.MeshBasicMaterial({ map: placeholderTex, toneMapped: false }));
+    art.position.z = ART_DEPTH / 2 + .002; holder.add(art);
+    const plaque = makePlaque(item); plaque.position.set(0, -(dims.h / 2) - .42, ART_DEPTH / 2 + .02); holder.add(plaque);
+    for (const mesh of [art, frame, plaque]) { mesh.userData.item = item; artMeshes.push(mesh); }
+    scene.add(holder);
+    records.push({ item, x: slot.x, z: slot.z, zone: slot.zone, holder, art, frame, plaque, ratio, tex: null, loaded: false, loading: false });
+}
+
+function buildArtworkLegacy(item, j, room) {
     const side = j % 2;                 // 0 = left wall, 1 = right wall
     const idx  = Math.floor(j / 2);
     const z    = room.z0 + SPACING * (idx + 1);
@@ -421,9 +508,7 @@ function buildArtwork(item, j, room) {
 }
 
 function artworkDims(ratio) {
-    let h = MAX_H, w = MAX_H * ratio;
-    if (w > MAX_W) { w = MAX_W; h = MAX_W / ratio; }
-    return { w, h };
+    return artworkDimensions(ratio, { maxHeight: MAX_H, maxWidth: MAX_W });
 }
 
 // ── Proximity texture streaming ──────────────────────────────────────────────
@@ -550,11 +635,20 @@ function reveal() {
     loaderEl.classList.add('fade');
     setTimeout(() => loaderEl.classList.add('hidden'), 600);
     hudEl.classList.remove('hidden');
+    const welcome = document.getElementById('museum-welcome');
+    if (welcome) welcome.classList.remove('hidden');
     if (isTouch) crosshair.classList.add('active');
 }
 
 // ── Controls ─────────────────────────────────────────────────────────────────
 function bindControls() {
+    document.getElementById('museum-start')?.addEventListener('click', () => {
+        document.getElementById('museum-welcome')?.classList.add('hidden');
+        canvas.focus();
+        if (!isTouch) canvas.requestPointerLock?.();
+    });
+    document.getElementById('museum-reset')?.addEventListener('click', resetPosition);
+    document.getElementById('museum-retry')?.addEventListener('click', () => location.reload());
     if (!isTouch) {
         canvas.addEventListener('click', () => {
             if (panelOpen) return;
@@ -621,6 +715,7 @@ function setKey(code, val) {
         case 'KeyS': case 'ArrowDown':  move.back    = val; break;
         case 'KeyA': case 'ArrowLeft':  move.left    = val; break;
         case 'KeyD': case 'ArrowRight': move.right   = val; break;
+        case 'Enter': if (val && !panelOpen) inspectAtNDC(0, 0); break;
         case 'Escape': if (val && panelOpen) closePanel(); break;
     }
 }
@@ -654,30 +749,40 @@ function openPanel(item) {
     document.getElementById('panel-desc').textContent = item.desc || '';
     document.getElementById('panel-link').href = item.url || '#';
 
-    panelEl.classList.remove('hidden');
-    requestAnimationFrame(() => panelEl.classList.add('open'));
+    setPanelVisibility(panelEl, true);
     panelOpen = true;
     if (document.pointerLockElement) document.exitPointerLock();
+    document.getElementById('panel-close').focus();
 }
 
 function closePanel() {
-    panelEl.classList.remove('open');
+    setPanelVisibility(panelEl, false);
     panelOpen = false;
-    setTimeout(() => panelEl.classList.add('hidden'), 400);
+    canvas.focus();
 }
 
 function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => (
-        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-    ));
+    return escapeMuseumHtml(s);
 }
 
 // ── Collision ────────────────────────────────────────────────────────────────
 function insideAny(x, z) {
-    for (const r of walkRects) {
-        if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) return true;
-    }
-    return false;
+    return isInsideWalkable(x, z, walkRects);
+}
+
+function resetPosition() {
+    if (!layoutDef) return;
+    camera.position.set(layoutDef.spawn.x, EYE_H, layoutDef.spawn.z);
+    yaw = layoutDef.spawn.yaw;
+    pitch = 0;
+}
+
+function showWebglFallback() {
+    showFallbackUI();
+}
+
+function disposeMuseum() {
+    disposeScene(scene, renderer, [placeholderTex, ...records.map(rec => rec.tex)]);
 }
 
 // ── Loop ─────────────────────────────────────────────────────────────────────
@@ -685,6 +790,7 @@ const clock = new THREE.Clock();
 const fwd = new THREE.Vector3();
 const rgt = new THREE.Vector3();
 const dir = new THREE.Vector3();
+let progressTick = 0;
 
 function animate() {
     requestAnimationFrame(animate);
@@ -702,21 +808,27 @@ function animate() {
 
     if (dir.lengthSq() > 0) {
         dir.normalize().multiplyScalar(3.2 * dt);
-        const ox = camera.position.x, oz = camera.position.z;
-        const nx = ox + dir.x, nz = oz + dir.z;
-        // Axis-separated sliding: try full move, then each axis alone
-        if (insideAny(nx, nz)) {
-            camera.position.x = nx; camera.position.z = nz;
-        } else if (insideAny(nx, oz)) {
-            camera.position.x = nx;
-        } else if (insideAny(ox, nz)) {
-            camera.position.z = nz;
-        }
+        const next = resolveWalkMove(
+            { x: camera.position.x, z: camera.position.z },
+            { x: dir.x, z: dir.z },
+            walkRects
+        );
+        camera.position.x = next.x;
+        camera.position.z = next.z;
     }
     camera.position.y = EYE_H;
 
     updateStreaming();
     updateLights(false);
+
+    if ((++progressTick % 30) === 0 && records.length) {
+        const nearest = records.reduce((best, rec) => {
+            const distance = Math.hypot(rec.x - camera.position.x, rec.z - camera.position.z);
+            return !best || distance < best.distance ? { rec, distance } : best;
+        }, null);
+        const progress = document.getElementById('museum-progress');
+        if (progress && nearest) progress.textContent = `${nearest.rec.zone || 'Gallery'} · ${records.length} objects`;
+    }
 
     if (isLocked && crosshair.classList.contains('active')) {
         raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -732,3 +844,7 @@ function onResize() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+init();
+document.getElementById('museum-retry')?.addEventListener('click', () => location.reload());

@@ -3,5 +3,6 @@
     "description": "Procedurally builds walkable 3D exhibition rooms from your collection. Visitors stroll a first-person gallery of framed items with plaques and jump to full details.",
     "version": "1.0",
     "author": "Antigravity",
-    "admin_menu_priority": 70
+    "admin_menu_priority": 70,
+    "wide_admin_page": true
 }

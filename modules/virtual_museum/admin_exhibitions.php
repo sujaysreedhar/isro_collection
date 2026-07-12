@@ -1,306 +1,255 @@
 <?php
-// modules/virtual_museum/admin_exhibitions.php
-// Rendered inside admin/module_page.php content area (admin layout wraps it).
-
-/** @var PDO $pdo */
+// Guided full-page exhibition builder. Rendered inside admin/module_page.php.
 global $pdo;
 
 $csrf = function_exists('ensureCsrfToken') ? ensureCsrfToken() : '';
+$baseUrl = SITE_URL . '/admin/module_page.php?m=virtual_museum';
+$action = $_GET['action'] ?? 'list';
+$id = (int) ($_GET['id'] ?? 0);
 
-// Source option lists
-$categories = [];
-$collections = [];
-$tags = [];
-try { $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll(PDO::FETCH_ASSOC); } catch (\PDOException $e) {}
-try { $collections = $pdo->query("SELECT id, title AS name FROM collections ORDER BY title")->fetchAll(PDO::FETCH_ASSOC); } catch (\PDOException $e) {}
-try { $tags = $pdo->query("SELECT id, name FROM tags ORDER BY name")->fetchAll(PDO::FETCH_ASSOC); } catch (\PDOException $e) {}
+$sourceOptions = ['category' => [], 'collection' => [], 'tag' => []];
+try { $sourceOptions['category'] = $pdo->query('SELECT id, name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $e) {}
+try { $sourceOptions['collection'] = $pdo->query('SELECT id, title AS name FROM collections ORDER BY title')->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $e) {}
+try { $sourceOptions['tag'] = $pdo->query('SELECT id, name FROM tags ORDER BY name')->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $e) {}
 
-// Items available for manual exhibitions (bounded)
-$itemPool = [];
-try {
-    $itemPool = $pdo->query("SELECT id, reg_number, title FROM items WHERE is_visible = 1 ORDER BY id DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
-} catch (\PDOException $e) {}
+$exhibition = $id > 0 ? $this->getExhibitionById($id) : null;
+$isEditor = in_array($action, ['new', 'edit'], true);
+$sources = $exhibition ? $this->getExhibitionSources($id, $exhibition) : [];
+$overrides = $exhibition ? $this->getExhibitionOverrides($id) : [];
+$resolved = $exhibition ? $this->resolveItems($exhibition) : [];
 
-// Existing exhibitions + their manual item ids
 $exhibitions = [];
-try { $exhibitions = $pdo->query("SELECT * FROM museum_exhibitions ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC); } catch (\PDOException $e) {}
+if (!$isEditor) {
+    try { $exhibitions = $pdo->query('SELECT * FROM museum_exhibitions ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $e) {}
+}
 
-$manualMap = [];
-try {
-    $rows = $pdo->query("SELECT exhibition_id, item_id FROM museum_exhibition_items ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as $r) { $manualMap[(int) $r['exhibition_id']][] = (int) $r['item_id']; }
-} catch (\PDOException $e) {}
-
-$optionsJson = json_encode([
-    'category'   => $categories,
-    'collection' => $collections,
-    'tag'        => $tags,
-], JSON_UNESCAPED_SLASHES);
-
-$sourceLabel = function ($ex) use ($categories, $collections, $tags) {
-    $find = function ($list, $id) {
-        foreach ($list as $o) { if ((int) $o['id'] === (int) $id) return $o['name']; }
-        return '#' . $id;
-    };
-    switch ($ex['source_type']) {
-        case 'category':   return 'Category · ' . $find($categories, $ex['source_id']);
-        case 'collection': return 'Collection · ' . $find($collections, $ex['source_id']);
-        case 'tag':        return 'Tag · ' . $find($tags, $ex['source_id']);
-        case 'manual':     return 'Hand-picked items';
-    }
-    return $ex['source_type'];
+$icon = static function (string $path, string $class = 'w-5 h-5'): string {
+    return '<svg class="' . $class . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="' . $path . '"/></svg>';
 };
 ?>
 
-<div class="max-w-6xl">
-    <div class="flex items-center justify-between mb-6">
+<style>
+.vm-shell{--vm-bg:#0b1119;--vm-panel:#121d29;--vm-panel-2:#172536;--vm-line:#2a3a4d;--vm-text:#edf3f7;--vm-muted:#8fa1b3;--vm-accent:#d2a566;--vm-accent-2:#f0c887;color:var(--vm-text)}
+.vm-card{background:linear-gradient(145deg,rgba(23,37,54,.96),rgba(14,24,35,.96));border:1px solid var(--vm-line);box-shadow:0 18px 60px rgba(0,0,0,.18)}
+.vm-input{width:100%;min-height:46px;border:1px solid #34485e;background:#0d1722;color:#fff;border-radius:.75rem;padding:.7rem .85rem;outline:none}
+.vm-input:focus{border-color:var(--vm-accent);box-shadow:0 0 0 3px rgba(210,165,102,.14)}
+.vm-btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.65rem 1rem;font-weight:700;transition:.18s ease}
+.vm-btn:focus-visible,.vm-action:focus-visible{outline:3px solid rgba(240,200,135,.55);outline-offset:2px}
+.vm-primary{background:var(--vm-accent);color:#111820}.vm-primary:hover{background:var(--vm-accent-2)}
+.vm-secondary{background:#203044;color:#e8eef3;border:1px solid #354960}.vm-secondary:hover{background:#293b50}
+.vm-step[aria-current="step"]{color:var(--vm-accent-2);border-color:var(--vm-accent)}
+.vm-stage{display:none}.vm-stage.is-active{display:block}
+.vm-source-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .65rem;border:1px solid #40556b;background:#203247;border-radius:999px;font-size:.78rem}
+.vm-item-card[aria-grabbed="true"]{opacity:.55;border-color:var(--vm-accent)}
+.vm-choice[aria-checked="true"]{border-color:var(--vm-accent);box-shadow:0 0 0 2px rgba(210,165,102,.18)}
+@media(max-width:767px){.vm-step-label{display:none}.vm-sticky{position:static!important}.vm-table-card{display:block}}
+</style>
+
+<div class="vm-shell -m-6 md:-m-8 min-h-[calc(100vh-4rem)] bg-[#0b1119] p-5 md:p-8">
+<?php if (!$isEditor): ?>
+    <header class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-8">
         <div>
-            <h1 class="text-2xl font-bold text-white">Virtual Museum</h1>
-            <p class="text-sm text-slate-400 mt-1">Build walkable 3D exhibitions from your collection.</p>
+            <p class="text-xs uppercase tracking-[.22em] text-[#d2a566] font-bold">Curator workspace</p>
+            <h1 class="text-3xl md:text-4xl font-bold mt-2">Virtual Museum</h1>
+            <p class="text-sm text-[#8fa1b3] mt-2">Build cinematic, accessible exhibitions from multiple collection sources.</p>
         </div>
-        <button id="vm-new-btn" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold">+ New Exhibition</button>
-    </div>
+        <a href="<?= $baseUrl ?>&action=new" class="vm-btn vm-primary"><?= $icon('M12 5v14M5 12h14') ?> New exhibition</a>
+    </header>
 
-    <!-- List -->
-    <div class="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
-        <table class="w-full text-sm">
-            <thead class="bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider">
-                <tr>
-                    <th class="text-left px-4 py-3">Title</th>
-                    <th class="text-left px-4 py-3">Source</th>
-                    <th class="text-left px-4 py-3">Theme</th>
-                    <th class="text-left px-4 py-3">Status</th>
-                    <th class="text-right px-4 py-3">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-700/70">
-                <?php if (empty($exhibitions)): ?>
-                    <tr><td colspan="5" class="px-4 py-10 text-center text-slate-500">No exhibitions yet. Create your first one.</td></tr>
-                <?php else: foreach ($exhibitions as $ex): ?>
-                    <tr class="text-slate-200 hover:bg-slate-700/30"
-                        data-ex='<?= htmlspecialchars(json_encode([
-                            'id' => (int) $ex['id'],
-                            'title' => $ex['title'],
-                            'description' => $ex['description'],
-                            'source_type' => $ex['source_type'],
-                            'source_id' => $ex['source_id'],
-                            'item_limit' => (int) $ex['item_limit'],
-                            'theme' => $ex['theme'],
-                            'is_published' => (int) $ex['is_published'],
-                            'items' => $manualMap[(int) $ex['id']] ?? [],
-                        ], JSON_UNESCAPED_SLASHES), ENT_QUOTES) ?>'>
-                        <td class="px-4 py-3 font-semibold"><?= htmlspecialchars($ex['title']) ?></td>
-                        <td class="px-4 py-3 text-slate-400"><?= htmlspecialchars($sourceLabel($ex)) ?></td>
-                        <td class="px-4 py-3 text-slate-400"><?= htmlspecialchars(str_replace('_', ' ', $ex['theme'])) ?></td>
-                        <td class="px-4 py-3">
-                            <?php if ((int) $ex['is_published'] === 1): ?>
-                                <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold">Published</span>
-                            <?php else: ?>
-                                <span class="px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-400 text-xs font-semibold">Draft</span>
-                            <?php endif; ?>
-                        </td>
-                        <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <a href="<?= SITE_URL ?>/museum/<?= rawurlencode($ex['slug']) ?>" target="_blank" class="text-sky-400 hover:text-sky-300 mr-3">View</a>
-                            <button class="vm-edit text-indigo-400 hover:text-indigo-300 mr-3">Edit</button>
-                            <button class="vm-delete text-rose-400 hover:text-rose-300" data-id="<?= (int) $ex['id'] ?>" data-title="<?= htmlspecialchars($ex['title'], ENT_QUOTES) ?>">Delete</button>
-                        </td>
-                    </tr>
-                <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Editor modal -->
-<div id="vm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
-    <div class="bg-slate-800 border border-slate-600 rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto shadow-2xl">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-            <h2 id="vm-modal-title" class="text-lg font-bold text-white">New Exhibition</h2>
-            <button id="vm-close" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
-        </div>
-        <div class="p-6 space-y-5">
-            <input type="hidden" id="vm-id" value="0">
-
+    <main class="max-w-7xl mx-auto">
+        <?php if (!$exhibitions): ?>
+            <section class="vm-card rounded-2xl p-12 text-center">
+                <div class="w-14 h-14 rounded-2xl bg-[#24364a] text-[#d2a566] grid place-items-center mx-auto mb-5"><?= $icon('M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6', 'w-7 h-7') ?></div>
+                <h2 class="text-xl font-bold">Create your first exhibition</h2>
+                <p class="text-[#8fa1b3] mt-2 mb-6">Combine sources, curate the sequence, and choose a room layout.</p>
+                <a href="<?= $baseUrl ?>&action=new" class="vm-btn vm-primary">Start building</a>
+            </section>
+        <?php else: ?>
+            <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                <?php foreach ($exhibitions as $ex):
+                    $items = $this->resolveItems($ex);
+                    $cover = $items[0]['thumb'] ?? null;
+                    $exSources = $this->getExhibitionSources((int) $ex['id'], $ex);
+                    $sourceText = count($exSources) . ' source' . (count($exSources) === 1 ? '' : 's');
+                ?>
+                <article class="vm-card rounded-2xl overflow-hidden flex flex-col" data-exhibition-id="<?= (int) $ex['id'] ?>">
+                    <div class="aspect-[16/8] bg-[#101b27] relative overflow-hidden">
+                        <?php if ($cover): ?><img src="<?= htmlspecialchars($cover) ?>" alt="" loading="lazy" class="w-full h-full object-cover opacity-80"><?php endif; ?>
+                        <div class="absolute inset-0 bg-gradient-to-t from-[#101923] via-transparent to-transparent"></div>
+                        <span class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold <?= (int) $ex['is_published'] ? 'bg-emerald-400/20 text-emerald-200' : 'bg-slate-300/15 text-slate-200' ?>">
+                            <?= (int) $ex['is_published'] ? 'Published' : 'Draft' ?>
+                        </span>
+                    </div>
+                    <div class="p-5 flex-1">
+                        <h2 class="text-lg font-bold line-clamp-1"><?= htmlspecialchars($ex['title']) ?></h2>
+                        <p class="text-xs text-[#8fa1b3] mt-2"><?= count($items) ?> items · <?= htmlspecialchars($sourceText) ?> · <?= htmlspecialchars(ucwords(str_replace('_', ' ', $ex['layout'] ?? 'grand_hall'))) ?></p>
+                    </div>
+                    <div class="px-5 pb-5 flex flex-wrap gap-2">
+                        <a class="vm-btn vm-secondary text-xs flex-1" href="<?= $baseUrl ?>&action=edit&id=<?= (int) $ex['id'] ?>">Edit</a>
+                        <a class="vm-btn vm-secondary text-xs" href="<?= SITE_URL ?>/museum/preview/<?= (int) $ex['id'] ?>" target="_blank" rel="noopener">Preview</a>
+                        <button class="vm-action vm-duplicate vm-btn vm-secondary text-xs" data-id="<?= (int) $ex['id'] ?>">Duplicate</button>
+                        <button class="vm-action vm-delete vm-btn text-rose-300 bg-rose-500/10 border border-rose-500/25 text-xs" data-id="<?= (int) $ex['id'] ?>" data-title="<?= htmlspecialchars($ex['title'], ENT_QUOTES) ?>" aria-label="Delete <?= htmlspecialchars($ex['title']) ?>"><?= $icon('M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14') ?></button>
+                    </div>
+                </article>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </main>
+<?php else: ?>
+    <header class="max-w-7xl mx-auto mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+            <a href="<?= $baseUrl ?>" class="vm-btn vm-secondary" aria-label="Back to exhibitions"><?= $icon('M15 18l-6-6 6-6') ?></a>
             <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Title</label>
-                <input id="vm-title" type="text" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white focus:border-indigo-500 outline-none" placeholder="e.g. Highlights of Fine Art">
+                <p class="text-xs uppercase tracking-[.2em] text-[#d2a566] font-bold"><?= $exhibition ? 'Edit exhibition' : 'New exhibition' ?></p>
+                <h1 id="vm-editor-heading" class="text-2xl font-bold mt-1"><?= htmlspecialchars($exhibition['title'] ?? 'Untitled exhibition') ?></h1>
             </div>
-
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
-                <textarea id="vm-description" rows="2" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white focus:border-indigo-500 outline-none" placeholder="Shown on the museum landing page."></textarea>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Items come from</label>
-                    <select id="vm-source-type" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white outline-none">
-                        <option value="category">A category</option>
-                        <option value="collection">A curated collection</option>
-                        <option value="tag">A tag</option>
-                        <option value="manual">Hand-picked items</option>
-                    </select>
-                </div>
-                <div id="vm-source-wrap">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Source</label>
-                    <select id="vm-source-id" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white outline-none"></select>
-                </div>
-            </div>
-
-            <div id="vm-manual-wrap" class="hidden">
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Pick items <span class="text-slate-500">(Ctrl/Cmd-click for multiple)</span></label>
-                <select id="vm-item-ids" multiple size="10" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white outline-none text-sm">
-                    <?php foreach ($itemPool as $it): ?>
-                        <option value="<?= (int) $it['id'] ?>"><?= htmlspecialchars(($it['reg_number'] ? $it['reg_number'] . ' — ' : '') . $it['title']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Max items in room</label>
-                    <input id="vm-item-limit" type="number" min="1" max="100" value="40" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Room theme</label>
-                    <select id="vm-theme" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white outline-none">
-                        <option value="classic">Classic (warm gallery)</option>
-                        <option value="dark">Dark (spotlit)</option>
-                        <option value="white_cube">White cube (modern)</option>
-                    </select>
-                </div>
-            </div>
-
-            <label class="flex items-center gap-2.5 cursor-pointer">
-                <input id="vm-published" type="checkbox" class="w-4 h-4 rounded accent-indigo-500">
-                <span class="text-sm text-slate-300">Published (visible to visitors)</span>
-            </label>
-
-            <div id="vm-error" class="hidden text-sm text-rose-400"></div>
         </div>
-        <div class="flex justify-end gap-3 px-6 py-4 border-t border-slate-700">
-            <button id="vm-cancel" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm">Cancel</button>
-            <button id="vm-save" class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold">Save Exhibition</button>
-        </div>
-    </div>
+        <?php if ($exhibition): ?><a href="<?= SITE_URL ?>/museum/preview/<?= $id ?>" target="_blank" rel="noopener" class="vm-btn vm-secondary">Preview draft <?= $icon('M14 3h7v7m0-7L10 14M5 7v14h14v-5') ?></a><?php endif; ?>
+    </header>
+
+    <nav class="max-w-7xl mx-auto vm-card rounded-2xl p-2 mb-6 grid grid-cols-4 gap-2" aria-label="Exhibition editor stages">
+        <?php foreach ([['details','1','Details'],['sources','2','Sources'],['curation','3','Curate'],['room_publish','4','Rooms & publish']] as [$key,$number,$label]): ?>
+            <button type="button" class="vm-step vm-action min-h-12 rounded-xl border border-transparent px-3 text-sm font-bold text-[#8fa1b3]" data-step="<?= $key ?>">
+                <span class="inline-grid place-items-center w-6 h-6 rounded-full bg-white/5 mr-1"><?= $number ?></span><span class="vm-step-label"><?= $label ?></span>
+            </button>
+        <?php endforeach; ?>
+    </nav>
+
+    <main class="max-w-7xl mx-auto grid lg:grid-cols-[1fr_280px] gap-6 items-start">
+        <section class="vm-card rounded-2xl p-5 md:p-7 min-h-[560px]">
+            <div class="vm-stage" data-step="details">
+                <p class="text-xs uppercase tracking-[.18em] text-[#d2a566] font-bold">Stage 1</p><h2 class="text-2xl font-bold mt-2">Exhibition details</h2>
+                <p class="text-sm text-[#8fa1b3] mt-2 mb-7">Introduce the story. The public URL remains stable after creation.</p>
+                <div class="space-y-5 max-w-3xl">
+                    <label class="block"><span class="text-sm font-semibold block mb-2">Title *</span><input id="vm-title" class="vm-input" value="<?= htmlspecialchars($exhibition['title'] ?? '') ?>" maxlength="255" required></label>
+                    <label class="block"><span class="text-sm font-semibold block mb-2">Description</span><textarea id="vm-description" class="vm-input min-h-32" rows="5"><?= htmlspecialchars($exhibition['description'] ?? '') ?></textarea></label>
+                    <label class="block max-w-xs"><span class="text-sm font-semibold block mb-2">Maximum displayed items</span><input id="vm-item-limit" class="vm-input" type="number" min="1" max="100" value="<?= (int) ($exhibition['item_limit'] ?? 40) ?>"><span class="text-xs text-[#8fa1b3] mt-2 block">Hard limit: 100 items.</span></label>
+                    <?php if ($exhibition): ?><div class="rounded-xl border border-[#314357] bg-[#0d1722] p-4"><span class="text-xs text-[#8fa1b3]">Stable public URL</span><code class="block text-sm text-[#f0c887] mt-1 break-all"><?= SITE_URL ?>/museum/<?= htmlspecialchars($exhibition['slug']) ?></code></div><?php endif; ?>
+                </div>
+            </div>
+
+            <div class="vm-stage" data-step="sources">
+                <p class="text-xs uppercase tracking-[.18em] text-[#d2a566] font-bold">Stage 2</p><h2 class="text-2xl font-bold mt-2">Combine collection sources</h2>
+                <p class="text-sm text-[#8fa1b3] mt-2 mb-6">Items added to these sources will flow into the exhibition automatically.</p>
+                <label class="block"><span class="sr-only">Search available sources</span><input id="vm-source-search" class="vm-input" type="search" placeholder="Search categories, collections, and tags…"></label>
+                <div id="vm-selected-sources" class="flex flex-wrap gap-2 mt-4 min-h-10"></div>
+                <div id="vm-source-results" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-6"></div>
+            </div>
+
+            <div class="vm-stage" data-step="curation">
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div><p class="text-xs uppercase tracking-[.18em] text-[#d2a566] font-bold">Stage 3</p><h2 class="text-2xl font-bold mt-2">Curate the sequence</h2><p class="text-sm text-[#8fa1b3] mt-2">Drag cards or use the arrow controls. Removing a live item creates a persistent exclusion.</p></div>
+                    <div class="text-sm text-[#8fa1b3]"><strong id="vm-resolved-count" class="text-white"><?= count($resolved) ?></strong> visible · <strong id="vm-excluded-count" class="text-white"><?= count(array_filter($overrides, static fn($o) => $o['selection_state'] === 'exclude')) ?></strong> excluded</div>
+                </div>
+                <div class="mt-6 grid xl:grid-cols-[1fr_320px] gap-6">
+                    <div><div id="vm-curated-grid" class="grid sm:grid-cols-2 gap-3"></div></div>
+                    <aside class="rounded-xl border border-[#2a3a4d] bg-[#0d1722] p-4 xl:sticky xl:top-4 self-start">
+                        <h3 class="font-bold">Hand-pick items</h3><p class="text-xs text-[#8fa1b3] mt-1 mb-4">Search the complete visible catalog.</p>
+                        <input id="vm-item-search" class="vm-input" type="search" placeholder="Title or registration no.">
+                        <div id="vm-item-results" class="space-y-2 mt-4 max-h-[460px] overflow-y-auto"></div>
+                        <button id="vm-load-more" type="button" class="vm-btn vm-secondary w-full mt-3 hidden">Load more</button>
+                    </aside>
+                </div>
+            </div>
+
+            <div class="vm-stage" data-step="room_publish">
+                <p class="text-xs uppercase tracking-[.18em] text-[#d2a566] font-bold">Stage 4</p><h2 class="text-2xl font-bold mt-2">Rooms and publishing</h2>
+                <p class="text-sm text-[#8fa1b3] mt-2 mb-7">Choose atmosphere and architecture independently.</p>
+                <fieldset><legend class="font-bold mb-3">Room theme</legend><div class="grid sm:grid-cols-3 gap-3" id="vm-theme-choices">
+                    <?php foreach (['classic'=>'Heritage','dark'=>'Nocturne','white_cube'=>'White cube'] as $value=>$label): ?><button type="button" class="vm-choice vm-action rounded-xl border border-[#34485e] bg-[#111c28] p-4 text-left min-h-24" data-theme="<?= $value ?>" role="radio"><strong><?= $label ?></strong><span class="block text-xs text-[#8fa1b3] mt-2"><?= $value === 'dark' ? 'Cinematic, spotlit, high contrast' : ($value === 'classic' ? 'Warm timber and gallery plaster' : 'Bright contemporary minimalism') ?></span></button><?php endforeach; ?>
+                </div></fieldset>
+                <fieldset class="mt-7"><legend class="font-bold mb-3">Room layout</legend><div class="grid sm:grid-cols-3 gap-3" id="vm-layout-choices">
+                    <?php foreach (['grand_hall'=>['Grand Hall','Works with 1+ items'],'l_gallery'=>['L-Gallery','Recommended for 12+'],'courtyard_loop'=>['Courtyard Loop','Recommended for 24+']] as $value=>$copy): ?><button id="vm-layout-<?= $value ?>" type="button" class="vm-choice vm-action rounded-xl border border-[#34485e] bg-[#111c28] p-4 text-left min-h-28" data-layout="<?= $value ?>" role="radio"><span class="block h-10 rounded-lg bg-gradient-to-r from-[#25394c] to-[#3c2c22] mb-3"></span><strong><?= $copy[0] ?></strong><span class="block text-xs text-[#8fa1b3] mt-1"><?= $copy[1] ?></span></button><?php endforeach; ?>
+                </div></fieldset>
+                <div id="vm-layout-warning" class="hidden mt-4 rounded-xl border border-amber-400/25 bg-amber-300/10 text-amber-100 p-4 text-sm" role="status"></div>
+                <label class="mt-7 flex items-start gap-3 rounded-xl border border-[#34485e] bg-[#111c28] p-4 cursor-pointer"><input id="vm-published" type="checkbox" class="mt-1 w-5 h-5 accent-[#d2a566]" <?= !empty($exhibition['is_published']) ? 'checked' : '' ?>><span><strong>Publish exhibition</strong><span class="block text-xs text-[#8fa1b3] mt-1">When off, the exhibition remains a private draft.</span></span></label>
+            </div>
+
+            <div id="vm-error" class="hidden mt-6 rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 p-4 text-sm" role="alert"></div>
+        </section>
+
+        <aside class="vm-card vm-sticky lg:sticky lg:top-6 rounded-2xl p-5">
+            <p class="text-xs uppercase tracking-[.16em] text-[#8fa1b3] font-bold">Progress</p>
+            <div class="mt-4 space-y-3 text-sm"><div>Details <span id="vm-check-details" class="float-right text-[#d2a566]">●</span></div><div>Sources <span id="vm-check-sources" class="float-right text-[#8fa1b3]">●</span></div><div>Curation <span id="vm-check-curation" class="float-right text-[#8fa1b3]">●</span></div><div>Room <span id="vm-check-room_publish" class="float-right text-[#8fa1b3]">●</span></div></div>
+            <hr class="border-[#2a3a4d] my-5">
+            <button id="vm-save-stage" type="button" class="vm-btn vm-primary w-full">Save and continue</button>
+            <button id="vm-previous-stage" type="button" class="vm-btn vm-secondary w-full mt-2">Previous stage</button>
+            <p id="vm-save-status" class="text-xs text-[#8fa1b3] text-center mt-3" aria-live="polite"></p>
+        </aside>
+    </main>
+<?php endif; ?>
 </div>
 
 <script>
-(function () {
-    const OPTIONS = <?= $optionsJson ?>;
-    const CSRF = <?= json_encode($csrf) ?>;
-    const AJAX = <?= json_encode(SITE_URL . '/admin/ajax.php') ?>;
+(() => {
+const AJAX = <?= json_encode(SITE_URL . '/admin/ajax.php') ?>;
+const BASE = <?= json_encode($baseUrl) ?>;
+const CSRF = <?= json_encode($csrf) ?>;
+const config = <?= json_encode([
+    'id' => (int) ($exhibition['id'] ?? 0),
+    'slug' => $exhibition['slug'] ?? '',
+    'theme' => $exhibition['theme'] ?? 'classic',
+    'layout' => $exhibition['layout'] ?? 'grand_hall',
+    'sources' => array_map(static fn($s) => ['type'=>$s['source_type'],'id'=>(int)$s['source_id'],'sort_order'=>(int)$s['sort_order']], $sources),
+    'overrides' => $overrides,
+    'resolved' => $resolved,
+    'sourceOptions' => $sourceOptions,
+], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const post = async body => { body.set('csrf_token', CSRF); const r = await fetch(AJAX,{method:'POST',body,headers:{'X-CSRF-Token':CSRF}}); const d = await r.json(); if(!d.success) throw new Error(d.error || 'Request failed.'); return d; };
 
-    const $ = (id) => document.getElementById(id);
-    const modal = $('vm-modal');
+document.querySelectorAll('.vm-delete').forEach(btn => btn.addEventListener('click', async () => {
+    if(!confirm(`Delete exhibition “${btn.dataset.title}”? This cannot be undone.`)) return;
+    const b=new URLSearchParams({action:'museum_delete',id:btn.dataset.id}); try{await post(b);location.reload();}catch(e){alert(e.message);}
+}));
+document.querySelectorAll('.vm-duplicate').forEach(btn => btn.addEventListener('click', async () => {
+    btn.disabled=true; const b=new URLSearchParams({action:'museum_duplicate',id:btn.dataset.id}); try{const d=await post(b);location.href=`${BASE}&action=edit&id=${d.id}`;}catch(e){alert(e.message);btn.disabled=false;}
+}));
+if (!$('vm-save-stage')) return;
 
-    function openModal() { modal.classList.remove('hidden'); modal.classList.add('flex'); }
-    function closeModal() { modal.classList.add('hidden'); modal.classList.remove('flex'); $('vm-error').classList.add('hidden'); }
+let exhibitionId=config.id, dirty=false;
+let sources=[...config.sources];
+const overrides=new Map(Object.entries(config.overrides).map(([id,row])=>[Number(id),{selection_state:row.selection_state,sort_order:row.sort_order}]));
+let order=config.resolved.map(item=>Number(item.id));
+const itemById=new Map(config.resolved.map(item=>[Number(item.id),item]));
+let theme=config.theme, layout=config.layout, active='details', searchPage=1, searchTerm='';
+const steps=['details','sources','curation','room_publish'];
 
-    function populateSources(type, selectedId) {
-        const sel = $('vm-source-id');
-        sel.innerHTML = '';
-        (OPTIONS[type] || []).forEach((o) => {
-            const opt = document.createElement('option');
-            opt.value = o.id; opt.textContent = o.name;
-            if (String(o.id) === String(selectedId)) opt.selected = true;
-            sel.appendChild(opt);
-        });
-    }
+function setDirty(){dirty=true;$('vm-save-status').textContent='Unsaved changes';}
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+document.querySelectorAll('input,textarea').forEach(el=>el.addEventListener('input',setDirty));
 
-    function onTypeChange(selectedId) {
-        const type = $('vm-source-type').value;
-        if (type === 'manual') {
-            $('vm-source-wrap').classList.add('hidden');
-            $('vm-manual-wrap').classList.remove('hidden');
-        } else {
-            $('vm-source-wrap').classList.remove('hidden');
-            $('vm-manual-wrap').classList.add('hidden');
-            populateSources(type, selectedId);
-        }
-    }
+function showStep(step){active=steps.includes(step)?step:'details';document.querySelectorAll('.vm-stage').forEach(el=>el.classList.toggle('is-active',el.dataset.step===active));document.querySelectorAll('.vm-step').forEach(el=>el.setAttribute('aria-current',el.dataset.step===active?'step':'false'));$('vm-previous-stage').classList.toggle('invisible',active==='details');$('vm-save-stage').textContent=active==='room_publish'?'Save exhibition':'Save and continue';history.replaceState(null,'',`${BASE}&action=${exhibitionId?'edit':'new'}${exhibitionId?`&id=${exhibitionId}`:''}&step=${active}`);}
+document.querySelectorAll('.vm-step').forEach(btn=>btn.addEventListener('click',()=>showStep(btn.dataset.step)));
+$('vm-previous-stage').addEventListener('click',()=>showStep(steps[Math.max(0,steps.indexOf(active)-1)]));
 
-    $('vm-source-type').addEventListener('change', () => onTypeChange(null));
+function sourceName(source){return (config.sourceOptions[source.type]||[]).find(x=>Number(x.id)===Number(source.id))?.name || `#${source.id}`;}
+function renderSources(){
+    $('vm-selected-sources').innerHTML=sources.length?sources.map((s,i)=>`<span class="vm-source-chip"><span class="uppercase text-[10px] text-[#d2a566]">${esc(s.type)}</span>${esc(sourceName(s))}<button type="button" data-source-remove="${i}" class="w-6 h-6" aria-label="Remove ${esc(sourceName(s))}">×</button></span>`).join(''):'<span class="text-sm text-[#8fa1b3]">No live sources selected. You can still hand-pick items in the next stage.</span>';
+    document.querySelectorAll('[data-source-remove]').forEach(btn=>btn.addEventListener('click',()=>{sources.splice(Number(btn.dataset.sourceRemove),1);sources.forEach((s,i)=>s.sort_order=i);setDirty();renderSources();renderSourceResults();}));
+}
+function renderSourceResults(){const q=$('vm-source-search').value.trim().toLowerCase();const selected=new Set(sources.map(s=>`${s.type}:${s.id}`));let rows=[];Object.entries(config.sourceOptions).forEach(([type,opts])=>opts.forEach(o=>{if(!selected.has(`${type}:${o.id}`)&&(!q||o.name.toLowerCase().includes(q)))rows.push({type,...o});}));$('vm-source-results').innerHTML=rows.slice(0,60).map(r=>`<button type="button" class="vm-action text-left rounded-xl border border-[#34485e] bg-[#111c28] p-4 hover:border-[#d2a566]" data-source-add="${r.type}:${r.id}"><span class="uppercase text-[10px] text-[#d2a566] font-bold">${esc(r.type)}</span><strong class="block mt-1">${esc(r.name)}</strong></button>`).join('')||'<p class="text-sm text-[#8fa1b3]">No matching sources.</p>';document.querySelectorAll('[data-source-add]').forEach(btn=>btn.addEventListener('click',()=>{const [type,id]=btn.dataset.sourceAdd.split(':');sources.push({type,id:Number(id),sort_order:sources.length});setDirty();renderSources();renderSourceResults();}));}
+$('vm-source-search').addEventListener('input',renderSourceResults);
 
-    $('vm-new-btn').addEventListener('click', () => {
-        $('vm-modal-title').textContent = 'New Exhibition';
-        $('vm-id').value = '0';
-        $('vm-title').value = '';
-        $('vm-description').value = '';
-        $('vm-source-type').value = 'category';
-        $('vm-item-limit').value = '40';
-        $('vm-theme').value = 'classic';
-        $('vm-published').checked = false;
-        Array.from($('vm-item-ids').options).forEach((o) => o.selected = false);
-        onTypeChange(null);
-        openModal();
-    });
+function normalizeOrder(){order.forEach((id,i)=>overrides.set(id,{selection_state:'include',sort_order:i}));}
+function moveItem(id,delta){const at=order.indexOf(id),to=Math.max(0,Math.min(order.length-1,at+delta));if(at<0||at===to)return;order.splice(at,1);order.splice(to,0,id);normalizeOrder();setDirty();renderCurated();}
+function excludeItem(id){order=order.filter(x=>x!==id);overrides.set(id,{selection_state:'exclude',sort_order:null});setDirty();renderCurated();}
+function renderCurated(){
+    $('vm-resolved-count').textContent=order.length;$('vm-excluded-count').textContent=[...overrides.values()].filter(v=>v.selection_state==='exclude').length;
+    $('vm-curated-grid').innerHTML=order.map((id,i)=>{const item=itemById.get(id)||{id,title:`Item #${id}`,thumb:''};return `<article draggable="true" data-curated-id="${id}" class="vm-item-card rounded-xl border border-[#34485e] bg-[#111c28] p-3 flex gap-3 items-center"><span class="text-xs text-[#8fa1b3] w-6">${i+1}</span><img src="${esc(item.thumb)}" alt="" class="w-16 h-16 rounded-lg bg-[#0b1119] object-cover"><div class="min-w-0 flex-1"><strong class="text-sm line-clamp-2">${esc(item.title)}</strong><span class="text-xs text-[#8fa1b3]">${esc(item.reg||'')}</span></div><div class="grid gap-1"><button type="button" class="vm-action w-9 h-9 rounded-lg bg-white/5" data-move="-1" aria-label="Move ${esc(item.title)} up">↑</button><button type="button" class="vm-action w-9 h-9 rounded-lg bg-white/5" data-move="1" aria-label="Move ${esc(item.title)} down">↓</button><button type="button" class="vm-action w-9 h-9 rounded-lg bg-rose-500/10 text-rose-300" data-exclude aria-label="Remove ${esc(item.title)}">×</button></div></article>`}).join('')||'<div class="rounded-xl border border-dashed border-[#40556b] p-10 text-center text-[#8fa1b3]">Save sources or hand-pick items to build the sequence.</div>';
+    document.querySelectorAll('[data-curated-id]').forEach(card=>{const id=Number(card.dataset.curatedId);card.querySelectorAll('[data-move]').forEach(b=>b.addEventListener('click',()=>moveItem(id,Number(b.dataset.move))));card.querySelector('[data-exclude]').addEventListener('click',()=>excludeItem(id));card.addEventListener('dragstart',()=>{card.setAttribute('aria-grabbed','true');card.dataset.dragging='1';});card.addEventListener('dragend',()=>{card.setAttribute('aria-grabbed','false');delete card.dataset.dragging;});card.addEventListener('dragover',e=>e.preventDefault());card.addEventListener('drop',e=>{e.preventDefault();const from=document.querySelector('[data-dragging="1"]');if(!from)return;const fromId=Number(from.dataset.curatedId),fromAt=order.indexOf(fromId),toAt=order.indexOf(id);order.splice(fromAt,1);order.splice(toAt,0,fromId);normalizeOrder();setDirty();renderCurated();});});
+}
+async function searchItems(reset=true){if(reset){searchPage=1;$('vm-item-results').innerHTML='';}const params=new URLSearchParams({action:'museum_item_search',q:searchTerm,page:String(searchPage)});const r=await fetch(`${AJAX}?${params}`);const d=await r.json();if(!d.success)throw new Error(d.error);$('vm-item-results').insertAdjacentHTML('beforeend',d.items.map(item=>`<button type="button" class="vm-action w-full flex gap-3 items-center text-left rounded-lg border border-[#34485e] p-2 hover:border-[#d2a566]" data-add-item="${item.id}"><img src="${esc(item.thumb)}" alt="" class="w-12 h-12 rounded object-cover"><span class="min-w-0"><strong class="text-xs line-clamp-2">${esc(item.title)}</strong><small class="text-[#8fa1b3]">${esc(item.reg||'')}</small></span></button>`).join(''));d.items.forEach(item=>itemById.set(Number(item.id),item));document.querySelectorAll('[data-add-item]').forEach(btn=>btn.onclick=()=>{const id=Number(btn.dataset.addItem);if(!order.includes(id))order.push(id);normalizeOrder();setDirty();renderCurated();});$('vm-load-more').classList.toggle('hidden',!d.has_more);}
+let timer;$('vm-item-search').addEventListener('input',e=>{clearTimeout(timer);searchTerm=e.target.value.trim();timer=setTimeout(()=>searchItems(true).catch(err=>$('vm-error').textContent=err.message),250);});$('vm-load-more').addEventListener('click',()=>{searchPage++;searchItems(false);});
 
-    document.querySelectorAll('.vm-edit').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const ex = JSON.parse(btn.closest('tr').dataset.ex);
-            $('vm-modal-title').textContent = 'Edit Exhibition';
-            $('vm-id').value = ex.id;
-            $('vm-title').value = ex.title || '';
-            $('vm-description').value = ex.description || '';
-            $('vm-source-type').value = ex.source_type;
-            $('vm-item-limit').value = ex.item_limit || 40;
-            $('vm-theme').value = ex.theme || 'classic';
-            $('vm-published').checked = ex.is_published == 1;
-            onTypeChange(ex.source_id);
-            const selected = new Set((ex.items || []).map(String));
-            Array.from($('vm-item-ids').options).forEach((o) => { o.selected = selected.has(o.value); });
-            openModal();
-        });
-    });
+function selectChoice(kind,value){if(kind==='theme')theme=value;else layout=value;document.querySelectorAll(`[data-${kind}]`).forEach(el=>el.setAttribute('aria-checked',el.dataset[kind]===value?'true':'false'));setDirty();updateWarning();}
+document.querySelectorAll('[data-theme]').forEach(el=>el.addEventListener('click',()=>selectChoice('theme',el.dataset.theme)));
+document.querySelectorAll('[data-layout]').forEach(el=>el.addEventListener('click',()=>selectChoice('layout',el.dataset.layout)));
+function updateWarning(){const min={grand_hall:1,l_gallery:12,courtyard_loop:24}[layout]||1;const el=$('vm-layout-warning');el.classList.toggle('hidden',order.length>=min);el.textContent=order.length<min?`This layout is recommended for ${min}+ items. You can still save or publish it.`:'';}
 
-    document.querySelectorAll('.vm-delete').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            if (!confirm('Delete exhibition "' + btn.dataset.title + '"? This cannot be undone.')) return;
-            const body = new URLSearchParams();
-            body.set('action', 'museum_delete');
-            body.set('csrf_token', CSRF);
-            body.set('id', btn.dataset.id);
-            fetch(AJAX, { method: 'POST', body, headers: { 'X-CSRF-Token': CSRF } })
-                .then((r) => r.json())
-                .then((d) => { if (d.success) location.reload(); else alert(d.error || 'Delete failed.'); })
-                .catch(() => alert('Network error.'));
-        });
-    });
+$('vm-save-stage').addEventListener('click',async()=>{const btn=$('vm-save-stage'),error=$('vm-error');error.classList.add('hidden');btn.disabled=true;btn.textContent='Saving…';$('vm-save-status').textContent='Saving changes';try{const b=new URLSearchParams({action:'museum_save',stage:active,id:String(exhibitionId)});if(active==='details'){b.set('title',$('vm-title').value.trim());b.set('description',$('vm-description').value.trim());b.set('item_limit',$('vm-item-limit').value);}else if(active==='sources'){b.set('sources_json',JSON.stringify(sources));}else if(active==='curation'){normalizeOrder();b.set('items_json',JSON.stringify([...overrides].map(([item_id,row])=>({item_id,...row}))));}else{b.set('theme',theme);b.set('layout',layout);if($('vm-published').checked)b.set('is_published','1');}const d=await post(b);dirty=false;$('vm-save-status').textContent='Saved';if(active==='details'&&!exhibitionId){exhibitionId=d.id;location.href=`${BASE}&action=edit&id=${d.id}&step=sources`;return;}const next=steps[steps.indexOf(active)+1];if(next){if(active==='sources'||active==='curation'){location.href=`${BASE}&action=edit&id=${exhibitionId}&step=${next}`;return;}showStep(next);}}catch(e){error.textContent=e.message;error.classList.remove('hidden');error.focus();}finally{btn.disabled=false;btn.textContent=active==='room_publish'?'Save exhibition':'Save and continue';}});
 
-    $('vm-save').addEventListener('click', () => {
-        const type = $('vm-source-type').value;
-        const body = new URLSearchParams();
-        body.set('action', 'museum_save');
-        body.set('csrf_token', CSRF);
-        body.set('id', $('vm-id').value);
-        body.set('title', $('vm-title').value.trim());
-        body.set('description', $('vm-description').value.trim());
-        body.set('source_type', type);
-        body.set('item_limit', $('vm-item-limit').value);
-        body.set('theme', $('vm-theme').value);
-        if ($('vm-published').checked) body.set('is_published', '1');
-        if (type === 'manual') {
-            Array.from($('vm-item-ids').selectedOptions).forEach((o) => body.append('item_ids[]', o.value));
-        } else {
-            body.set('source_id', $('vm-source-id').value);
-        }
-
-        const errEl = $('vm-error');
-        errEl.classList.add('hidden');
-        fetch(AJAX, { method: 'POST', body, headers: { 'X-CSRF-Token': CSRF } })
-            .then((r) => r.json())
-            .then((d) => {
-                if (d.success) { location.reload(); }
-                else { errEl.textContent = d.error || 'Save failed.'; errEl.classList.remove('hidden'); }
-            })
-            .catch(() => { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); });
-    });
-
-    $('vm-close').addEventListener('click', closeModal);
-    $('vm-cancel').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-
-    onTypeChange(null);
+renderSources();renderSourceResults();renderCurated();searchItems(true);selectChoice('theme',theme);selectChoice('layout',layout);dirty=false;showStep(new URLSearchParams(location.search).get('step')||'details');
 })();
 </script>
