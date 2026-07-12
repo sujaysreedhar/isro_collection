@@ -45,67 +45,138 @@ ob_start();
 // (no additionalHead needed — Theme Studio injects via frontend_head hook)
 $additionalHead = ob_get_clean();
 
-// Fetch Categories for discovery section
+// Fetch categories (with item counts) for the discovery section
 global $pdo;
-$stmtCats = $pdo->query("SELECT id, name, image_path FROM categories WHERE image_path IS NOT NULL AND image_path != '' ORDER BY id ASC LIMIT 8");
+$stmtCats = $pdo->query("
+    SELECT c.id, c.name, c.image_path, COUNT(ic.item_id) AS item_count
+    FROM categories c
+    LEFT JOIN item_category ic ON ic.category_id = c.id
+    WHERE c.image_path IS NOT NULL AND c.image_path != ''
+    GROUP BY c.id, c.name, c.image_path
+    ORDER BY c.id ASC LIMIT 8
+");
 $homeCategories = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
 
+// Collection stats (used by hero strip when enabled)
+$totalItems = $totalWithImgs = $totalCategories = 0;
+if ($showStats) {
+    $totalItems = (int) $pdo->query("SELECT COUNT(*) FROM items")->fetchColumn();
+    $totalWithImgs = (int) $pdo->query("SELECT COUNT(DISTINCT item_id) FROM media")->fetchColumn();
+    $totalCategories = (int) $pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();
+}
+
+// Detect dark hero background so text defaults stay readable on any palette.
+// For a centered hero with a background image, the overlay colour dominates instead.
+$heroBgSetting = ($heroStyle === 'centered' && $heroImgUrl && $heroOverlayOpacity >= 40)
+    ? $heroOverlayColor
+    : $ts('color_hero_bg', '#ffffff');
+$heroBgHex = ltrim($heroBgSetting, '#');
+if (strlen($heroBgHex) === 3) {
+    $heroBgHex = $heroBgHex[0] . $heroBgHex[0] . $heroBgHex[1] . $heroBgHex[1] . $heroBgHex[2] . $heroBgHex[2];
+}
+$heroIsDark = (0.299 * hexdec(substr($heroBgHex, 0, 2))
+    + 0.587 * hexdec(substr($heroBgHex, 2, 2))
+    + 0.114 * hexdec(substr($heroBgHex, 4, 2))) < 128;
+$heroDarkClass = $heroIsDark ? ' tc-on-dark' : '';
+
+$heroTitleStyle = 'color:' . ($heroTextColor
+    ? htmlspecialchars($heroTextColor)
+    : ($heroIsDark ? '#f9fafb' : 'var(--color-primary,#111827)'));
+$heroAccentStyle = $heroAccentColor ? 'color:' . htmlspecialchars($heroAccentColor) : '';
+$heroTaglineStyle = 'color:' . ($heroTaglineColor
+    ? htmlspecialchars($heroTaglineColor)
+    : ($heroIsDark ? 'rgba(249,250,251,.75)' : 'var(--color-text-muted,#6b7280)'));
+
 require_once ThemeManager::getHeader();
+
+/* Reusable pill search form */
+$renderSearchForm = static function (string $placeholder = 'Search items, dates, or stories...') {
+    ?>
+    <form action="<?= SITE_URL ?>/search.php" method="GET" class="tc-search-pill relative flex items-center">
+        <svg class="h-5 w-5 tc-text-muted absolute left-5 pointer-events-none" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input type="text" name="q" data-autocomplete="true" autocomplete="off"
+            class="flex-grow pl-13 pr-3 py-4 text-base bg-transparent border-0 focus:outline-none tc-text"
+            placeholder="<?= htmlspecialchars($placeholder) ?>">
+        <button type="submit" class="tc-search-pill-btn m-1.5 px-6 py-2.5 font-semibold text-sm">Search</button>
+    </form>
+    <?php
+};
 ?>
 
 <?php /* ═══════════ HERO SECTION ═══════════ */ ?>
 <?php if ($heroStyle === 'split'): ?>
     <!-- SPLIT: text left, optional image right -->
-    <div class="hero-pattern border-b tc-border overflow-hidden">
-        <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch min-h-[420px]">
+    <div class="tc-hero-modern<?= $heroDarkClass ?> border-b tc-border overflow-hidden relative">
+        <div class="tc-hero-glow" aria-hidden="true"></div>
+        <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch min-h-[480px] relative">
             <!-- Text side -->
-            <div class="flex-1 flex flex-col justify-center px-6 lg:px-12 py-16 lg:py-24">
-                <?php
-                $h1Style = $heroTextColor ? "color:" . htmlspecialchars($heroTextColor) : "";
-                $acStyle = $heroAccentColor ? "style=\"color:" . htmlspecialchars($heroAccentColor) . "\"" : "";
-                ?>
-                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold serif tracking-tight leading-tight"
-                    style="<?= $h1Style ?>">
+            <div class="flex-1 flex flex-col justify-center px-6 lg:px-12 py-16 lg:py-24 reveal">
+                <span class="tc-eyebrow mb-5">
+                    <span class="tc-eyebrow-dot" aria-hidden="true"></span>
+                    Curated Archive
+                </span>
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold serif tracking-tight leading-[1.08]"
+                    style="<?= $heroTitleStyle ?>">
                     <?= htmlspecialchars($heroTitle ?: 'Discover history in the') ?><br>
-                    <span class="tc-accent-text" <?= $acStyle ?>><?= htmlspecialchars(SITE_TITLE) ?></span>
+                    <span class="tc-accent-text tc-hero-underline" style="<?= $heroAccentStyle ?>"><?= htmlspecialchars(SITE_TITLE) ?></span>
                 </h1>
-                <?php if ($heroTagline): ?>
-                    <p class="mt-4 text-lg max-w-lg"
-                        style="color:<?= $heroTaglineColor ? htmlspecialchars($heroTaglineColor) : 'var(--color-text-muted,#6b7280)' ?>">
-                        <?= htmlspecialchars($heroTagline) ?>
-                    </p>
-                <?php else: ?>
-                    <p class="mt-4 text-lg max-w-lg"
-                        style="color:<?= $heroTaglineColor ? htmlspecialchars($heroTaglineColor) : 'var(--color-text-muted,#6b7280)' ?>">
-                        Explore pictorial cancellations, narratives, and media from across India.
-                    </p>
-                <?php endif; ?>
+                <p class="mt-6 text-lg leading-relaxed max-w-lg" style="<?= $heroTaglineStyle ?>">
+                    <?= htmlspecialchars($heroTagline ?: 'Explore pictorial cancellations, narratives, and media from across India.') ?>
+                </p>
+
                 <?php if ($showSearch): ?>
-                    <div class="mt-8 max-w-lg">
-                        <form action="<?= SITE_URL ?>/search.php" method="GET"
-                            class="relative rounded-lg shadow-sm flex overflow-hidden"
-                            style="border:1px solid var(--color-border,#e5e7eb);">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                            </div>
-                            <input type="text" name="q" data-autocomplete="true" autocomplete="off"
-                                class="flex-grow pl-12 pr-4 py-4 text-base bg-white tc-input border-0"
-                                placeholder="Search items, dates, or stories...">
-                            <button type="submit" class="px-6 py-4 font-semibold text-base tc-search-btn">Search</button>
-                        </form>
+                    <div class="mt-9 max-w-lg">
+                        <?php $renderSearchForm(); ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($homeCategories): ?>
+                    <div class="mt-6 flex flex-wrap items-center gap-2 max-w-lg">
+                        <span class="text-xs font-semibold uppercase tracking-wider tc-text-muted mr-1">Popular:</span>
+                        <?php foreach (array_slice($homeCategories, 0, 4) as $qc): ?>
+                            <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $qc['id'] ?>" class="tc-chip">
+                                <?= htmlspecialchars($qc['name']) ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($showStats): ?>
+                    <div class="mt-10 flex items-center gap-8 flex-wrap">
+                        <div>
+                            <div class="text-3xl font-extrabold serif tc-primary-text">
+                                <?= number_format($totalItems) ?></div>
+                            <div class="text-xs font-semibold uppercase tracking-wider tc-text-muted mt-1">Items archived</div>
+                        </div>
+                        <div class="tc-stat-divider" aria-hidden="true"></div>
+                        <div>
+                            <div class="text-3xl font-extrabold serif tc-primary-text">
+                                <?= number_format($totalWithImgs) ?></div>
+                            <div class="text-xs font-semibold uppercase tracking-wider tc-text-muted mt-1">With images</div>
+                        </div>
+                        <div class="tc-stat-divider" aria-hidden="true"></div>
+                        <div>
+                            <div class="text-3xl font-extrabold serif tc-primary-text">
+                                <?= number_format($totalCategories) ?></div>
+                            <div class="text-xs font-semibold uppercase tracking-wider tc-text-muted mt-1">Categories</div>
+                        </div>
                     </div>
                 <?php endif; ?>
             </div>
+
             <!-- Image side -->
             <?php if ($heroImgUrl): ?>
-                <div class="hidden lg:block flex-1 min-h-[380px] relative overflow-hidden">
-                    <img src="<?= htmlspecialchars($heroImgUrl) ?>" alt="Hero"
-                        class="absolute inset-0 w-full h-full object-cover">
-                    <div class="absolute inset-0"
-                        style="background: linear-gradient(to right, <?= $overlayRgba ?> 0%, transparent 40%);"></div>
+                <div class="hidden lg:flex flex-1 items-center justify-center relative py-16 pr-12 reveal reveal-delay-1">
+                    <div class="tc-hero-frame relative w-full max-w-xl">
+                        <img src="<?= htmlspecialchars($heroImgUrl) ?>" alt="Hero"
+                            class="w-full h-[420px] object-cover tc-hero-img">
+                        <div class="absolute inset-0 tc-hero-img pointer-events-none"
+                            style="background: linear-gradient(to top right, <?= $overlayRgba ?> 0%, transparent 45%);"></div>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -113,37 +184,56 @@ require_once ThemeManager::getHeader();
 
 <?php elseif ($heroStyle === 'centered'): ?>
     <!-- CENTERED: full-width centred hero, optional background image -->
-    <div class="hero-pattern border-b tc-border relative overflow-hidden" <?php if ($heroImgUrl): ?>
+    <div class="tc-hero-modern<?= $heroDarkClass ?> border-b tc-border relative overflow-hidden" <?php if ($heroImgUrl): ?>
             style="background-image: url('<?= htmlspecialchars($heroImgUrl) ?>'); background-size:cover; background-position:center center;"
         <?php endif; ?>>
         <?php if ($heroImgUrl): ?>
             <div class="absolute inset-0" style="background: <?= $overlayRgba ?>;"></div>
+        <?php else: ?>
+            <div class="tc-hero-glow" aria-hidden="true"></div>
         <?php endif; ?>
-        <div class="relative z-10 max-w-3xl mx-auto text-center px-6 py-24">
-            <h1 class="text-5xl sm:text-6xl font-extrabold serif tracking-tight"
-                style="color:<?= $heroTextColor ? htmlspecialchars($heroTextColor) : 'var(--color-primary,#111827)' ?>">
+        <div class="relative z-10 max-w-3xl mx-auto text-center px-6 py-24 lg:py-28 reveal">
+            <span class="tc-eyebrow mb-6 mx-auto">
+                <span class="tc-eyebrow-dot" aria-hidden="true"></span>
+                Curated Archive
+            </span>
+            <h1 class="text-5xl sm:text-6xl font-extrabold serif tracking-tight leading-[1.08]"
+                style="<?= $heroTitleStyle ?>">
                 <?= htmlspecialchars($heroTitle ?: SITE_TITLE) ?>
             </h1>
-            <p class="mt-4 text-xl"
-                style="color:<?= $heroTaglineColor ? htmlspecialchars($heroTaglineColor) : 'var(--color-text-muted,#6b7280)' ?>">
+            <p class="mt-6 text-xl leading-relaxed" style="<?= $heroTaglineStyle ?>">
                 <?= htmlspecialchars($heroTagline ?: 'Explore pictorial cancellations from across India.') ?>
             </p>
             <?php if ($showSearch): ?>
                 <div class="mt-10 max-w-xl mx-auto">
-                    <form action="<?= SITE_URL ?>/search.php" method="GET"
-                        class="relative rounded-xl shadow-lg flex overflow-hidden"
-                        style="border:1px solid var(--color-border,#e5e7eb);">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
-                        <input type="text" name="q" data-autocomplete="true" autocomplete="off"
-                            class="flex-grow pl-12 pr-4 py-4 text-base bg-white tc-input border-0"
-                            placeholder="Search items, dates, or stories...">
-                        <button type="submit" class="px-6 py-4 font-semibold text-base tc-search-btn">Search</button>
-                    </form>
+                    <?php $renderSearchForm(); ?>
+                </div>
+            <?php endif; ?>
+            <?php if ($homeCategories): ?>
+                <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
+                    <?php foreach (array_slice($homeCategories, 0, 4) as $qc): ?>
+                        <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $qc['id'] ?>" class="tc-chip">
+                            <?= htmlspecialchars($qc['name']) ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+            <?php if ($showStats): ?>
+                <div class="mt-12 flex items-center justify-center gap-8 flex-wrap">
+                    <div>
+                        <div class="text-3xl font-extrabold serif tc-primary-text"><?= number_format($totalItems) ?></div>
+                        <div class="text-xs font-semibold uppercase tracking-wider tc-text-muted mt-1">Items archived</div>
+                    </div>
+                    <div class="tc-stat-divider" aria-hidden="true"></div>
+                    <div>
+                        <div class="text-3xl font-extrabold serif tc-primary-text"><?= number_format($totalWithImgs) ?></div>
+                        <div class="text-xs font-semibold uppercase tracking-wider tc-text-muted mt-1">With images</div>
+                    </div>
+                    <div class="tc-stat-divider" aria-hidden="true"></div>
+                    <div>
+                        <div class="text-3xl font-extrabold serif tc-primary-text"><?= number_format($totalCategories) ?></div>
+                        <div class="text-xs font-semibold uppercase tracking-wider tc-text-muted mt-1">Categories</div>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -151,56 +241,38 @@ require_once ThemeManager::getHeader();
 
 <?php else: /* minimal */ ?>
     <!-- MINIMAL: just a compact search bar banner -->
-    <div class="border-b tc-border" style="background:var(--color-hero-bg,#fff);">
-        <div class="max-w-3xl mx-auto px-4 py-10 text-center">
+    <div class="border-b tc-border tc-hero-modern<?= $heroDarkClass ?> relative overflow-hidden">
+        <div class="max-w-3xl mx-auto px-4 py-12 text-center relative z-10 reveal">
             <h1 class="text-3xl font-bold serif mb-6"
-                style="color:<?= $heroTextColor ? htmlspecialchars($heroTextColor) : 'var(--color-primary,#111827)' ?>">
-                <?= htmlspecialchars(SITE_TITLE) ?>
+                style="<?= $heroTitleStyle ?>">
+                <?= htmlspecialchars($heroTitle ?: SITE_TITLE) ?>
             </h1>
             <?php if ($showSearch): ?>
-                <form action="<?= SITE_URL ?>/search.php" method="GET"
-                    class="relative rounded-lg flex overflow-hidden shadow-sm"
-                    style="border:1px solid var(--color-border,#e5e7eb);">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                    </div>
-                    <input type="text" name="q" data-autocomplete="true" autocomplete="off"
-                        class="flex-grow pl-10 pr-4 py-3 text-base bg-white tc-input border-0"
-                        placeholder="Search the collection...">
-                    <button type="submit" class="px-5 py-3 font-semibold tc-search-btn">Search</button>
-                </form>
+                <?php $renderSearchForm('Search the collection...'); ?>
+            <?php endif; ?>
+            <?php if ($showStats): ?>
+                <p class="mt-5 text-sm tc-text-muted">
+                    <strong class="tc-primary-text"><?= number_format($totalItems) ?></strong> items ·
+                    <strong class="tc-primary-text"><?= number_format($totalWithImgs) ?></strong> with images ·
+                    <strong class="tc-primary-text"><?= number_format($totalCategories) ?></strong> categories
+                </p>
             <?php endif; ?>
         </div>
     </div>
 <?php endif; ?>
 
-<?php /* ═══════════ STATS BAR ═══════════ */ ?>
-<?php if ($showStats): ?>
-    <?php
-    global $pdo;
-    $totalItems = $pdo->query("SELECT COUNT(*) FROM items")->fetchColumn();
-    $totalWithImgs = $pdo->query("SELECT COUNT(DISTINCT item_id) FROM media")->fetchColumn();
-    ?>
-    <div class="border-b tc-border" style="background:var(--color-surface,#fff);">
-        <div
-            class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap gap-6 justify-center sm:justify-start text-sm font-medium tc-text">
-            <span>📦 <strong class="tc-primary-text"><?= number_format((int) $totalItems) ?></strong> items in
-                collection</span>
-            <span>🖼 <strong class="tc-primary-text"><?= number_format((int) $totalWithImgs) ?></strong> with images</span>
-        </div>
-    </div>
-<?php endif; ?>
-
 <?php /* ═══════════ FEATURED ITEMS ═══════════ */ ?>
-<main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16">
-    <div class="flex items-center justify-between mb-8">
-        <h2 class="text-3xl font-bold serif tc-primary-text">Recently Added Items</h2>
-        <a href="<?= SITE_URL ?>/search.php"
-            class="text-sm font-semibold tc-accent-text hover:opacity-80 flex items-center gap-1">
-            View All
+<main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
+    <div class="flex items-end justify-between gap-6 mb-10 reveal">
+        <div>
+            <span class="tc-eyebrow mb-3">
+                <span class="tc-eyebrow-dot" aria-hidden="true"></span>
+                Latest additions
+            </span>
+            <h2 class="text-3xl lg:text-4xl font-bold serif tc-primary-text">Recently Added Items</h2>
+        </div>
+        <a href="<?= SITE_URL ?>/search.php" class="tc-btn-outline hidden sm:inline-flex">
+            View all
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
@@ -209,16 +281,16 @@ require_once ThemeManager::getHeader();
 
     <?php if (count($featuredItems) > 0): ?>
         <div class="grid <?= $gridClass ?> gap-6 lg:gap-8">
-            <?php foreach ($featuredItems as $item): ?>
+            <?php foreach ($featuredItems as $i => $item): ?>
                 <a href="<?= SITE_URL ?>/item/<?= $item['id'] ?>"
-                    class="tc-card tc-radius group flex flex-col h-full overflow-hidden">
-                    <div class="relative h-56 overflow-hidden" style="background:var(--color-border,#e5e7eb);">
+                    class="tc-card-modern group flex flex-col h-full overflow-hidden reveal reveal-delay-<?= $i % 3 ?>">
+                    <div class="relative h-60 overflow-hidden" style="background:var(--color-border,#e5e7eb);">
                         <?php if (!empty($item['file_path'])): ?>
                             <?php $imgUrl = isset($storage)
                                 ? $storage->url('display/' . $item['file_path'])
                                 : SITE_URL . '/uploads/display/' . $item['file_path']; ?>
                             <img src="<?= htmlspecialchars($imgUrl) ?>" alt="<?= htmlspecialchars($item['title']) ?>"
-                                class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                                class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700 ease-out"
                                 loading="lazy">
                         <?php else: ?>
                             <div class="flex items-center justify-center h-full tc-text-muted">
@@ -228,10 +300,18 @@ require_once ThemeManager::getHeader();
                                 </svg>
                             </div>
                         <?php endif; ?>
-                        <div class="absolute bottom-0 left-0 px-3 py-1 text-xs font-bold tc-text-muted tracking-wider"
-                            style="background:color-mix(in srgb,var(--color-surface,#fff) 90%,transparent);">
-                            <?= htmlspecialchars($item['reg_number']) ?>
-                        </div>
+
+                        <div class="absolute inset-0 tc-card-scrim opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                            aria-hidden="true"></div>
+
+                        <span class="absolute top-3 left-3 tc-reg-badge"><?= htmlspecialchars($item['reg_number']) ?></span>
+
+                        <span class="absolute bottom-3 right-3 tc-view-pill opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+                            View item
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </span>
 
                         <?php if (class_exists('HookRegistry')) {
                             HookRegistry::doAction('item_card_badge', $item);
@@ -242,26 +322,34 @@ require_once ThemeManager::getHeader();
                             class="text-lg font-bold serif tc-primary-text mb-2 group-hover:tc-accent-text transition-colors line-clamp-2">
                             <?= htmlspecialchars($item['title']) ?>
                         </h3>
-                        <p class="text-sm tc-text-muted line-clamp-3 mb-3 flex-grow">
+                        <p class="text-sm leading-relaxed tc-text-muted line-clamp-3 mb-4 flex-grow">
                             <?= htmlspecialchars(strip_tags($item['physical_description'] ?? 'No description available.')) ?>
                         </p>
                         <?php $cardTags = $featuredTags[$item['id']] ?? []; ?>
                         <?php if ($cardTags): ?>
-                            <div class="flex flex-wrap gap-1 mt-auto">
+                            <div class="flex flex-wrap gap-1.5 mt-auto pt-3 border-t tc-border">
                                 <?php foreach (array_slice($cardTags, 0, 4) as $ct): ?>
-                                    <span class="inline-flex items-center px-2 py-0.5 text-xs tc-text-muted tc-radius"
-                                        style="background:color-mix(in srgb,var(--color-accent,#2563eb) 10%,transparent);">
-                                        <span class="mr-0.5 tc-accent-text">#</span><?= htmlspecialchars($ct['name']) ?>
+                                    <span class="tc-tag">
+                                        <span class="tc-accent-text">#</span><?= htmlspecialchars($ct['name']) ?>
                                     </span>
                                 <?php endforeach; ?>
                                 <?php if (count($cardTags) > 4): ?>
-                                    <span class="text-xs tc-text-muted">+<?= count($cardTags) - 4 ?></span>
+                                    <span class="text-xs tc-text-muted self-center">+<?= count($cardTags) - 4 ?></span>
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
                     </div>
                 </a>
             <?php endforeach; ?>
+        </div>
+
+        <div class="mt-8 text-center sm:hidden">
+            <a href="<?= SITE_URL ?>/search.php" class="tc-btn-outline inline-flex">
+                View all items
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            </a>
         </div>
     <?php else: ?>
         <div class="text-center py-20 tc-surface border tc-border tc-radius">
@@ -276,35 +364,91 @@ require_once ThemeManager::getHeader();
 
     <?php /* ═══════════ BROWSE BY CATEGORY ═══════════ */ ?>
     <?php if ($homeCategories): ?>
-    <div class="mt-20">
-        <div class="flex items-center justify-between mb-8">
-            <h2 class="text-3xl font-bold serif tc-primary-text">Browse by Category</h2>
-            <div class="h-px flex-1 bg-tc-border ml-8 opacity-30"></div>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            <?php foreach ($homeCategories as $cat): ?>
-                <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $cat['id'] ?>" class="group block">
-                    <div class="relative aspect-video rounded-2xl overflow-hidden tc-border bg-tc-accent-bg/5 hover:shadow-xl transition-all duration-300">
-                        <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($cat['image_path']) ?>"
-                            class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                            alt="<?= htmlspecialchars($cat['name']) ?>" loading="lazy">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                        <div class="absolute inset-0 p-6 flex flex-col justify-end">
-                            <h4 class="font-bold text-lg serif transition-colors" style="color: #ffffff !important;">
-                                <?= htmlspecialchars($cat['name']) ?>
-                            </h4>
+        <div class="mt-20 lg:mt-24">
+            <div class="flex items-end justify-between gap-6 mb-10 reveal">
+                <div>
+                    <span class="tc-eyebrow mb-3">
+                        <span class="tc-eyebrow-dot" aria-hidden="true"></span>
+                        Discover
+                    </span>
+                    <h2 class="text-3xl lg:text-4xl font-bold serif tc-primary-text">Browse by Category</h2>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+                <?php foreach ($homeCategories as $i => $cat): ?>
+                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $cat['id'] ?>"
+                        class="group block reveal reveal-delay-<?= $i % 4 ?>">
+                        <div class="tc-cat-card relative aspect-video overflow-hidden">
+                            <img src="<?= SITE_URL ?>/uploads/categories/<?= htmlspecialchars($cat['image_path']) ?>"
+                                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                                alt="<?= htmlspecialchars($cat['name']) ?>" loading="lazy">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent"></div>
+                            <div class="absolute inset-0 p-4 lg:p-5 flex flex-col justify-end">
+                                <h4 class="font-bold text-base lg:text-lg serif leading-snug" style="color:#ffffff !important;">
+                                    <?= htmlspecialchars($cat['name']) ?>
+                                </h4>
+                                <?php if ((int) $cat['item_count'] > 0): ?>
+                                    <span class="text-xs font-medium mt-0.5" style="color:rgba(255,255,255,.75);">
+                                        <?= number_format((int) $cat['item_count']) ?>
+                                        item<?= (int) $cat['item_count'] === 1 ? '' : 's' ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <span class="tc-cat-arrow absolute top-3 right-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300"
+                                aria-hidden="true">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                </svg>
+                            </span>
                         </div>
-                    </div>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php /* ═══════════ EXPLORE CTA ═══════════ */ ?>
+    <div class="mt-20 lg:mt-24 reveal">
+        <div class="tc-cta-band relative overflow-hidden px-6 py-14 lg:px-16 lg:py-16 text-center">
+            <div class="relative z-10 max-w-2xl mx-auto">
+                <h2 class="text-3xl lg:text-4xl font-bold serif" style="color:#ffffff;">Explore the full archive</h2>
+                <p class="mt-3 text-base lg:text-lg" style="color:rgba(255,255,255,.85);">
+                    Search across the entire collection — filter by category, tag, or keyword to uncover every story.
+                </p>
+                <a href="<?= SITE_URL ?>/search.php" class="tc-btn-light mt-8 inline-flex">
+                    Start exploring
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
                 </a>
-            <?php endforeach; ?>
+            </div>
         </div>
     </div>
-    <?php endif; ?>
 
     <!-- Modular Sections -->
     <?php if (class_exists('HookRegistry')) {
         HookRegistry::doAction('home_page_sections');
     } ?>
 </main>
+
+<script>
+    // Scroll-reveal animations (respects prefers-reduced-motion)
+    (function () {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            document.querySelectorAll('.reveal').forEach(el => el.classList.add('is-visible'));
+            return;
+        }
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('is-visible');
+                    io.unobserve(e.target);
+                }
+            });
+        }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+        document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+    })();
+</script>
 
 <?php require_once ThemeManager::getFooter(); ?>

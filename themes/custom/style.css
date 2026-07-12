@@ -96,6 +96,284 @@ h1, h2, h3, h4, .serif {
     background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f3f4f6' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
+/* Modern hero: hero-bg + faint dot grid + soft accent glow */
+.tc-hero-modern {
+    background-color: var(--color-hero-bg, #ffffff);
+    background-image: radial-gradient(color-mix(in srgb, var(--color-primary, #111827) 7%, transparent) 1px, transparent 1px);
+    background-size: 26px 26px;
+}
+.tc-hero-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(600px 320px at 85% 15%, color-mix(in srgb, var(--color-accent, #2563eb) 10%, transparent), transparent 70%),
+        radial-gradient(500px 300px at 5% 90%, color-mix(in srgb, var(--color-accent, #2563eb) 6%, transparent), transparent 70%);
+}
+
+/* Dark-hero overrides: applied when the configured hero background is dark */
+.tc-on-dark.tc-hero-modern {
+    background-image: radial-gradient(rgba(255, 255, 255, .08) 1px, transparent 1px);
+}
+.tc-on-dark .tc-primary-text { color: #f9fafb; }
+.tc-on-dark .tc-text-muted { color: rgba(249, 250, 251, .65); }
+.tc-on-dark .tc-stat-divider { background: rgba(255, 255, 255, .18); }
+.tc-on-dark .tc-eyebrow {
+    color: #ffffff;
+    background: color-mix(in srgb, var(--color-accent, #2563eb) 30%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent, #2563eb) 55%, transparent);
+}
+.tc-on-dark .tc-eyebrow-dot { background: #ffffff; }
+
+/* Accent word underline flourish */
+.tc-hero-underline {
+    position: relative;
+    display: inline-block;
+}
+.tc-hero-underline::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0.04em;
+    height: 0.28em;
+    background: color-mix(in srgb, var(--color-accent, #2563eb) 18%, transparent);
+    border-radius: 999px;
+    z-index: -1;
+}
+
+/* Framed hero image */
+.tc-hero-frame::before {
+    content: '';
+    position: absolute;
+    inset: -14px 14px 14px -14px;
+    border: 2px solid color-mix(in srgb, var(--color-accent, #2563eb) 35%, transparent);
+    border-radius: calc(var(--border-radius, 0.5rem) + 10px);
+    pointer-events: none;
+}
+.tc-hero-img {
+    border-radius: calc(var(--border-radius, 0.5rem) + 4px);
+    box-shadow: 0 24px 60px -16px rgba(0, 0, 0, .25);
+}
+
+/* ── Eyebrow label & chips ─────────────────────────────────────────────────── */
+.tc-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: fit-content;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-accent, #2563eb);
+    background: color-mix(in srgb, var(--color-accent, #2563eb) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent, #2563eb) 22%, transparent);
+    border-radius: 999px;
+}
+.tc-eyebrow-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--color-accent, #2563eb);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent, #2563eb) 25%, transparent);
+}
+
+.tc-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text, #374151);
+    background: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: 999px;
+    transition: all .18s ease;
+}
+.tc-chip:hover {
+    color: var(--color-accent, #2563eb);
+    border-color: color-mix(in srgb, var(--color-accent, #2563eb) 45%, transparent);
+    background: color-mix(in srgb, var(--color-accent, #2563eb) 7%, var(--color-surface, #ffffff));
+    transform: translateY(-1px);
+}
+
+/* ── Pill search bar ───────────────────────────────────────────────────────── */
+.tc-search-pill {
+    background: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: 999px;
+    box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .15);
+    transition: border-color .18s ease, box-shadow .18s ease;
+}
+.tc-search-pill:focus-within {
+    border-color: var(--color-accent, #2563eb);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent, #2563eb) 15%, transparent),
+        0 10px 30px -12px rgba(0, 0, 0, .15);
+}
+.tc-search-pill input {
+    padding-left: 3.25rem;
+}
+/* Icon sits on the pill's light surface, so keep it muted even inside a dark hero */
+.tc-search-pill svg.tc-text-muted {
+    color: var(--color-text-muted, #6b7280);
+}
+.tc-search-pill-btn {
+    background: var(--color-accent, #2563eb);
+    color: #ffffff;
+    border-radius: 999px;
+    white-space: nowrap;
+    transition: background-color .15s ease, transform .15s ease;
+}
+.tc-search-pill-btn:hover {
+    background: var(--color-accent-dark, #1d4ed8);
+}
+.tc-search-pill-btn:active { transform: scale(.97); }
+
+/* ── Hero stats ────────────────────────────────────────────────────────────── */
+.tc-stat-divider {
+    width: 1px;
+    height: 2.5rem;
+    background: var(--color-border, #e5e7eb);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+.tc-btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-accent, #2563eb);
+    border: 1px solid color-mix(in srgb, var(--color-accent, #2563eb) 40%, transparent);
+    border-radius: 999px;
+    transition: all .18s ease;
+}
+.tc-btn-outline:hover {
+    background: var(--color-accent, #2563eb);
+    color: #ffffff;
+}
+.tc-btn-light {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.6rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-accent, #2563eb);
+    background: #ffffff;
+    border-radius: 999px;
+    box-shadow: 0 8px 24px -8px rgba(0, 0, 0, .35);
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+.tc-btn-light:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px -10px rgba(0, 0, 0, .4);
+}
+
+/* ── Modern item cards ─────────────────────────────────────────────────────── */
+.tc-card-modern {
+    background-color: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: calc(var(--border-radius, 0.5rem) + 6px);
+    overflow: hidden;
+    transition: box-shadow .25s ease, transform .25s ease, border-color .25s ease;
+}
+.tc-card-modern:hover {
+    box-shadow: 0 20px 45px -12px rgba(0, 0, 0, .16);
+    border-color: color-mix(in srgb, var(--color-accent, #2563eb) 30%, var(--color-border, #e5e7eb));
+    transform: translateY(-4px);
+}
+.tc-card-scrim {
+    background: linear-gradient(to top, rgba(0, 0, 0, .45), transparent 55%);
+}
+.tc-reg-badge {
+    display: inline-flex;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--color-primary, #111827);
+    background: color-mix(in srgb, var(--color-surface, #fff) 88%, transparent);
+    backdrop-filter: blur(4px);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+}
+.tc-view-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: var(--color-accent, #2563eb);
+    border-radius: 999px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
+}
+.tc-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #6b7280);
+    background: color-mix(in srgb, var(--color-accent, #2563eb) 8%, transparent);
+    border-radius: 999px;
+}
+
+/* ── Category cards ────────────────────────────────────────────────────────── */
+.tc-cat-card {
+    border-radius: calc(var(--border-radius, 0.5rem) + 8px);
+    box-shadow: 0 4px 14px -6px rgba(0, 0, 0, .12);
+    transition: box-shadow .3s ease, transform .3s ease;
+}
+.group:hover .tc-cat-card {
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .28);
+    transform: translateY(-3px);
+}
+.tc-cat-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    color: #ffffff;
+    background: color-mix(in srgb, var(--color-accent, #2563eb) 85%, #000);
+}
+
+/* ── CTA band ──────────────────────────────────────────────────────────────── */
+.tc-cta-band {
+    border-radius: calc(var(--border-radius, 0.5rem) + 12px);
+    background:
+        radial-gradient(500px 260px at 12% 0%, rgba(255, 255, 255, .14), transparent 65%),
+        radial-gradient(420px 240px at 92% 100%, rgba(255, 255, 255, .1), transparent 65%),
+        linear-gradient(135deg, var(--color-accent, #2563eb), var(--color-accent-dark, #1d4ed8));
+    box-shadow: 0 24px 60px -20px color-mix(in srgb, var(--color-accent, #2563eb) 55%, transparent);
+}
+
+/* ── Scroll-reveal animation ───────────────────────────────────────────────── */
+.reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity .6s ease, transform .6s ease;
+}
+.reveal.is-visible {
+    opacity: 1;
+    transform: none;
+}
+.reveal-delay-1 { transition-delay: .1s; }
+.reveal-delay-2 { transition-delay: .2s; }
+.reveal-delay-3 { transition-delay: .3s; }
+.reveal-delay-0 { transition-delay: 0s; }
+@media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+}
+
 /* ── Nav links ─────────────────────────────────────────────────────────────── */
 .tc-nav-active {
     color: var(--color-accent, #111827);

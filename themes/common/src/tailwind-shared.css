@@ -9,6 +9,7 @@
 @source "../../../admin/**/*.php";
 @source "../../../modules/**/*.php";
 @source "../../../includes/**/*.php";
+@source "../../../themes/**/*.php";
 @source "../../../*.php";
 
 /* ── Custom Theme Configuration ───────────────────────────────────── */
