@@ -114,7 +114,8 @@ class MediaProcessor
         int $itemId,
         string $caption = '',
         string $license = 'Public Domain',
-        bool $isPrimary = false
+        bool $isPrimary = false,
+        ?array $croppedFile = null
     ): array {
         $runtimeError = $this->imageRuntimeError();
         if ($runtimeError !== null)
@@ -149,8 +150,23 @@ class MediaProcessor
 
         // WebP variants
         $webpName = $baseName . '.webp';
-        $this->saveVariant($src, $origW, $origH, 'thumbnails', $webpName, 200, true);
-        $this->saveVariant($src, $origW, $origH, 'display', $webpName, 1200, false);
+        
+        if ($croppedFile && $croppedFile['error'] === UPLOAD_ERR_OK) {
+            $croppedMime = $finfo->file($croppedFile['tmp_name']);
+            $cropSrc = $this->gdLoad($croppedFile['tmp_name'], $croppedMime);
+            if ($cropSrc) {
+                $cropW = imagesx($cropSrc);
+                $cropH = imagesy($cropSrc);
+                $this->saveVariant($cropSrc, $cropW, $cropH, 'thumbnails', $webpName, 200, true);
+                imagedestroy($cropSrc);
+            } else {
+                $this->saveVariant($src, $origW, $origH, 'thumbnails', $webpName, 200, true);
+            }
+        } else {
+            $this->saveVariant($src, $origW, $origH, 'thumbnails', $webpName, 200, true);
+        }
+
+        $this->saveVariant($src, $origW, $origH, 'display', $webpName, $origW, false);
         imagedestroy($src);
 
         try {

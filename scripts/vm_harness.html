@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<!--
+    Virtual Museum dev harness — renders the 3D room with generated placeholder
+    data so the engine can be tested without MySQL. Not linked from the app.
+    Usage: serve the collection root over HTTP and open
+        /scripts/vm_harness.html?theme=classic|dark|white_cube&n=40
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VM Harness</title>
+    <link rel="stylesheet" href="/modules/virtual_museum/assets/museum.css">
+    <script type="importmap">
+    { "imports": { "three": "/modules/virtual_museum/assets/lib/three.module.js" } }
+    </script>
+    <script>
+    (function () {
+        const q = new URLSearchParams(location.search);
+        const N = parseInt(q.get('n') || '40', 10);
+        const themeName = q.get('theme') || 'classic';
+
+        function fakeImage(i) {
+            const w = 480 + (i % 3) * 160;
+            const h = 360 + ((i * 7) % 3) * 130;
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const g = c.getContext('2d');
+            const hue = (i * 47) % 360;
+            const grad = g.createLinearGradient(0, 0, w, h);
+            grad.addColorStop(0, `hsl(${hue}, 55%, 62%)`);
+            grad.addColorStop(1, `hsl(${(hue + 60) % 360}, 60%, 38%)`);
+            g.fillStyle = grad;
+            g.fillRect(0, 0, w, h);
+            g.fillStyle = 'rgba(255,255,255,0.85)';
+            for (let k = 0; k < 5; k++) {
+                g.beginPath();
+                g.arc((i * 83 + k * 131) % w, (i * 59 + k * 97) % h, 18 + (k * 11) % 40, 0, Math.PI * 2);
+                g.fill();
+            }
+            g.fillStyle = '#00000088';
+            g.font = 'bold 48px Georgia';
+            g.fillText('#' + (i + 1), 24, 60);
+            return { url: c.toDataURL('image/jpeg', 0.72), ratio: w / h };
+        }
+
+        const items = [];
+        for (let i = 0; i < N; i++) {
+            const img = fakeImage(i);
+            items.push({
+                id: i + 1,
+                title: 'Test Artwork No. ' + (i + 1) + (i % 4 === 0 ? ' with a Rather Long Descriptive Title' : ''),
+                reg: 'REG-' + (1000 + i),
+                date: String(1900 + (i * 3) % 120),
+                credit: 'Harness Collection',
+                desc: 'Generated placeholder artwork used to verify room layout, lighting, plaques, doorways and streaming without a database.',
+                display: img.url,
+                thumb: img.url,
+                ratio: img.ratio,
+                url: '#item-' + (i + 1),
+            });
+        }
+
+        window.MUSEUM_CONFIG = {
+            slug: 'harness',
+            title: 'Harness Grand Exhibition',
+            theme: themeName,
+            dataUrl: '/__vm_harness_data__',
+            lobbyUrl: '#',
+            assetUrl: '/modules/virtual_museum/assets',
+        };
+
+        const realFetch = window.fetch.bind(window);
+        window.fetch = function (url, opts) {
+            if (String(url).includes('__vm_harness_data__')) {
+                return Promise.resolve({
+                    json: async () => ({ success: true, exhibition: { title: 'Harness', theme: themeName }, items }),
+                });
+            }
+            return realFetch(url, opts);
+        };
+    })();
+    </script>
+</head>
+<body class="museum-body">
+
+    <canvas id="museum-canvas"></canvas>
+
+    <div id="museum-loader" class="museum-loader">
+        <div class="loader-inner">
+            <div class="loader-icon">🏛️</div>
+            <div class="loader-title">Harness Grand Exhibition</div>
+            <div class="loader-bar"><div id="loader-bar-fill" class="loader-bar-fill"></div></div>
+            <div id="loader-status" class="loader-status">Preparing the gallery…</div>
+        </div>
+    </div>
+
+    <div id="museum-hud" class="museum-hud hidden">
+        <div class="hud-top">
+            <a href="#" class="hud-btn">&larr; Exit</a>
+            <div class="hud-title">Harness Grand Exhibition</div>
+        </div>
+        <div id="hud-hint" class="hud-hint">
+            <span class="hint-desktop">Click to look around · <b>W A S D</b> to walk · click a piece to inspect · <b>Esc</b> to release</span>
+            <span class="hint-touch">Drag to look · use the pad to walk · tap a piece to inspect</span>
+        </div>
+        <div id="museum-crosshair" class="museum-crosshair"></div>
+        <div id="touch-pad" class="touch-pad">
+            <button class="pad-btn pad-up"    data-dir="forward">▲</button>
+            <button class="pad-btn pad-left"  data-dir="left">◀</button>
+            <button class="pad-btn pad-right" data-dir="right">▶</button>
+            <button class="pad-btn pad-down"  data-dir="back">▼</button>
+        </div>
+    </div>
+
+    <div id="museum-panel" class="museum-panel hidden">
+        <button id="panel-close" class="panel-close" aria-label="Close">&times;</button>
+        <div class="panel-media"><img id="panel-img" src="" alt=""></div>
+        <div class="panel-body">
+            <h2 id="panel-title"></h2>
+            <div id="panel-meta" class="panel-meta"></div>
+            <p id="panel-desc" class="panel-desc"></p>
+            <a id="panel-link" class="panel-link" href="#">View full details &rarr;</a>
+        </div>
+    </div>
+
+    <div id="museum-empty" class="museum-empty hidden">
+        <div>
+            <div class="empty-icon">🖼️</div>
+            <h2>This exhibition has no items yet</h2>
+            <p>Add visible items with images to its source, then republish.</p>
+            <a href="#" class="hud-btn">&larr; Back to the museum</a>
+        </div>
+    </div>
+
+    <script type="module" src="/modules/virtual_museum/assets/museum.js"></script>
+</body>
+</html>

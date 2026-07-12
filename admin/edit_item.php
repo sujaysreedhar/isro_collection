@@ -240,16 +240,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     : [$_FILES['media_upload']];
 
                 $isFirstInBatch = true;
-                foreach ($files as $file) {
+                foreach ($files as $i => $file) {
                     if ($file['error'] === UPLOAD_ERR_NO_FILE)
                         continue;
+
+                    $croppedFile = null;
+                    if (isset($_FILES['media_cropped_' . $i]) && $_FILES['media_cropped_' . $i]['error'] !== UPLOAD_ERR_NO_FILE) {
+                        $croppedFile = $_FILES['media_cropped_' . $i];
+                    }
 
                     $result = $mp->process(
                         $file,
                         $id,
                         trim($_POST['media_caption'] ?? ''),
                         $_POST['media_license'] ?? 'All Rights Reserved',
-                        (isset($_POST['is_primary']) && $isFirstInBatch)
+                        (isset($_POST['is_primary']) && $isFirstInBatch),
+                        $croppedFile
                     );
 
                     if ($result['success']) {
@@ -1075,12 +1081,11 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
             // Remove the original file input from formData
             formData.delete('media_upload[]');
 
-            // Repopulate media_upload[]: use cropped blob if exists, else original file
+            // Repopulate media_upload[]: always use original file, and append cropped blob if exists
             originalFiles.forEach((file, index) => {
+                formData.append('media_upload[]', file);
                 if (croppedBlobs[index]) {
-                    formData.append('media_upload[]', croppedBlobs[index], 'cropped_image_' + index + '.webp');
-                } else {
-                    formData.append('media_upload[]', file);
+                    formData.append('media_cropped_' + index, croppedBlobs[index], 'cropped_image_' + index + '.webp');
                 }
             });
 
