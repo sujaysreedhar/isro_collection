@@ -29,23 +29,191 @@ $icon = static function (string $path, string $class = 'w-5 h-5'): string {
 ?>
 
 <style>
-.vm-shell{--vm-bg:#0b1119;--vm-panel:#121d29;--vm-panel-2:#172536;--vm-line:#2a3a4d;--vm-text:#edf3f7;--vm-muted:#8fa1b3;--vm-accent:#d2a566;--vm-accent-2:#f0c887;color:var(--vm-text)}
-.vm-card{background:linear-gradient(145deg,rgba(23,37,54,.96),rgba(14,24,35,.96));border:1px solid var(--vm-line);box-shadow:0 18px 60px rgba(0,0,0,.18)}
-.vm-input{width:100%;min-height:46px;border:1px solid #34485e;background:#0d1722;color:#fff;border-radius:.75rem;padding:.7rem .85rem;outline:none}
-.vm-input:focus{border-color:var(--vm-accent);box-shadow:0 0 0 3px rgba(210,165,102,.14)}
-.vm-btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.65rem 1rem;font-weight:700;transition:.18s ease}
-.vm-btn:focus-visible,.vm-action:focus-visible{outline:3px solid rgba(240,200,135,.55);outline-offset:2px}
-.vm-primary{background:var(--vm-accent);color:#111820}.vm-primary:hover{background:var(--vm-accent-2)}
-.vm-secondary{background:#203044;color:#e8eef3;border:1px solid #354960}.vm-secondary:hover{background:#293b50}
-.vm-step[aria-current="step"]{color:var(--vm-accent-2);border-color:var(--vm-accent)}
-.vm-stage{display:none}.vm-stage.is-active{display:block}
-.vm-source-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .65rem;border:1px solid #40556b;background:#203247;border-radius:999px;font-size:.78rem}
-.vm-item-card[aria-grabbed="true"]{opacity:.55;border-color:var(--vm-accent)}
-.vm-choice[aria-checked="true"]{border-color:var(--vm-accent);box-shadow:0 0 0 2px rgba(210,165,102,.18)}
-@media(max-width:767px){.vm-step-label{display:none}.vm-sticky{position:static!important}.vm-table-card{display:block}}
+.vm-shell {
+    --vm-bg: #090e15;
+    --vm-panel: rgba(18, 29, 41, 0.7);
+    --vm-panel-2: rgba(23, 37, 54, 0.85);
+    --vm-line: rgba(42, 58, 77, 0.6);
+    --vm-text: #edf3f7;
+    --vm-muted: #8fa1b3;
+    --vm-accent: #d2a566;
+    --vm-accent-2: #f0c887;
+    --vm-glass-border: rgba(255, 255, 255, 0.05);
+    color: var(--vm-text);
+    background: radial-gradient(circle at top right, rgba(23,37,54,0.4), transparent 50%),
+                radial-gradient(circle at bottom left, rgba(210,165,102,0.05), transparent 40%),
+                var(--vm-bg);
+}
+
+.vm-card {
+    background: var(--vm-panel);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--vm-glass-border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vm-card:hover {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+article.vm-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(210,165,102,0.3);
+}
+
+.vm-input {
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid rgba(52, 72, 94, 0.8);
+    background: rgba(13, 23, 34, 0.6);
+    color: #fff;
+    border-radius: 0.75rem;
+    padding: 0.7rem 0.85rem;
+    outline: none;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+.vm-input:focus {
+    background: rgba(13, 23, 34, 0.9);
+    border-color: var(--vm-accent);
+    box-shadow: 0 0 0 4px rgba(210,165,102,0.15), inset 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.vm-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.65rem 1rem;
+    font-weight: 700;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+.vm-btn:active { transform: scale(0.97); }
+.vm-btn:focus-visible, .vm-action:focus-visible {
+    outline: 3px solid rgba(240,200,135,0.55);
+    outline-offset: 2px;
+}
+
+.vm-primary {
+    background: linear-gradient(135deg, var(--vm-accent), var(--vm-accent-2));
+    color: #111820;
+    box-shadow: 0 4px 12px rgba(210,165,102,0.2);
+    border: none;
+}
+.vm-primary:hover {
+    box-shadow: 0 6px 16px rgba(210,165,102,0.35);
+    transform: translateY(-1px);
+}
+.vm-primary::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(rgba(255,255,255,0.2), transparent);
+    opacity: 0; transition: opacity 0.2s;
+}
+.vm-primary:hover::after { opacity: 1; }
+
+.vm-secondary {
+    background: rgba(32, 48, 68, 0.6);
+    backdrop-filter: blur(8px);
+    color: #e8eef3;
+    border: 1px solid rgba(53, 73, 96, 0.8);
+}
+.vm-secondary:hover {
+    background: rgba(41, 59, 80, 0.8);
+    border-color: rgba(64, 85, 107, 1);
+    transform: translateY(-1px);
+}
+
+.vm-step {
+    transition: all 0.3s ease;
+    position: relative;
+}
+.vm-step::after {
+    content: ''; position: absolute; bottom: -4px; left: 10%; right: 10%; height: 2px;
+    background: var(--vm-accent); border-radius: 2px;
+    opacity: 0; transform: scaleX(0); transition: all 0.3s ease;
+}
+.vm-step[aria-current="step"] {
+    color: var(--vm-accent-2);
+    background: rgba(210,165,102,0.05);
+}
+.vm-step[aria-current="step"]::after {
+    opacity: 1; transform: scaleX(1);
+}
+
+@keyframes slideUpFade {
+    0% { opacity: 0; transform: translateY(12px) scale(0.99); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.vm-stage { display: none; }
+.vm-stage.is-active {
+    display: block;
+    animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.vm-source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid rgba(64, 85, 107, 0.6);
+    background: rgba(32, 50, 71, 0.6);
+    backdrop-filter: blur(4px);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    transition: all 0.2s ease;
+}
+.vm-source-chip:hover {
+    border-color: var(--vm-accent);
+    background: rgba(32, 50, 71, 0.9);
+}
+
+.vm-item-card {
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.vm-item-card:hover {
+    border-color: rgba(210,165,102,0.4);
+    background: rgba(23, 37, 54, 0.8);
+}
+.vm-item-card[aria-grabbed="true"] {
+    opacity: 0.6;
+    border-color: var(--vm-accent);
+    transform: scale(0.98);
+    box-shadow: 0 0 0 2px rgba(210,165,102,0.3);
+}
+
+.vm-choice {
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.vm-choice:hover {
+    border-color: rgba(210,165,102,0.4);
+    transform: translateY(-2px);
+    background: rgba(23, 37, 54, 0.8);
+}
+.vm-choice[aria-checked="true"] {
+    border-color: var(--vm-accent);
+    background: rgba(210,165,102,0.05);
+    box-shadow: 0 0 0 2px rgba(210,165,102,0.18), inset 0 0 20px rgba(210,165,102,0.05);
+}
+
+.vm-scroll::-webkit-scrollbar { width: 6px; }
+.vm-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 3px; }
+.vm-scroll::-webkit-scrollbar-thumb { background: rgba(143,161,179,0.3); border-radius: 3px; }
+.vm-scroll::-webkit-scrollbar-thumb:hover { background: rgba(143,161,179,0.5); }
+
+@media(max-width:767px) {
+    .vm-step-label { display: none; }
+    .vm-sticky { position: static !important; }
+}
 </style>
 
-<div class="vm-shell -m-6 md:-m-8 min-h-[calc(100vh-4rem)] bg-[#0b1119] p-5 md:p-8">
+<div class="vm-shell -m-6 md:-m-8 min-h-[calc(100vh-4rem)] bg-transparent p-5 md:p-8">
 <?php if (!$isEditor): ?>
     <header class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-8">
         <div>
@@ -146,7 +314,7 @@ $icon = static function (string $path, string $class = 'w-5 h-5'): string {
                     <aside class="rounded-xl border border-[#2a3a4d] bg-[#0d1722] p-4 xl:sticky xl:top-4 self-start">
                         <h3 class="font-bold">Hand-pick items</h3><p class="text-xs text-[#8fa1b3] mt-1 mb-4">Search the complete visible catalog.</p>
                         <input id="vm-item-search" class="vm-input" type="search" placeholder="Title or registration no.">
-                        <div id="vm-item-results" class="space-y-2 mt-4 max-h-[460px] overflow-y-auto"></div>
+                        <div id="vm-item-results" class="space-y-2 mt-4 max-h-[460px] overflow-y-auto vm-scroll"></div>
                         <button id="vm-load-more" type="button" class="vm-btn vm-secondary w-full mt-3 hidden">Load more</button>
                     </aside>
                 </div>
@@ -160,6 +328,18 @@ $icon = static function (string $path, string $class = 'w-5 h-5'): string {
                 </div></fieldset>
                 <fieldset class="mt-7"><legend class="font-bold mb-3">Room layout</legend><div class="grid sm:grid-cols-3 gap-3" id="vm-layout-choices">
                     <?php foreach (['grand_hall'=>['Grand Hall','Works with 1+ items'],'l_gallery'=>['L-Gallery','Recommended for 12+'],'courtyard_loop'=>['Courtyard Loop','Recommended for 24+']] as $value=>$copy): ?><button id="vm-layout-<?= $value ?>" type="button" class="vm-choice vm-action rounded-xl border border-[#34485e] bg-[#111c28] p-4 text-left min-h-28" data-layout="<?= $value ?>" role="radio"><span class="block h-10 rounded-lg bg-gradient-to-r from-[#25394c] to-[#3c2c22] mb-3"></span><strong><?= $copy[0] ?></strong><span class="block text-xs text-[#8fa1b3] mt-1"><?= $copy[1] ?></span></button><?php endforeach; ?>
+                </div></fieldset>
+                <fieldset class="mt-7"><legend class="font-bold mb-1">Centerpiece</legend>
+                <p class="text-xs text-[#8fa1b3] mb-3">The sculptural model displayed at the room's focal point.</p>
+                <div class="grid sm:grid-cols-3 gap-3" id="vm-centerpiece-choices">
+                    <?php foreach ([
+                        'auto'        => ['Automatic', 'Matches the chosen layout'],
+                        'torus_knot'  => ['Torus knot', 'Bronze knot on a plinth'],
+                        'icosahedron' => ['Gemstone', 'Faceted icosahedron'],
+                        'obelisk'     => ['Obelisk', 'Four-sided stone spire'],
+                        'globe'       => ['Globe', 'Polished sphere'],
+                        'none'        => ['None', 'Leave the focal point bare'],
+                    ] as $value => $copy): ?><button type="button" class="vm-choice vm-action rounded-xl border border-[#34485e] bg-[#111c28] p-4 text-left min-h-20" data-centerpiece="<?= $value ?>" role="radio"><strong><?= $copy[0] ?></strong><span class="block text-xs text-[#8fa1b3] mt-1"><?= $copy[1] ?></span></button><?php endforeach; ?>
                 </div></fieldset>
                 <div id="vm-layout-warning" class="hidden mt-4 rounded-xl border border-amber-400/25 bg-amber-300/10 text-amber-100 p-4 text-sm" role="status"></div>
                 <label class="mt-7 flex items-start gap-3 rounded-xl border border-[#34485e] bg-[#111c28] p-4 cursor-pointer"><input id="vm-published" type="checkbox" class="mt-1 w-5 h-5 accent-[#d2a566]" <?= !empty($exhibition['is_published']) ? 'checked' : '' ?>><span><strong>Publish exhibition</strong><span class="block text-xs text-[#8fa1b3] mt-1">When off, the exhibition remains a private draft.</span></span></label>
@@ -190,6 +370,7 @@ const config = <?= json_encode([
     'slug' => $exhibition['slug'] ?? '',
     'theme' => $exhibition['theme'] ?? 'classic',
     'layout' => $exhibition['layout'] ?? 'grand_hall',
+    'centerpiece' => in_array($exhibition['centerpiece'] ?? '', VirtualMuseumModule::CENTERPIECES, true) ? $exhibition['centerpiece'] : 'auto',
     'sources' => array_map(static fn($s) => ['type'=>$s['source_type'],'id'=>(int)$s['source_id'],'sort_order'=>(int)$s['sort_order']], $sources),
     'overrides' => $overrides,
     'resolved' => $resolved,
@@ -213,14 +394,14 @@ let sources=[...config.sources];
 const overrides=new Map(Object.entries(config.overrides).map(([id,row])=>[Number(id),{selection_state:row.selection_state,sort_order:row.sort_order}]));
 let order=config.resolved.map(item=>Number(item.id));
 const itemById=new Map(config.resolved.map(item=>[Number(item.id),item]));
-let theme=config.theme, layout=config.layout, active='details', searchPage=1, searchTerm='';
+let theme=config.theme, layout=config.layout, centerpiece=config.centerpiece, active='details', searchPage=1, searchTerm='';
 const steps=['details','sources','curation','room_publish'];
 
 function setDirty(){dirty=true;$('vm-save-status').textContent='Unsaved changes';}
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 document.querySelectorAll('input,textarea').forEach(el=>el.addEventListener('input',setDirty));
 
-function showStep(step){active=steps.includes(step)?step:'details';document.querySelectorAll('.vm-stage').forEach(el=>el.classList.toggle('is-active',el.dataset.step===active));document.querySelectorAll('.vm-step').forEach(el=>el.setAttribute('aria-current',el.dataset.step===active?'step':'false'));$('vm-previous-stage').classList.toggle('invisible',active==='details');$('vm-save-stage').textContent=active==='room_publish'?'Save exhibition':'Save and continue';history.replaceState(null,'',`${BASE}&action=${exhibitionId?'edit':'new'}${exhibitionId?`&id=${exhibitionId}`:''}&step=${active}`);}
+function showStep(step){active=steps.includes(step)?step:'details';document.querySelectorAll('.vm-stage').forEach(el=>el.classList.toggle('is-active',el.dataset.step===active));document.querySelectorAll('.vm-step').forEach(el=>el.setAttribute('aria-current',el.dataset.step===active?'step':'false'));$('vm-previous-stage').classList.toggle('invisible',active==='details');$('vm-save-stage').textContent=active==='room_publish'?'Save exhibition':'Save and continue';history.replaceState(null,'',`${BASE}&action=${exhibitionId?'edit':'new'}${exhibitionId?`&id=${exhibitionId}`:''}&step=${active}`);steps.forEach((s,i)=>{const dot=$('vm-check-'+s);if(dot)dot.className=steps.indexOf(active)>=i?'float-right text-[#d2a566]':'float-right text-[#8fa1b3]';});}
 document.querySelectorAll('.vm-step').forEach(btn=>btn.addEventListener('click',()=>showStep(btn.dataset.step)));
 $('vm-previous-stage').addEventListener('click',()=>showStep(steps[Math.max(0,steps.indexOf(active)-1)]));
 
@@ -243,13 +424,14 @@ function renderCurated(){
 async function searchItems(reset=true){if(reset){searchPage=1;$('vm-item-results').innerHTML='';}const params=new URLSearchParams({action:'museum_item_search',q:searchTerm,page:String(searchPage)});const r=await fetch(`${AJAX}?${params}`);const d=await r.json();if(!d.success)throw new Error(d.error);$('vm-item-results').insertAdjacentHTML('beforeend',d.items.map(item=>`<button type="button" class="vm-action w-full flex gap-3 items-center text-left rounded-lg border border-[#34485e] p-2 hover:border-[#d2a566]" data-add-item="${item.id}"><img src="${esc(item.thumb)}" alt="" class="w-12 h-12 rounded object-cover"><span class="min-w-0"><strong class="text-xs line-clamp-2">${esc(item.title)}</strong><small class="text-[#8fa1b3]">${esc(item.reg||'')}</small></span></button>`).join(''));d.items.forEach(item=>itemById.set(Number(item.id),item));document.querySelectorAll('[data-add-item]').forEach(btn=>btn.onclick=()=>{const id=Number(btn.dataset.addItem);if(!order.includes(id))order.push(id);normalizeOrder();setDirty();renderCurated();});$('vm-load-more').classList.toggle('hidden',!d.has_more);}
 let timer;$('vm-item-search').addEventListener('input',e=>{clearTimeout(timer);searchTerm=e.target.value.trim();timer=setTimeout(()=>searchItems(true).catch(err=>$('vm-error').textContent=err.message),250);});$('vm-load-more').addEventListener('click',()=>{searchPage++;searchItems(false);});
 
-function selectChoice(kind,value){if(kind==='theme')theme=value;else layout=value;document.querySelectorAll(`[data-${kind}]`).forEach(el=>el.setAttribute('aria-checked',el.dataset[kind]===value?'true':'false'));setDirty();updateWarning();}
+function selectChoice(kind,value){if(kind==='theme')theme=value;else if(kind==='layout')layout=value;else centerpiece=value;document.querySelectorAll(`[data-${kind}]`).forEach(el=>el.setAttribute('aria-checked',el.dataset[kind]===value?'true':'false'));setDirty();updateWarning();}
 document.querySelectorAll('[data-theme]').forEach(el=>el.addEventListener('click',()=>selectChoice('theme',el.dataset.theme)));
 document.querySelectorAll('[data-layout]').forEach(el=>el.addEventListener('click',()=>selectChoice('layout',el.dataset.layout)));
+document.querySelectorAll('[data-centerpiece]').forEach(el=>el.addEventListener('click',()=>selectChoice('centerpiece',el.dataset.centerpiece)));
 function updateWarning(){const min={grand_hall:1,l_gallery:12,courtyard_loop:24}[layout]||1;const el=$('vm-layout-warning');el.classList.toggle('hidden',order.length>=min);el.textContent=order.length<min?`This layout is recommended for ${min}+ items. You can still save or publish it.`:'';}
 
-$('vm-save-stage').addEventListener('click',async()=>{const btn=$('vm-save-stage'),error=$('vm-error');error.classList.add('hidden');btn.disabled=true;btn.textContent='Saving…';$('vm-save-status').textContent='Saving changes';try{const b=new URLSearchParams({action:'museum_save',stage:active,id:String(exhibitionId)});if(active==='details'){b.set('title',$('vm-title').value.trim());b.set('description',$('vm-description').value.trim());b.set('item_limit',$('vm-item-limit').value);}else if(active==='sources'){b.set('sources_json',JSON.stringify(sources));}else if(active==='curation'){normalizeOrder();b.set('items_json',JSON.stringify([...overrides].map(([item_id,row])=>({item_id,...row}))));}else{b.set('theme',theme);b.set('layout',layout);if($('vm-published').checked)b.set('is_published','1');}const d=await post(b);dirty=false;$('vm-save-status').textContent='Saved';if(active==='details'&&!exhibitionId){exhibitionId=d.id;location.href=`${BASE}&action=edit&id=${d.id}&step=sources`;return;}const next=steps[steps.indexOf(active)+1];if(next){if(active==='sources'||active==='curation'){location.href=`${BASE}&action=edit&id=${exhibitionId}&step=${next}`;return;}showStep(next);}}catch(e){error.textContent=e.message;error.classList.remove('hidden');error.focus();}finally{btn.disabled=false;btn.textContent=active==='room_publish'?'Save exhibition':'Save and continue';}});
+$('vm-save-stage').addEventListener('click',async()=>{const btn=$('vm-save-stage'),error=$('vm-error');error.classList.add('hidden');btn.disabled=true;btn.textContent='Saving…';$('vm-save-status').textContent='Saving changes';try{const b=new URLSearchParams({action:'museum_save',stage:active,id:String(exhibitionId)});if(active==='details'){b.set('title',$('vm-title').value.trim());b.set('description',$('vm-description').value.trim());b.set('item_limit',$('vm-item-limit').value);}else if(active==='sources'){b.set('sources_json',JSON.stringify(sources));}else if(active==='curation'){normalizeOrder();b.set('items_json',JSON.stringify([...overrides].map(([item_id,row])=>({item_id,...row}))));}else{b.set('theme',theme);b.set('layout',layout);b.set('centerpiece',centerpiece);if($('vm-published').checked)b.set('is_published','1');}const d=await post(b);dirty=false;$('vm-save-status').textContent='Saved';if(active==='details'&&!exhibitionId){exhibitionId=d.id;location.href=`${BASE}&action=edit&id=${d.id}&step=sources`;return;}const next=steps[steps.indexOf(active)+1];if(next){if(active==='sources'||active==='curation'){location.href=`${BASE}&action=edit&id=${exhibitionId}&step=${next}`;return;}showStep(next);}}catch(e){error.textContent=e.message;error.classList.remove('hidden');error.focus();}finally{btn.disabled=false;btn.textContent=active==='room_publish'?'Save exhibition':'Save and continue';}});
 
-renderSources();renderSourceResults();renderCurated();searchItems(true);selectChoice('theme',theme);selectChoice('layout',layout);dirty=false;showStep(new URLSearchParams(location.search).get('step')||'details');
+renderSources();renderSourceResults();renderCurated();searchItems(true);selectChoice('theme',theme);selectChoice('layout',layout);selectChoice('centerpiece',centerpiece);dirty=false;showStep(new URLSearchParams(location.search).get('step')||'details');
 })();
 </script>

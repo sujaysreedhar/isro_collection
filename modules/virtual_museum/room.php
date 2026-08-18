@@ -6,17 +6,7 @@ require_once __DIR__ . '/../../includes/ThemeManager.php';
 
 $previewId = (int) ($_GET['preview_id'] ?? 0);
 $slug = trim($_GET['slug'] ?? '');
-$ex = null;
-try {
-    if ($previewId > 0) {
-        $stmt = $pdo->prepare('SELECT * FROM museum_exhibitions WHERE id = ?');
-        $stmt->execute([$previewId]);
-    } else {
-        $stmt = $pdo->prepare('SELECT * FROM museum_exhibitions WHERE slug = ? AND is_published = 1');
-        $stmt->execute([$slug]);
-    }
-    $ex = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-} catch (Throwable $e) {}
+$ex = $previewId > 0 ? $this->getExhibitionById($previewId) : $this->getExhibitionBySlug($slug, true);
 
 if (!$ex) {
     http_response_code(404);
@@ -29,6 +19,7 @@ if (!$ex) {
 
 $theme = in_array($ex['theme'] ?? '', VirtualMuseumModule::THEMES, true) ? $ex['theme'] : 'classic';
 $layout = in_array($ex['layout'] ?? '', VirtualMuseumModule::LAYOUTS, true) ? $ex['layout'] : 'grand_hall';
+$centerpiece = in_array($ex['centerpiece'] ?? '', VirtualMuseumModule::CENTERPIECES, true) ? $ex['centerpiece'] : 'auto';
 $items = $this->resolveItems($ex);
 $is2d = ($_GET['view'] ?? '') === '2d';
 $baseRoomUrl = $previewId > 0 ? SITE_URL . '/museum/preview/' . $previewId : SITE_URL . '/museum/' . rawurlencode($ex['slug']);
@@ -75,7 +66,7 @@ if ($is2d) {
 $assetUrl = SITE_URL . '/modules/virtual_museum/assets';
 $assetDir = __DIR__ . '/assets';
 $config = [
-    'slug'=>$ex['slug'], 'title'=>$ex['title'], 'theme'=>$theme, 'layout'=>$layout,
+    'slug'=>$ex['slug'], 'title'=>$ex['title'], 'theme'=>$theme, 'layout'=>$layout, 'centerpiece'=>$centerpiece,
     'dataUrl'=>SITE_URL . '/ajax.php?action=museum_data&slug=' . rawurlencode($ex['slug']),
     'items'=>$previewId > 0 ? $items : null,
     'lobbyUrl'=>SITE_URL . '/museum', 'view2dUrl'=>$baseRoomUrl . '?view=2d', 'assetUrl'=>$assetUrl,
@@ -84,7 +75,7 @@ $config = [
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?= htmlspecialchars($ex['title']) ?> — 3D Exhibition</title>
     <link rel="stylesheet" href="<?= $assetUrl ?>/museum.css?v=<?= @filemtime($assetDir.'/museum.css') ?: 1 ?>">
     <script type="importmap">{"imports":{"three":"<?= $assetUrl ?>/lib/three.module.js?v=<?= @filemtime($assetDir.'/lib/three.module.js') ?: 1 ?>"}}</script>
@@ -105,14 +96,14 @@ $config = [
         <div class="hud-top" id="museum-controls">
             <a href="<?= $config['lobbyUrl'] ?>" class="hud-btn" title="Leave exhibition">← Exit</a>
             <div class="hud-title"><span><?= htmlspecialchars($ex['title']) ?></span><small id="museum-progress">Room 1 · <?= count($items) ?> objects</small></div>
-            <div class="hud-actions"><button id="museum-reset" class="hud-btn" type="button">Reset position</button><a class="hud-btn" href="<?= htmlspecialchars($config['view2dUrl']) ?>">2D view</a></div>
+            <div class="hud-actions"><button id="museum-reset" class="hud-btn" type="button" aria-label="Reset position"><span class="btn-ico" aria-hidden="true">⟲</span><span class="btn-text">Reset position</span></button><a class="hud-btn" href="<?= htmlspecialchars($config['view2dUrl']) ?>">2D view</a></div>
         </div>
-        <div id="hud-hint" class="hud-hint"><span class="hint-desktop">Click to look · <b>W A S D</b> to walk · focus an artwork and press <b>Enter</b></span><span class="hint-touch">Drag to look · use the movement pad · tap artwork to inspect</span></div>
+        <div id="hud-hint" class="hud-hint"><span class="hint-desktop">Click to look · <b>W A S D</b> to walk · hold <b>Shift</b> to run · focus an artwork and press <b>Enter</b></span><span class="hint-touch">Drag to look · use the movement pad · tap artwork to inspect</span></div>
         <div id="museum-crosshair" class="museum-crosshair"></div>
         <div id="touch-pad" class="touch-pad" aria-label="Movement controls"><button class="pad-btn pad-up" data-dir="forward" aria-label="Move forward">▲</button><button class="pad-btn pad-left" data-dir="left" aria-label="Move left">◀</button><button class="pad-btn pad-right" data-dir="right" aria-label="Move right">▶</button><button class="pad-btn pad-down" data-dir="back" aria-label="Move backward">▼</button></div>
     </div>
 
-    <aside id="museum-panel" class="museum-panel hidden" aria-labelledby="panel-title" aria-hidden="true"><button id="panel-close" class="panel-close" aria-label="Close object details">×</button><div class="panel-media"><img id="panel-img" src="" alt=""></div><div class="panel-body"><h2 id="panel-title"></h2><div id="panel-meta" class="panel-meta"></div><p id="panel-desc" class="panel-desc"></p><a id="panel-link" class="panel-link" href="#">View full record →</a></div></aside>
+    <aside id="museum-panel" class="museum-panel hidden" aria-labelledby="panel-title" aria-hidden="true"><div class="panel-grip" aria-hidden="true"></div><button id="panel-close" class="panel-close" aria-label="Close object details">×</button><div class="panel-media"><img id="panel-img" src="" alt=""></div><div class="panel-body"><h2 id="panel-title"></h2><div id="panel-meta" class="panel-meta"></div><p id="panel-desc" class="panel-desc"></p><a id="panel-link" class="panel-link" href="#">View full record →</a></div></aside>
 
     <div id="museum-empty" class="museum-empty hidden"><div><svg class="empty-mark" viewBox="0 0 64 64" fill="none" stroke="currentColor"><path d="M8 54h48M12 54V24L32 12l20 12v30M20 32h24"/></svg><h2>This exhibition has no displayable objects</h2><p>Add visible items with images, then publish again.</p><a href="<?= $config['lobbyUrl'] ?>" class="hud-btn">Back to the museum</a></div></div>
 

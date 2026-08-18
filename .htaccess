@@ -3,8 +3,9 @@ Options -Indexes
 # Enable the rewrite engine
 RewriteEngine On
 
-# Set the base path for this subdirectory install
-RewriteBase /collection/
+# Set the base path for this subdirectory install (removed to support root domains)
+# RewriteBase /collection/
+
 
 # ─── Legacy Module Frontend Pages ────────────────────────────────────────────
 RewriteRule ^timeline\.php$ modules/timeline/timeline.php [L,QSA]

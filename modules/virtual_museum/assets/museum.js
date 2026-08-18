@@ -38,20 +38,26 @@ const THEMES = {
 const theme = THEMES[CFG.theme] || THEMES.classic;
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const SPACING  = 4.0;    // metres between artwork centres along a wall
-const HALL_W   = 8.0;    // room width
 const WALL_H   = 5.0;    // wall height
 const EYE_H    = 1.6;    // camera / artwork centre height
-const PAD      = 0.7;    // how close the camera may get to a wall
-const ROOM_CAP = 16;     // max artworks per room before a new room is added
-const DOOR_W   = 1.8;    // doorway width
-const DOOR_H   = 2.6;    // doorway height
 const WALL_T   = 0.15;   // cross-wall thickness
 const ART_DEPTH = 0.09;
 const MAX_H = 2.3, MAX_W = 3.2, DEFAULT_RATIO = 1.4;
 const LOAD_RADIUS = 15;   // load full-res art within this distance
 const UNLOAD_RADIUS = 24; // free full-res art beyond this distance
 const LIGHT_POOL = 8;     // constant number of live point lights
+const WALK_SPEED = 3.2;   // metres per second
+const RUN_SPEED  = 5.4;   // metres per second while Shift is held
+const MOVE_SMOOTHING = 12; // velocity easing factor (higher = snappier)
+
+// Centerpiece models available at a room's focal point. CFG.centerpiece picks
+// one; 'auto' falls back to the layout's default, 'none' leaves the floor bare.
+const CENTERPIECE_BUILDERS = {
+    torus_knot:  () => ({ geometry: new THREE.TorusKnotGeometry(.48, .14, 80, 12), lift: .5,  spin: true }),
+    icosahedron: () => ({ geometry: new THREE.IcosahedronGeometry(.62, 1),         lift: .62, spin: true }),
+    globe:       () => ({ geometry: new THREE.SphereGeometry(.58, 32, 20),         lift: .58, spin: true }),
+    obelisk:     () => ({ geometry: new THREE.CylinderGeometry(.14, .4, 2.2, 4),   lift: 1.1, spin: false }),
+};
 
 // ── DOM ──────────────────────────────────────────────────────────────────────
 const canvas    = document.getElementById('museum-canvas');
@@ -94,16 +100,18 @@ const records   = [];   // per-artwork streaming records
 const walkRects = [];   // walkable floor rectangles (rooms + doorways)
 const fixturePoints = []; // ceiling fixture positions
 const poolLights = [];  // reusable point lights, repositioned to nearest fixtures
-let roomDefs = [];      // {items, z0, z1, first, last}
+const spinners  = [];   // centerpiece meshes given a slow idle rotation
 let layoutDef = null;
-let TOTAL_L = 8;        // spine length, set once rooms are chunked
+let TOTAL_L = 8;        // spine length, set from the layout bounds
 let placeholderTex = null;
 
 // ── Control state ────────────────────────────────────────────────────────────
 let yaw = Math.PI, pitch = 0;          // start facing +Z (into the hall)
 let isLocked = false;
 let panelOpen = false;
+let running = false;
 const move = { forward: false, back: false, left: false, right: false };
+const velocity = new THREE.Vector3();  // smoothed walk velocity (m/s)
 
 
 async function init() {
@@ -148,21 +156,6 @@ async function init() {
     reveal();
 }
 
-// ── Room chunking ────────────────────────────────────────────────────────────
-function chunkRooms(items) {
-    const rooms = [];
-    let z = 0;
-    for (let i = 0; i < items.length; i += ROOM_CAP) {
-        const slice = items.slice(i, i + ROOM_CAP);
-        const perSide = Math.ceil(slice.length / 2);
-        const len = (perSide + 1) * SPACING;
-        rooms.push({ items: slice, z0: z, z1: z + len, first: i + 1, last: i + slice.length });
-        z += len;
-    }
-    TOTAL_L = z;
-    return rooms;
-}
-
 // ── Shell geometry (floor, walls, doorways, trim, fixtures) ──────────────────
 function buildShell() {
     const wallMat = new THREE.MeshStandardMaterial({ color: theme.wall, roughness: .92 });
@@ -201,147 +194,40 @@ function buildShell() {
     placeBanner(CFG.title || '', bounds.maxZ - .12);
 }
 
+/** Which centerpiece model to build: honour CFG, fall back per layout. */
+function resolveCenterpiece(layoutDefault) {
+    const choice = CFG.centerpiece || 'auto';
+    if (choice === 'none') return null;
+    if (CENTERPIECE_BUILDERS[choice]) return choice;
+    return layoutDefault; // 'auto' or anything unrecognised
+}
+
+function addCenterpiece(kind, x, baseY, z, scale) {
+    const { geometry, lift, spin } = CENTERPIECE_BUILDERS[kind]();
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: theme.frame, metalness: .5, roughness: .32 }));
+    mesh.scale.setScalar(scale);
+    mesh.position.set(x, baseY + lift * scale, z);
+    if (kind === 'obelisk') mesh.rotation.y = Math.PI / 4; // face a flat side forward
+    scene.add(mesh);
+    if (spin) spinners.push(mesh);
+}
+
 function buildFocalPoints() {
     const stone = new THREE.MeshStandardMaterial({ color: theme.trim, roughness: .72 });
     for (const point of layoutDef.focalPoints || []) {
         if (point.type === 'courtyard') {
+            // The planted bed always exists; only the sculpture is configurable.
             const bed = new THREE.Mesh(new THREE.BoxGeometry(point.width, .34, point.length), new THREE.MeshStandardMaterial({ color: 0x263d35, roughness: 1 }));
             bed.position.set(point.x, .17, point.z); scene.add(bed);
-            const sculpture = new THREE.Mesh(new THREE.IcosahedronGeometry(1.25, 1), new THREE.MeshStandardMaterial({ color: theme.frame, roughness: .35, metalness: .45 }));
-            sculpture.position.set(point.x, 1.45, point.z); scene.add(sculpture);
+            const kind = resolveCenterpiece('icosahedron');
+            if (kind) addCenterpiece(kind, point.x, .34, point.z, 1.8);
         } else {
+            const kind = resolveCenterpiece(point.type === 'sculpture' ? 'icosahedron' : 'torus_knot');
+            if (!kind) continue;
             const plinth = new THREE.Mesh(new THREE.CylinderGeometry(.85, 1.05, 1.05, 32), stone);
             plinth.position.set(point.x, .525, point.z); scene.add(plinth);
-            const object = new THREE.Mesh(new THREE.TorusKnotGeometry(.48, .14, 80, 12), new THREE.MeshStandardMaterial({ color: theme.frame, metalness: .55, roughness: .3 }));
-            object.position.set(point.x, 1.55, point.z); scene.add(object);
+            addCenterpiece(kind, point.x, 1.05, point.z, 1);
         }
-    }
-}
-
-function buildShellLegacy() {
-    scene.fog = new THREE.Fog(theme.fog, theme.fogNear || 16, Math.min(TOTAL_L * 1.3, 120));
-
-    const midZ = TOTAL_L / 2;
-    const wallMat    = new THREE.MeshStandardMaterial({ color: theme.wall, roughness: 0.95 });
-    const floorMat   = new THREE.MeshStandardMaterial({ color: theme.floor, roughness: 0.8, metalness: 0.05 });
-    const ceilingMat = new THREE.MeshStandardMaterial({ color: theme.ceiling, roughness: 1.0 });
-    const trimMat    = new THREE.MeshStandardMaterial({ color: theme.trim, roughness: 0.7, metalness: 0.1 });
-
-    // Continuous floor, ceiling, runner
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, TOTAL_L), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(0, 0, midZ);
-    scene.add(floor);
-
-    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, TOTAL_L), ceilingMat);
-    ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.set(0, WALL_H, midZ);
-    scene.add(ceiling);
-
-    const runner = new THREE.Mesh(
-        new THREE.PlaneGeometry(2.4, TOTAL_L * 0.96),
-        new THREE.MeshStandardMaterial({ color: theme.runner, roughness: 1.0 })
-    );
-    runner.rotation.x = -Math.PI / 2;
-    runner.position.set(0, 0.02, midZ);
-    scene.add(runner);
-
-    // Side walls: one segment per room, alternating subtle tint
-    const baseWall = new THREE.Color(theme.wall);
-    roomDefs.forEach((room, k) => {
-        const len = room.z1 - room.z0;
-        const cz  = (room.z0 + room.z1) / 2;
-        const tinted = baseWall.clone().offsetHSL(0, 0, k % 2 ? -0.022 : 0.014);
-        const mat = new THREE.MeshStandardMaterial({ color: tinted, roughness: 0.95 });
-
-        const left = new THREE.Mesh(new THREE.PlaneGeometry(len, WALL_H), mat);
-        left.rotation.y = Math.PI / 2;
-        left.position.set(-HALL_W / 2, WALL_H / 2, cz);
-        scene.add(left);
-
-        const right = new THREE.Mesh(new THREE.PlaneGeometry(len, WALL_H), mat);
-        right.rotation.y = -Math.PI / 2;
-        right.position.set(HALL_W / 2, WALL_H / 2, cz);
-        scene.add(right);
-    });
-
-    // Solid end walls
-    const front = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, WALL_H), wallMat);
-    front.position.set(0, WALL_H / 2, 0);
-    scene.add(front);
-
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, WALL_H), wallMat);
-    back.rotation.y = Math.PI;
-    back.position.set(0, WALL_H / 2, TOTAL_L);
-    scene.add(back);
-
-    // Cross walls with doorways between rooms; signage on the entrance face
-    const panelW = (HALL_W - DOOR_W) / 2;
-    for (let d = 0; d < roomDefs.length - 1; d++) {
-        const zb = roomDefs[d].z1;
-
-        const leftPanel = new THREE.Mesh(new THREE.BoxGeometry(panelW, WALL_H, WALL_T), wallMat);
-        leftPanel.position.set(-(DOOR_W / 2 + panelW / 2), WALL_H / 2, zb);
-        scene.add(leftPanel);
-
-        const rightPanel = new THREE.Mesh(new THREE.BoxGeometry(panelW, WALL_H, WALL_T), wallMat);
-        rightPanel.position.set(DOOR_W / 2 + panelW / 2, WALL_H / 2, zb);
-        scene.add(rightPanel);
-
-        const lintel = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W, WALL_H - DOOR_H, WALL_T), wallMat);
-        lintel.position.set(0, DOOR_H + (WALL_H - DOOR_H) / 2, zb);
-        scene.add(lintel);
-
-        const threshold = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W + 0.3, 0.03, 0.5), trimMat);
-        threshold.position.set(0, 0.035, zb);
-        scene.add(threshold);
-
-        // First doorway carries the exhibition banner; the rest get room signs.
-        const faceZ = zb - WALL_T / 2 - 0.015;
-        if (d === 0) {
-            placeBanner(CFG.title || '', faceZ);
-        } else {
-            const next = roomDefs[d + 1];
-            placeSign(`Room ${d + 2}`, `Items ${next.first}–${next.last}`, faceZ);
-        }
-    }
-
-    // Single-room exhibitions keep the banner on the far wall.
-    if (roomDefs.length === 1) {
-        placeBanner(CFG.title || '', TOTAL_L - 0.06);
-    }
-
-    // Baseboards + crown moulding along both side walls (full length)
-    const trimBar = (x, y) => {
-        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, TOTAL_L), trimMat);
-        bar.position.set(x, y, midZ);
-        scene.add(bar);
-    };
-    trimBar(-HALL_W / 2 + 0.04, 0.09);
-    trimBar( HALL_W / 2 - 0.04, 0.09);
-    trimBar(-HALL_W / 2 + 0.04, WALL_H - 0.14);
-    trimBar( HALL_W / 2 - 0.04, WALL_H - 0.14);
-
-    // Ceiling light fixtures: emissive panels along each room; the light pool
-    // attaches point lights to the nearest few as the visitor moves.
-    const fixtureMat = new THREE.MeshBasicMaterial({ color: theme.fixture, toneMapped: false });
-    roomDefs.forEach((room) => {
-        for (let z = room.z0 + SPACING; z < room.z1 - 1; z += SPACING * 1.5) {
-            const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.2), fixtureMat);
-            panel.rotation.x = Math.PI / 2;   // face downward
-            panel.position.set(0, WALL_H - 0.03, z);
-            scene.add(panel);
-            fixtureZs.push(z);
-        }
-    });
-
-    // Walkable rectangles: one per room + one per doorway (overlapping both rooms)
-    roomDefs.forEach((room) => {
-        walkRects.push({ x0: -HALL_W / 2 + PAD, x1: HALL_W / 2 - PAD, z0: room.z0 + PAD, z1: room.z1 - PAD });
-    });
-    for (let d = 0; d < roomDefs.length - 1; d++) {
-        const zb = roomDefs[d].z1;
-        walkRects.push({ x0: -DOOR_W / 2 + 0.3, x1: DOOR_W / 2 - 0.3, z0: zb - PAD - 0.15, z1: zb + PAD + 0.15 });
     }
 }
 
@@ -417,34 +303,6 @@ function placeBanner(title, z) {
     scene.add(banner);
 }
 
-function placeSign(title, sub, z) {
-    const cw = 512, ch = 192;
-    const c = document.createElement('canvas');
-    c.width = cw; c.height = ch;
-    const g = c.getContext('2d');
-    g.fillStyle = theme.banner;
-    g.fillRect(0, 0, cw, ch);
-    g.fillStyle = theme.bannerText;
-    g.textAlign = 'center';
-    g.font = 'bold 64px Georgia, serif';
-    g.fillText(title, cw / 2, 86);
-    g.globalAlpha = 0.75;
-    g.font = '34px Georgia, serif';
-    g.fillText(sub, cw / 2, 148);
-    g.globalAlpha = 1;
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const sw = 2.2, sh = sw * (ch / cw);
-    const sign = new THREE.Mesh(
-        new THREE.PlaneGeometry(sw, sh),
-        new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })
-    );
-    sign.position.set(0, 3.5, z);
-    sign.rotation.y = Math.PI;
-    scene.add(sign);
-}
-
 // ── Artworks (placeholder now, full-res streamed by proximity) ───────────────
 function buildArtwork(item, index, slot) {
     if (!slot) return;
@@ -465,46 +323,6 @@ function buildArtwork(item, index, slot) {
     for (const mesh of [art, frame, plaque]) { mesh.userData.item = item; artMeshes.push(mesh); }
     scene.add(holder);
     records.push({ item, x: slot.x, z: slot.z, zone: slot.zone, holder, art, frame, plaque, ratio, tex: null, loaded: false, loading: false });
-}
-
-function buildArtworkLegacy(item, j, room) {
-    const side = j % 2;                 // 0 = left wall, 1 = right wall
-    const idx  = Math.floor(j / 2);
-    const z    = room.z0 + SPACING * (idx + 1);
-    const x    = side === 0 ? -HALL_W / 2 + 0.06 : HALL_W / 2 - 0.06;
-    const rotY = side === 0 ? Math.PI / 2 : -Math.PI / 2;
-
-    const ratio = item.ratio || null;
-    const dims = artworkDims(ratio || DEFAULT_RATIO);
-
-    const holder = new THREE.Group();
-    holder.position.set(x, EYE_H, z);
-    holder.rotation.y = rotY;
-
-    const frame = new THREE.Mesh(
-        new THREE.BoxGeometry(dims.w + 0.2, dims.h + 0.2, ART_DEPTH),
-        new THREE.MeshStandardMaterial({ color: theme.frame, roughness: 0.55, metalness: 0.25 })
-    );
-    holder.add(frame);
-
-    const art = new THREE.Mesh(
-        new THREE.PlaneGeometry(dims.w, dims.h),
-        new THREE.MeshBasicMaterial({ map: placeholderTex, toneMapped: false })
-    );
-    art.position.z = ART_DEPTH / 2 + 0.002;
-    holder.add(art);
-
-    const plaque = makePlaque(item);
-    plaque.position.set(0, -(dims.h / 2) - 0.42, ART_DEPTH / 2 + 0.02);
-    holder.add(plaque);
-
-    for (const m of [art, frame, plaque]) {
-        m.userData.item = item;
-        artMeshes.push(m);
-    }
-    scene.add(holder);
-
-    records.push({ item, x, z, art, frame, plaque, ratio, tex: null, loaded: false, loading: false });
 }
 
 function artworkDims(ratio) {
@@ -648,7 +466,6 @@ function bindControls() {
         if (!isTouch) canvas.requestPointerLock?.();
     });
     document.getElementById('museum-reset')?.addEventListener('click', resetPosition);
-    document.getElementById('museum-retry')?.addEventListener('click', () => location.reload());
     if (!isTouch) {
         canvas.addEventListener('click', () => {
             if (panelOpen) return;
@@ -715,6 +532,7 @@ function setKey(code, val) {
         case 'KeyS': case 'ArrowDown':  move.back    = val; break;
         case 'KeyA': case 'ArrowLeft':  move.left    = val; break;
         case 'KeyD': case 'ArrowRight': move.right   = val; break;
+        case 'ShiftLeft': case 'ShiftRight': running = val; break;
         case 'Enter': if (val && !panelOpen) inspectAtNDC(0, 0); break;
         case 'Escape': if (val && panelOpen) closePanel(); break;
     }
@@ -806,17 +624,25 @@ function animate() {
     if (move.right)   dir.add(rgt);
     if (move.left)    dir.sub(rgt);
 
-    if (dir.lengthSq() > 0) {
-        dir.normalize().multiplyScalar(3.2 * dt);
+    // Ease the velocity toward the input direction so walking starts and stops
+    // smoothly instead of snapping — reads as gliding, not teleporting.
+    if (dir.lengthSq() > 0) dir.normalize().multiplyScalar(running ? RUN_SPEED : WALK_SPEED);
+    const blend = Math.min(1, MOVE_SMOOTHING * dt);
+    velocity.x += (dir.x - velocity.x) * blend;
+    velocity.z += (dir.z - velocity.z) * blend;
+
+    if (velocity.lengthSq() > 1e-6) {
         const next = resolveWalkMove(
             { x: camera.position.x, z: camera.position.z },
-            { x: dir.x, z: dir.z },
+            { x: velocity.x * dt, z: velocity.z * dt },
             walkRects
         );
         camera.position.x = next.x;
         camera.position.z = next.z;
     }
     camera.position.y = EYE_H;
+
+    for (const mesh of spinners) mesh.rotation.y += dt * 0.25;
 
     updateStreaming();
     updateLights(false);

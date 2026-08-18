@@ -9,8 +9,14 @@ class VirtualMuseumModule extends BaseModule
     public const THEMES = ['classic', 'dark', 'white_cube'];
     public const LAYOUTS = ['grand_hall', 'l_gallery', 'courtyard_loop'];
 
+    /** Focal-point centerpiece models. 'auto' picks the layout's default. */
+    public const CENTERPIECES = ['auto', 'torus_knot', 'icosahedron', 'obelisk', 'globe', 'none'];
+
     /** @var string|null Cached media ORDER BY clause (is_primary-aware). */
     private $mediaOrder = null;
+
+    /** @var bool|null Whether museum_exhibitions.centerpiece exists (lazily migrated). */
+    private $hasCenterpieceColumn = null;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -26,6 +32,7 @@ class VirtualMuseumModule extends BaseModule
             item_limit INT NOT NULL DEFAULT 40,
             theme VARCHAR(32) NOT NULL DEFAULT 'classic',
             layout VARCHAR(32) NOT NULL DEFAULT 'grand_hall',
+            centerpiece VARCHAR(32) NOT NULL DEFAULT 'auto',
             is_published TINYINT(1) NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ");
@@ -122,6 +129,7 @@ class VirtualMuseumModule extends BaseModule
     {
         // Frontend AJAX: item payload for a given exhibition slug (consumed by museum.js)
         HookRegistry::addFilter('frontend_ajax_museum_data', function ($handled) {
+            header('Content-Type: application/json');
             $slug = trim($_REQUEST['slug'] ?? '');
             $ex = $this->getExhibitionBySlug($slug, true);
             if (!$ex) {
@@ -136,6 +144,7 @@ class VirtualMuseumModule extends BaseModule
                     'description' => $ex['description'],
                     'theme'       => in_array($ex['theme'], self::THEMES, true) ? $ex['theme'] : 'classic',
                     'layout'      => in_array($ex['layout'] ?? '', self::LAYOUTS, true) ? $ex['layout'] : 'grand_hall',
+                    'centerpiece' => in_array($ex['centerpiece'] ?? '', self::CENTERPIECES, true) ? $ex['centerpiece'] : 'auto',
                     'item_count'  => count($items = $this->resolveItems($ex)),
                 ],
                 'items' => $items,
@@ -204,96 +213,6 @@ class VirtualMuseumModule extends BaseModule
         }
 
         return array_map([$this, 'formatItemPayload'], VirtualMuseumItemSelection::resolve($candidates, $overrides, $limit));
-    }
-
-    /** Legacy resolver retained only as a readable compatibility reference. */
-    private function resolveItemsLegacy(array $ex): array
-    {
-        global $storage;
-
-        $limit = max(1, min(100, (int) $ex['item_limit']));
-        $ord = $this->mediaOrderClause();
-        $imgSub = "(SELECT file_path FROM media WHERE item_id = i.id AND media_type = 'image' ORDER BY {$ord} LIMIT 1)";
-        $dimSub = "(SELECT dimensions FROM media WHERE item_id = i.id AND media_type = 'image' ORDER BY {$ord} LIMIT 1)";
-
-        $base = "SELECT i.id, i.title, i.reg_number, i.production_date, i.credit_line, i.physical_description,
-                        {$imgSub} AS img, {$dimSub} AS dims
-                 FROM items i";
-        $where = " WHERE i.is_visible = 1";
-        $order = " ORDER BY i.id DESC";
-        $params = [];
-
-        switch ($ex['source_type']) {
-            case 'category':
-                $where .= " AND i.category_id = ?";
-                $params[] = (int) $ex['source_id'];
-                break;
-            case 'collection':
-                $base .= " JOIN collection_items ci ON ci.item_id = i.id AND ci.collection_id = ?";
-                $params[] = (int) $ex['source_id'];
-                $order = " ORDER BY ci.sort_order ASC";
-                break;
-            case 'tag':
-                $base .= " JOIN item_tag it ON it.item_id = i.id AND it.tag_id = ?";
-                $params[] = (int) $ex['source_id'];
-                break;
-            case 'manual':
-                $base .= " JOIN museum_exhibition_items mei ON mei.item_id = i.id AND mei.exhibition_id = ?";
-                $params[] = (int) $ex['id'];
-                $order = " ORDER BY mei.sort_order ASC";
-                break;
-        }
-
-        try {
-            $stmt = $this->pdo->prepare($base . $where . $order . " LIMIT " . $limit);
-            $stmt->execute($params);
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (\PDOException $e) {
-            return [];
-        }
-
-        $out = [];
-        foreach ($rows as $r) {
-            if (empty($r['img'])) {
-                continue; // no image to hang on the wall
-            }
-            $file = $r['img'];
-            $display = isset($storage)
-                ? $storage->url('display/' . $file)
-                : SITE_URL . '/uploads/display/' . rawurlencode($file);
-            $thumb = isset($storage)
-                ? $storage->url('thumbnails/' . $file)
-                : SITE_URL . '/uploads/thumbnails/' . rawurlencode($file);
-
-            $ratio = null;
-            if (!empty($r['dims']) && preg_match('/^(\d+)\s*[xX]\s*(\d+)$/', trim($r['dims']), $dm)) {
-                $h = (int) $dm[2];
-                if ($h > 0) {
-                    $ratio = round((int) $dm[1] / $h, 4);
-                }
-            }
-
-            $desc = trim(strip_tags($r['physical_description'] ?? ''));
-            if (function_exists('mb_substr') && mb_strlen($desc) > 320) {
-                $desc = mb_substr($desc, 0, 317) . '…';
-            } elseif (strlen($desc) > 320) {
-                $desc = substr($desc, 0, 317) . '…';
-            }
-
-            $out[] = [
-                'id'      => (int) $r['id'],
-                'title'   => $r['title'],
-                'reg'     => $r['reg_number'],
-                'date'    => $r['production_date'],
-                'credit'  => $r['credit_line'],
-                'desc'    => $desc,
-                'display' => $display,
-                'thumb'   => $thumb,
-                'ratio'   => $ratio,
-                'url'     => SITE_URL . '/item/' . (int) $r['id'],
-            ];
-        }
-        return $out;
     }
 
     public function getExhibitionSources(int $exhibitionId, ?array $legacy = null): array
@@ -440,41 +359,6 @@ class VirtualMuseumModule extends BaseModule
         return $cache[$itemId];
     }
 
-    private function exhibitionsForItemLegacy(int $itemId): array
-    {
-        static $cache = [];
-        if (isset($cache[$itemId])) {
-            return $cache[$itemId];
-        }
-
-        $branches = [
-            "(e.source_type = 'category' AND EXISTS (SELECT 1 FROM items i WHERE i.id = ? AND i.category_id = e.source_id AND i.is_visible = 1))",
-            "(e.source_type = 'manual' AND EXISTS (SELECT 1 FROM museum_exhibition_items mei WHERE mei.item_id = ? AND mei.exhibition_id = e.id))",
-        ];
-        $params = [$itemId, $itemId];
-
-        if ($this->tableExists('collection_items')) {
-            $branches[] = "(e.source_type = 'collection' AND EXISTS (SELECT 1 FROM collection_items ci WHERE ci.item_id = ? AND ci.collection_id = e.source_id))";
-            $params[] = $itemId;
-        }
-        if ($this->tableExists('item_tag')) {
-            $branches[] = "(e.source_type = 'tag' AND EXISTS (SELECT 1 FROM item_tag it WHERE it.item_id = ? AND it.tag_id = e.source_id))";
-            $params[] = $itemId;
-        }
-
-        try {
-            $stmt = $this->pdo->prepare(
-                "SELECT e.* FROM museum_exhibitions e
-                 WHERE e.is_published = 1 AND (" . implode(' OR ', $branches) . ")"
-            );
-            $stmt->execute($params);
-            $cache[$itemId] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (\PDOException $e) {
-            $cache[$itemId] = [];
-        }
-        return $cache[$itemId];
-    }
-
     // ── Frontend injection ───────────────────────────────────────────────────
 
     public function renderItemCrossLink($item)
@@ -518,81 +402,6 @@ class VirtualMuseumModule extends BaseModule
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             return $this->jsonError('Database error while saving.');
         }
-    }
-
-    private function ajaxSaveLegacy($handled)
-    {
-        header('Content-Type: application/json');
-        if (!$this->verifyCsrf()) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
-            return true;
-        }
-
-        $id          = (int) ($_POST['id'] ?? 0);
-        $title       = trim($_POST['title'] ?? '');
-        $description = trim($_POST['description'] ?? '');
-        $sourceType  = $_POST['source_type'] ?? 'category';
-        $sourceId    = ($_POST['source_id'] ?? '') === '' ? null : (int) $_POST['source_id'];
-        $itemLimit   = max(1, min(100, (int) ($_POST['item_limit'] ?? 40)));
-        $theme       = in_array($_POST['theme'] ?? '', self::THEMES, true) ? $_POST['theme'] : 'classic';
-        $published   = !empty($_POST['is_published']) ? 1 : 0;
-
-        if ($title === '') {
-            echo json_encode(['success' => false, 'error' => 'Title is required.']);
-            return true;
-        }
-        if (!in_array($sourceType, ['category', 'collection', 'tag', 'manual'], true)) {
-            echo json_encode(['success' => false, 'error' => 'Invalid source type.']);
-            return true;
-        }
-        if ($sourceType !== 'manual') {
-            if ($sourceId === null) {
-                echo json_encode(['success' => false, 'error' => 'Please choose a source for this exhibition.']);
-                return true;
-            }
-            $srcTable = ['category' => 'categories', 'collection' => 'collections', 'tag' => 'tags'][$sourceType];
-            try {
-                $chk = $this->pdo->prepare("SELECT 1 FROM `{$srcTable}` WHERE id = ?");
-                $chk->execute([$sourceId]);
-                if (!$chk->fetchColumn()) {
-                    echo json_encode(['success' => false, 'error' => 'The selected source no longer exists. Refresh and pick another.']);
-                    return true;
-                }
-            } catch (\PDOException $e) {
-                echo json_encode(['success' => false, 'error' => 'That source type is not available on this install.']);
-                return true;
-            }
-        }
-
-        $slug = $this->uniqueSlug($title, $id);
-
-        try {
-            if ($id > 0) {
-                $stmt = $this->pdo->prepare(
-                    "UPDATE museum_exhibitions
-                     SET title=?, slug=?, description=?, source_type=?, source_id=?, item_limit=?, theme=?, is_published=?
-                     WHERE id=?"
-                );
-                $stmt->execute([$title, $slug, $description, $sourceType, $sourceId, $itemLimit, $theme, $published, $id]);
-            } else {
-                $stmt = $this->pdo->prepare(
-                    "INSERT INTO museum_exhibitions (title, slug, description, source_type, source_id, item_limit, theme, is_published)
-                     VALUES (?,?,?,?,?,?,?,?)"
-                );
-                $stmt->execute([$title, $slug, $description, $sourceType, $sourceId, $itemLimit, $theme, $published]);
-                $id = (int) $this->pdo->lastInsertId();
-            }
-
-            if ($sourceType === 'manual') {
-                $this->saveManualItems($id, $_POST['item_ids'] ?? []);
-            }
-
-            echo json_encode(['success' => true, 'id' => $id, 'slug' => $slug]);
-        } catch (\PDOException $e) {
-            echo json_encode(['success' => false, 'error' => 'Database error while saving.']);
-        }
-        return true;
     }
 
     public function getExhibitionById(int $id): ?array
@@ -679,6 +488,7 @@ class VirtualMuseumModule extends BaseModule
     {
         $theme = in_array($_POST['theme'] ?? '', self::THEMES, true) ? $_POST['theme'] : null;
         $layout = in_array($_POST['layout'] ?? '', self::LAYOUTS, true) ? $_POST['layout'] : null;
+        $centerpiece = in_array($_POST['centerpiece'] ?? '', self::CENTERPIECES, true) ? $_POST['centerpiece'] : 'auto';
         $published = !empty($_POST['is_published']) ? 1 : 0;
         if (!$theme || !$layout) return $this->jsonError('Choose a valid room theme and layout.');
         if ($published) {
@@ -690,9 +500,14 @@ class VirtualMuseumModule extends BaseModule
             $preview['layout'] = $layout;
             if (!$this->resolveItems($preview)) return $this->jsonError('This exhibition has no visible items with images.');
         }
-        $stmt = $this->pdo->prepare('UPDATE museum_exhibitions SET theme = ?, layout = ?, is_published = ? WHERE id = ?');
-        $stmt->execute([$theme, $layout, $published, (int) $ex['id']]);
-        return $this->jsonSuccess(['published' => $published, 'layout' => $layout]);
+        if ($this->ensureCenterpieceColumn()) {
+            $stmt = $this->pdo->prepare('UPDATE museum_exhibitions SET theme = ?, layout = ?, centerpiece = ?, is_published = ? WHERE id = ?');
+            $stmt->execute([$theme, $layout, $centerpiece, $published, (int) $ex['id']]);
+        } else {
+            $stmt = $this->pdo->prepare('UPDATE museum_exhibitions SET theme = ?, layout = ?, is_published = ? WHERE id = ?');
+            $stmt->execute([$theme, $layout, $published, (int) $ex['id']]);
+        }
+        return $this->jsonSuccess(['published' => $published, 'layout' => $layout, 'centerpiece' => $centerpiece]);
     }
 
     public function ajaxDuplicate($handled)
@@ -712,6 +527,10 @@ class VirtualMuseumModule extends BaseModule
             );
             $stmt->execute([$title, $slug, $source['description'], (int) $source['item_limit'], $source['theme'], $source['layout'] ?? 'grand_hall']);
             $id = (int) $this->pdo->lastInsertId();
+            if ($this->ensureCenterpieceColumn()) {
+                $this->pdo->prepare('UPDATE museum_exhibitions SET centerpiece = ? WHERE id = ?')
+                    ->execute([$source['centerpiece'] ?? 'auto', $id]);
+            }
             $this->pdo->prepare(
                 'INSERT INTO museum_exhibition_sources (exhibition_id, source_type, source_id, sort_order)
                  SELECT ?, source_type, source_id, sort_order FROM museum_exhibition_sources WHERE exhibition_id = ?'
@@ -784,25 +603,25 @@ class VirtualMuseumModule extends BaseModule
         return true;
     }
 
-    private function saveManualItems(int $exhibitionId, $itemIds): void
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Installs created before the centerpiece feature lack the column;
+     * add it on first use instead of requiring a disable/enable cycle.
+     */
+    private function ensureCenterpieceColumn(): bool
     {
-        $this->pdo->prepare("DELETE FROM museum_exhibition_items WHERE exhibition_id = ?")->execute([$exhibitionId]);
-        if (!is_array($itemIds) || empty($itemIds)) {
-            return;
+        if ($this->hasCenterpieceColumn !== null) return $this->hasCenterpieceColumn;
+        if ($this->columnExists('museum_exhibitions', 'centerpiece')) {
+            return $this->hasCenterpieceColumn = true;
         }
-        $ins = $this->pdo->prepare(
-            "INSERT IGNORE INTO museum_exhibition_items (exhibition_id, item_id, sort_order) VALUES (?,?,?)"
-        );
-        $order = 0;
-        foreach ($itemIds as $itemId) {
-            $itemId = (int) $itemId;
-            if ($itemId > 0) {
-                $ins->execute([$exhibitionId, $itemId, $order++]);
-            }
+        try {
+            $this->pdo->exec("ALTER TABLE museum_exhibitions ADD COLUMN centerpiece VARCHAR(32) NOT NULL DEFAULT 'auto' AFTER layout");
+            return $this->hasCenterpieceColumn = true;
+        } catch (\PDOException $e) {
+            return $this->hasCenterpieceColumn = false;
         }
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
 
     private function jsonSuccess(array $data = [])
     {

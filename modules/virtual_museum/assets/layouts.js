@@ -29,8 +29,8 @@ function buildGrandHall(count) {
 
 function buildLGallery(count) {
     const perSurface = Math.max(1, Math.ceil(count / 4));
-    const verticalLength = Math.max(15, (perSurface + 1) * SPACING);
-    const horizontalLength = Math.max(15, (perSurface + 1) * SPACING);
+    const verticalLength = Math.max(15, (perSurface + 1) * SPACING + 10.8);
+    const horizontalLength = Math.max(15, (perSurface + 1) * SPACING + 6.3);
     const zTurn0 = verticalLength - HALF_WIDTH * 2;
     const zTurn1 = verticalLength;
     const endX = horizontalLength;
@@ -63,8 +63,8 @@ function buildLGallery(count) {
 
 function buildCourtyard(count) {
     const perSurface = Math.max(1, Math.ceil(count / 8));
-    const outerW = Math.max(22, (perSurface + 2) * SPACING);
-    const outerL = Math.max(22, (perSurface + 2) * SPACING);
+    const outerW = Math.max(22, (perSurface + 1) * SPACING + 9.4);
+    const outerL = Math.max(22, (perSurface + 1) * SPACING + 9.4);
     const x0 = -outerW / 2, x1 = outerW / 2, z0 = 0, z1 = outerL;
     const ring = 4.2;
     const ix0 = x0 + ring, ix1 = x1 - ring, iz0 = z0 + ring, iz1 = z1 - ring;
@@ -83,9 +83,19 @@ function buildCourtyard(count) {
         { x0, x1, z0, z1: iz0 }, { x0, x1, z0: iz1, z1 },
         { x0, x1: ix0, z0: iz0, z1: iz1 }, { x0: ix1, x1, z0: iz0, z1: iz1 },
     ];
+    // Walkable ring: pad only against real walls (outer walls inset, inner
+    // courtyard inflated) and let the four strips overlap in the corners.
+    // Shrinking each floor band on all sides leaves 2×PAD dead strips at the
+    // band boundaries, which blocked the walk halfway around the loop.
+    const walkRects = [
+        { x0: x0 + PAD, x1: x1 - PAD, z0: z0 + PAD, z1: iz0 - PAD },
+        { x0: x0 + PAD, x1: x1 - PAD, z0: iz1 + PAD, z1: z1 - PAD },
+        { x0: x0 + PAD, x1: ix0 - PAD, z0: z0 + PAD, z1: z1 - PAD },
+        { x0: ix1 + PAD, x1: x1 - PAD, z0: z0 + PAD, z1: z1 - PAD },
+    ];
     return {
         id: 'courtyard_loop', spawn: { x: 0, z: 1.4, yaw: Math.PI }, floorRects,
-        walkRects: floorRects.map(r => ({ x0: r.x0 + PAD, x1: r.x1 - PAD, z0: r.z0 + PAD, z1: r.z1 - PAD })),
+        walkRects,
         walls, slots: makeSlots(surfaces, count),
         fixtures: [...lineFixtures(x0 + ring / 2, 3, z1 - 3, 5), ...lineFixtures(x1 - ring / 2, 3, z1 - 3, 5), ...lineFixturesHorizontal(x0 + 3, x1 - 3, ring / 2, 5), ...lineFixturesHorizontal(x0 + 3, x1 - 3, z1 - ring / 2, 5)],
         focalPoints: [{ type: 'courtyard', x: 0, z: outerL / 2, width: ix1 - ix0, length: iz1 - iz0 }],
