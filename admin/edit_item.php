@@ -52,8 +52,9 @@ if (isset($_GET['msg']) && $_GET['msg'] === 'created') {
 $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
 $allNarratives = $pdo->query("SELECT id, title FROM narratives ORDER BY title ASC")->fetchAll();
 $allTags = $pdo->query("SELECT id, name FROM tags ORDER BY name ASC")->fetchAll();
-$allItems = $pdo->query("SELECT id, reg_number, title FROM items ORDER BY title ASC")->fetchAll();
+$recentRegNumbers = $pdo->query("SELECT reg_number FROM items WHERE reg_number IS NOT NULL AND reg_number != '' ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_COLUMN);
 $linkedRelated = [];
+$prelinkedRelatedItems = [];
 
 if ($id > 0) {
     $stmt = $pdo->prepare("SELECT * FROM items WHERE id = :id");
@@ -84,8 +85,16 @@ if ($id > 0) {
             );
             $rStmt->execute([':id' => $id, ':id2' => $id]);
             $linkedRelated = $rStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if (!empty($linkedRelated)) {
+                $inPh = implode(',', array_fill(0, count($linkedRelated), '?'));
+                $relStmt = $pdo->prepare("SELECT id, reg_number, title FROM items WHERE id IN ($inPh) ORDER BY title ASC");
+                $relStmt->execute($linkedRelated);
+                $prelinkedRelatedItems = $relStmt->fetchAll();
+            }
         } catch (\PDOException) {
             $linkedRelated = [];
+            $prelinkedRelatedItems = [];
         }
     } else {
         $error = "Item not found.";
@@ -527,11 +536,9 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                             value="<?= htmlspecialchars($item['reg_number'] ?? '') ?>" required class="input"
                             autocomplete="off">
                         <datalist id="reg_number_hints">
-                            <?php foreach ($allItems as $ri): ?>
-                                <?php if (!empty($ri['reg_number'])): ?>
-                                    <option value="<?= htmlspecialchars($ri['reg_number']) ?>">
-                                    <?php endif; ?>
-                                <?php endforeach; ?>
+                            <?php foreach ($recentRegNumbers as $regNum): ?>
+                                <option value="<?= htmlspecialchars($regNum) ?>">
+                            <?php endforeach; ?>
                         </datalist>
                     </div>
                     <div>
@@ -637,11 +644,9 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                     </label>
                     <select id="related-select" name="related_items[]" multiple placeholder="Search for an item…"
                         class="w-full">
-                        <?php foreach ($allItems as $ri): ?>
-                            <?php if ($ri['id'] == $id)
-                                continue; ?>
-                            <option value="<?= $ri['id'] ?>" <?= in_array($ri['id'], $linkedRelated) ? 'selected' : '' ?>>
-                                [<?= htmlspecialchars($ri['reg_number']) ?>] <?= htmlspecialchars($ri['title']) ?>
+                        <?php foreach ($prelinkedRelatedItems as $ri): ?>
+                            <option value="<?= (int)$ri['id'] ?>" selected>
+                                [<?= htmlspecialchars($ri['reg_number'] ?? '') ?>] <?= htmlspecialchars($ri['title'] ?? '') ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -906,8 +911,24 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
 
     new TomSelect('#related-select', {
         plugins: ['remove_button'],
+        valueField: 'id',
+        labelField: 'text',
+        searchField: ['text'],
         placeholder: 'Search for an item…',
-        maxOptions: 500,
+        maxOptions: 50,
+        loadThrottle: 300,
+        load: function(query, callback) {
+            if (!query.length) return callback();
+            var url = 'ajax.php?action=search_items&exclude=<?= (int)$id ?>&q=' + encodeURIComponent(query);
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(json) {
+                    callback(json.results || []);
+                })
+                .catch(function() {
+                    callback();
+                });
+        }
     });
 
     // Media upload tab switcher

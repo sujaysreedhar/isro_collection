@@ -286,9 +286,7 @@ $renderSearchForm = static function (string $placeholder = 'Search items, dates,
                     class="tc-card-modern group flex flex-col h-full overflow-hidden reveal reveal-delay-<?= $i % 3 ?>">
                     <div class="relative h-60 overflow-hidden" style="background:var(--color-border,#e5e7eb);">
                         <?php if (!empty($item['file_path'])): ?>
-                            <?php $imgUrl = isset($storage)
-                                ? $storage->url('display/' . $item['file_path'])
-                                : SITE_URL . '/uploads/display/' . $item['file_path']; ?>
+                            <?php $imgUrl = MediaProcessor::url($item['file_path'], 'card', 'image', $storage ?? null); ?>
                             <img src="<?= htmlspecialchars($imgUrl) ?>" alt="<?= htmlspecialchars($item['title']) ?>"
                                 class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700 ease-out"
                                 loading="lazy">

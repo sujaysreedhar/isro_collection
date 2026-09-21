@@ -77,6 +77,7 @@ class S3Storage implements StorageInterface {
     }
 
     public function exists(string $storagePath): bool {
+        $storagePath = MediaProcessor::normalizeStoragePath($storagePath);
         try {
             return $this->client->doesObjectExist($this->bucket, $this->fullKey($storagePath));
         } catch (AwsException $e) {
@@ -85,6 +86,7 @@ class S3Storage implements StorageInterface {
     }
 
     public function url(string $storagePath): string {
+        $storagePath = MediaProcessor::normalizeStoragePath($storagePath);
         $key = $this->fullKey($storagePath);
 
         // Build standard S3 public URL

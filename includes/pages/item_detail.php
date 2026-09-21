@@ -8,17 +8,24 @@ $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($id <= 0) {
     http_response_code(404);
-    die("Item ID not provided or invalid.");
+    require_once ThemeManager::getTemplatePath('404.php');
+    exit;
 }
 
-// 1. Fetch Item
-$itemStmt = $pdo->prepare("SELECT * FROM items WHERE id = :id");
+// 1. Fetch Item (respect visibility for public, allow preview for logged-in admins)
+$isAdmin = isset($_SESSION['admin_id']);
+$itemSql = "SELECT * FROM items WHERE id = :id";
+if (!$isAdmin) {
+    $itemSql .= " AND is_visible = 1";
+}
+$itemStmt = $pdo->prepare($itemSql);
 $itemStmt->execute([':id' => $id]);
 $item = $itemStmt->fetch();
 
 if (!$item) {
     http_response_code(404);
-    die("Item not found.");
+    require_once ThemeManager::getTemplatePath('404.php');
+    exit;
 }
 
 // 1b. Fetch all Categories for this item

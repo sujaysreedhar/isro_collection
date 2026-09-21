@@ -1,7 +1,7 @@
 <?php
 // modules/blog/post_detail.php
 require_once __DIR__ . '/../../config/config.php';
-global $pdo;
+global $pdo, $storage;
 
 $slug = $_GET['slug'] ?? '';
 if (!$slug) {
@@ -85,7 +85,7 @@ require_once ThemeManager::getHeader();
                         <div class="relative bg-gray-100 flex items-center justify-center">
                             <!-- Featured Image -->
                             <?php if ($post['featured_image']): ?>
-                                <img src="<?= SITE_URL ?>/uploads/<?= htmlspecialchars($post['featured_image']) ?>" alt="<?= htmlspecialchars($post['title']) ?>" class="w-full h-auto">
+                                <img src="<?= htmlspecialchars(BlogImage::url($post['featured_image'], 1200, $storage ?? null)) ?>" alt="<?= htmlspecialchars($post['title']) ?>" class="w-full h-auto">
                             <?php else: ?>
                                 <div class="flex items-center justify-center h-[400px] w-full text-gray-400 flex-col">
                                     <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>

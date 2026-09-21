@@ -220,14 +220,7 @@ require_once ThemeManager::getHeader();
                             $previewPath = trim((string)($item['preview_file_path'] ?? ''));
                             $previewUrl = '';
                             if ($previewPath !== '') {
-                                if (isset($storage)) {
-                                    $previewUrl = $storage->url('display/' . $previewPath);
-                                } else {
-                                    $displayPath = realpath(__DIR__ . '/../../uploads/display/' . $previewPath);
-                                    $previewUrl = $displayPath && file_exists($displayPath)
-                                        ? SITE_URL . '/uploads/display/' . rawurlencode($previewPath)
-                                        : SITE_URL . '/uploads/originals/' . rawurlencode($previewPath);
-                                }
+                                $previewUrl = MediaProcessor::url($previewPath, 'card', 'image', $storage ?? null);
                             }
                         ?>
                         <a href="<?= SITE_URL ?>/item/<?= $item['id'] ?>"

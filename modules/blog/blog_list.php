@@ -1,7 +1,7 @@
 <?php
 // modules/blog/blog_list.php
 require_once __DIR__ . '/../../config/config.php';
-global $pdo;
+global $pdo, $storage;
 
 $pageTitle = 'Blog - ' . SITE_TITLE;
 $currentMenu = 'blog';
@@ -147,7 +147,7 @@ require_once ThemeManager::getHeader();
                     <article class="blog-card group" onclick="window.location.href='<?= SITE_URL ?>/blog/<?= htmlspecialchars($post['slug']) ?>'">
                         <?php if ($post['featured_image']): ?>
                             <div class="blog-image-wrapper">
-                                <img src="<?= SITE_URL ?>/uploads/<?= htmlspecialchars($post['featured_image']) ?>" 
+                                <img src="<?= htmlspecialchars(BlogImage::url($post['featured_image'], 640, $storage ?? null)) ?>" 
                                      alt="<?= htmlspecialchars($post['title']) ?>" 
                                      class="blog-image" loading="lazy">
                             </div>

@@ -19,34 +19,32 @@ fputs($output, "\xEF\xBB\xBF");
 
 // Define Headers
 $headers = [
-    'ID', 'Reg Number', 'Title', 'Creation Date', 'Production Date', 
+    'ID', 'Reg Number', 'Title', 'Production Date', 
     'Year Start', 'Year End', 'Material', 'Category ID', 
-    'Physical Description', 'Historical Context', 'Dimensions',
+    'Physical Description', 'Historical Significance',
     'Credit Line', 'Is Visible'
 ];
 fputcsv($output, $headers);
 
 // Stream data query
-$stmt = $pdo->query("SELECT id, reg_number, title, creation_date, production_date, year_start, year_end, material, category_id, physical_description, historical_context, physical_dimensions, credit_line, is_visible FROM items ORDER BY id ASC");
+$stmt = $pdo->query("SELECT id, reg_number, title, production_date, year_start, year_end, material, category_id, physical_description, historical_significance, credit_line, is_visible FROM items ORDER BY id ASC");
 
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     // Clean HTML from rich text fields
-    $row['physical_description'] = strip_tags($row['physical_description']);
-    $row['historical_context'] = strip_tags($row['historical_context']);
+    $row['physical_description'] = strip_tags($row['physical_description'] ?? '');
+    $row['historical_significance'] = strip_tags($row['historical_significance'] ?? '');
     
     fputcsv($output, [
         $row['id'],
         $row['reg_number'],
         $row['title'],
-        $row['creation_date'],
         $row['production_date'],
         $row['year_start'],
         $row['year_end'],
         $row['material'],
         $row['category_id'],
         $row['physical_description'],
-        $row['historical_context'],
-        $row['physical_dimensions'],
+        $row['historical_significance'],
         $row['credit_line'],
         $row['is_visible']
     ]);

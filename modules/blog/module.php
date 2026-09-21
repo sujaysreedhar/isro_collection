@@ -34,18 +34,35 @@ class BlogModule extends BaseModule
         }, 10, 2);
 
         $pdo = $this->pdo;
-        HookRegistry::addFilter('search_results', function ($results, $params) use ($pdo) {
+        $storage = $GLOBALS['storage'] ?? null;
+        HookRegistry::addFilter('search_provider_counts', function ($counts, $params) use ($pdo) {
+            $q = trim((string)($params['q'] ?? ''));
+            if ($q === '') return $counts;
+            $term = '%' . $q . '%';
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM blog_posts WHERE status = 'published' AND (title LIKE ? OR content LIKE ?)");
+            $stmt->execute([$term, $term]);
+            $counts['blog'] = (int)$stmt->fetchColumn();
+            return $counts;
+        }, 10, 2);
+        HookRegistry::addFilter('search_results', function ($results, $params) use ($pdo, $storage) {
             $q = trim($params['q'] ?? '');
-            if (!$q)
+            $limit = max(0, min(100, (int)($params['blog_limit'] ?? 0)));
+            $offset = max(0, (int)($params['blog_offset'] ?? 0));
+            if (!$q || $limit === 0)
                 return $results;
 
             $searchTerm = '%' . $q . '%';
             $stmt = $pdo->prepare("
-                SELECT bp.* 
+                SELECT bp.id, bp.title, bp.slug, bp.featured_image, bp.published_at
                 FROM blog_posts bp 
                 WHERE bp.status = 'published' AND (bp.title LIKE ? OR bp.content LIKE ?)
+                ORDER BY bp.id DESC LIMIT ? OFFSET ?
             ");
-            $stmt->execute([$searchTerm, $searchTerm]);
+            $stmt->bindValue(1, $searchTerm);
+            $stmt->bindValue(2, $searchTerm);
+            $stmt->bindValue(3, $limit, PDO::PARAM_INT);
+            $stmt->bindValue(4, $offset, PDO::PARAM_INT);
+            $stmt->execute();
             $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             // Fetch tags for these posts
@@ -71,7 +88,7 @@ class BlogModule extends BaseModule
                     '_module_url' => SITE_URL . '/blog/' . $post['slug'],
                     '_module_type' => 'Blog Post',
                     '_module_tags' => $tagsByPost[$post['id']] ?? [],
-                    '_module_image_url' => $post['featured_image'] ? SITE_URL . '/uploads/' . $post['featured_image'] : '',
+                    '_module_image_url' => $post['featured_image'] ? BlogImage::url($post['featured_image'], 640, $storage) : '',
                     'title' => $post['title'],
                     'production_date' => date('M j, Y', strtotime($post['published_at'])),
                     'reg_number' => 'Blog Post',
@@ -91,6 +108,7 @@ class BlogModule extends BaseModule
 
     public function renderHomeSection()
     {
+        global $storage;
         $stmt = $this->pdo->query("SELECT * FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 3");
         $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -113,7 +131,7 @@ class BlogModule extends BaseModule
             echo '<div class="relative h-56 bg-gray-100 dark:bg-gray-900 overflow-hidden">';
 
             if (!empty($post['featured_image'])) {
-                $imgUrl = SITE_URL . '/uploads/' . htmlspecialchars($post['featured_image']);
+                $imgUrl = htmlspecialchars(BlogImage::url($post['featured_image'], 640, $storage ?? null));
                 echo '<img src="' . $imgUrl . '" alt="' . htmlspecialchars($post['title']) . '" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">';
             } else {
                 echo '<div class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900"><svg class="w-12 h-12 text-gray-300 " fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1l2.293-2.293A1 1 0 0121 5.414v13.172a1 1 0 01-1.707.707L17 17v1a2 2 0 01-2 2z"></path></svg></div>';

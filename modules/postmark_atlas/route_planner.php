@@ -16,15 +16,8 @@ if (!$isAtlasActive) {
 // ── Data Loading ─────────────────────────────────────────────────────────────
 // We load ALL postmark locations with coordinates. 
 // Since this is for client-side filtering along an actual road route.
-$stmt = $pdo->prepare("
-    SELECT pl.*, i.title AS linked_item_title, i.id AS item_link_id
-    FROM postmark_locations pl
-    LEFT JOIN items i ON i.id = pl.linked_item_id
-    WHERE pl.latitude != 0 AND pl.longitude != 0
-    ORDER BY pl.state ASC, pl.district ASC
-");
-$stmt->execute();
-$allLocations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+require_once __DIR__ . '/PublicLocations.php';
+$allLocations = PublicLocations::all($pdo, true);
 
 // Pass to the theme template
 $jsonAllLocations = json_encode($allLocations);

@@ -8,15 +8,15 @@
 /** @var PDO $pdo — injected by bootstrap/database.php */
 if (class_exists('HookRegistry')) {
     HookRegistry::addAction('item_saved', function() use ($pdo) {
-        (new SearchEngine($pdo))->rebuildVocabularyCache();
+        @unlink(CACHE_DIR . '/vocabulary.json');
         // Invalidate year range cache so search facets stay fresh
         $yearCacheFile = CACHE_DIR . '/year_range.json';
         if (file_exists($yearCacheFile)) @unlink($yearCacheFile);
     });
     HookRegistry::addAction('category_saved', function() use ($pdo) {
-        (new SearchEngine($pdo))->rebuildVocabularyCache();
+        @unlink(CACHE_DIR . '/vocabulary.json');
     });
     HookRegistry::addAction('category_deleted', function() use ($pdo) {
-        (new SearchEngine($pdo))->rebuildVocabularyCache();
+        @unlink(CACHE_DIR . '/vocabulary.json');
     });
 }

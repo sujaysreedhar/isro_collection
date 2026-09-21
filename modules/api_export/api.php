@@ -64,8 +64,10 @@ try {
 
         // Filters
         if (!empty($_GET['category'])) {
-            $where[] = "category_id = ?";
-            $params[] = (int)$_GET['category'];
+            $catId = (int)$_GET['category'];
+            $where[] = "(category_id = ? OR id IN (SELECT item_id FROM item_category WHERE category_id = ?))";
+            $params[] = $catId;
+            $params[] = $catId;
         }
         if (!empty($_GET['year'])) {
             $where[] = "? BETWEEN year_start AND year_end";
@@ -73,9 +75,9 @@ try {
         }
         if (!empty($_GET['search']) || !empty($_GET['q'])) {
             $searchTerm = $_GET['search'] ?? $_GET['q'];
-            $where[] = "MATCH(title, physical_description, historical_context) AGAINST(? IN BOOLEAN MODE)";
-            // Basic boolean mode mapping (very simplified)
+            $where[] = "(MATCH(title, physical_description) AGAINST(? IN BOOLEAN MODE) OR title LIKE ?)";
             $params[] = '*' . trim($searchTerm) . '*'; 
+            $params[] = '%' . trim($searchTerm) . '%';
         }
 
         $whereClause = implode(' AND ', $where);
@@ -104,13 +106,13 @@ try {
         $response['total_pages'] = ceil($response['total'] / $limit);
 
     } elseif ($action === 'item' && !empty($_GET['id'])) {
-        $stmt = $pdo->prepare("SELECT id, reg_number, title, production_date, year_start, year_end, material, physical_description, historical_context, credit_line FROM items WHERE id = ? AND is_visible = 1");
+        $stmt = $pdo->prepare("SELECT id, reg_number, title, production_date, year_start, year_end, material, physical_description, historical_significance, credit_line FROM items WHERE id = ? AND is_visible = 1");
         $stmt->execute([(int)$_GET['id']]);
         $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($item) {
             $item['physical_description'] = strip_tags($item['physical_description']);
-            $item['historical_context'] = strip_tags($item['historical_context']);
+            $item['historical_significance'] = strip_tags($item['historical_significance'] ?? '');
             
             // Get media
             $mStmt = $pdo->prepare("SELECT file_path, media_type, caption FROM media WHERE item_id = ? ORDER BY is_primary DESC, id ASC");
@@ -118,10 +120,10 @@ try {
             $item['media'] = $mStmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($item['media'] as &$m) {
                 if ($m['media_type'] === 'image') {
-                    $m['url_thumbs'] = SITE_URL . '/uploads/thumbs/' . $m['file_path'];
-                    $m['url_display'] = SITE_URL . '/uploads/display/' . $m['file_path'];
+                    $m['url_thumbs'] = SITE_URL . '/uploads/thumbnails/' . rawurlencode($m['file_path']);
+                    $m['url_display'] = SITE_URL . '/uploads/display/' . rawurlencode($m['file_path']);
                 } elseif ($m['media_type'] === 'pdf') {
-                    $m['url'] = SITE_URL . '/uploads/pdfs/' . $m['file_path'];
+                    $m['url'] = SITE_URL . '/uploads/pdfs/' . rawurlencode($m['file_path']);
                 }
             }
             

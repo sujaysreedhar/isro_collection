@@ -65,6 +65,7 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="<?= SITE_URL ?>/assets/js/atlas_text.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var map = L.map('frontendAtlasMap').setView([20.5937, 78.9629], 5);
@@ -95,27 +96,28 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
         rawData.forEach(function(loc) {
             if (loc.latitude && loc.longitude) {
                 var isAcquired = parseInt(loc.is_acquired, 10) === 1;
-                var markerTitle = (loc.ppc_name || loc.post_office) + ' - ' + loc.district;
+                var markerTitle = AtlasText.escape((loc.ppc_name || loc.post_office) + ' - ' + loc.district);
 
                 var statusHtml = isAcquired ?
                     '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">In Collection</span>' :
                     '<span style="background:#f3f4f6;color:#4b5563;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">Not Acquired</span>';
 
                 var ppcLine = loc.ppc_name
-                    ? '<p style="margin:0 0 2px 0;font-size:13px;font-weight:600;color:#374151;">' + loc.ppc_name + '</p>'
+                    ? '<p style="margin:0 0 2px 0;font-size:13px;font-weight:600;color:#374151;">' + AtlasText.escape(loc.ppc_name) + '</p>'
                     : '';
 
-                var itemHtml = loc.linked_item_title
+                var safeItemId = AtlasText.itemId(loc.linked_item_id);
+                var itemHtml = loc.linked_item_title && safeItemId
                     ? '<div style="margin:6px 0;padding:5px 7px;background:#eff6ff;border-radius:5px;">'
-                      + '<a href="' + '<?= SITE_URL ?>' + '/item/' + loc.linked_item_id
-                      + '" style="font-size:12px;color:#1d4ed8;text-decoration:none;font-weight:600;">🖼 ' + loc.linked_item_title + '</a>'
+                      + '<a href="' + '<?= SITE_URL ?>' + '/item/' + safeItemId
+                      + '" style="font-size:12px;color:#1d4ed8;text-decoration:none;font-weight:600;">🖼 ' + AtlasText.escape(loc.linked_item_title) + '</a>'
                       + '</div>'
                     : '';
 
                 var popupHtml = '<div style="font-family: Inter, sans-serif;min-width:200px;">' +
-                                '<h3 style="font-size:14px;font-weight:bold;margin:0 0 2px 0;">' + loc.post_office + '</h3>' +
+                                '<h3 style="font-size:14px;font-weight:bold;margin:0 0 2px 0;">' + AtlasText.escape(loc.post_office) + '</h3>' +
                                 ppcLine +
-                                '<p style="margin:0 0 6px 0;color:#6b7280;font-size:12px;">' + (loc.district||'') + ', ' + (loc.state||'') + ' · ' + loc.pin_code + '</p>' +
+                                '<p style="margin:0 0 6px 0;color:#6b7280;font-size:12px;">' + AtlasText.escape(loc.district) + ', ' + AtlasText.escape(loc.state) + ' · ' + AtlasText.escape(loc.pin_code) + '</p>' +
                                 statusHtml +
                                 itemHtml +
                                 '</div>';

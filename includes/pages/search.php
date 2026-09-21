@@ -3,6 +3,10 @@ require_once __DIR__ . '/../SearchEngine.php';
 global $pdo;
 
 $searchEngine = new SearchEngine($pdo);
+if ($invalidSearch = SearchEngine::validateParams($_GET)) {
+    http_response_code(400);
+    exit(htmlspecialchars($invalidSearch, ENT_QUOTES, 'UTF-8'));
+}
 
 // Extract parameters
 $params = [

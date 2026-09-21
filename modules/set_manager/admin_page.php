@@ -72,7 +72,12 @@ if ($setId > 0) {
                             <a href="module_page.php?m=set_manager&action=edit&id=<?= $s['id'] ?>" class="text-blue-600 hover:text-blue-800 font-bold text-sm bg-blue-50/50 px-4 py-2 rounded-xl transition">Edit</a>
                             <a href="<?= SITE_URL ?>/checklist/<?= $s['slug'] ?>" target="_blank" class="text-slate-600 hover:text-slate-900 font-bold text-sm bg-slate-50 px-4 py-2 rounded-xl transition">View</a>
                         </div>
-                        <a href="module_page.php?m=set_manager&action=delete&id=<?= $s['id'] ?>" class="text-rose-500 hover:text-rose-700 font-bold text-sm" onclick="return confirm('Really delete?')">Delete</a>
+                        <form method="POST" action="module_page.php?m=set_manager" onsubmit="return confirm('Really delete?')">
+                            <?= Csrf::input() ?>
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
+                            <button type="submit" class="text-rose-500 hover:text-rose-700 font-bold text-sm">Delete</button>
+                        </form>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -80,6 +85,7 @@ if ($setId > 0) {
 
     <?php else: ?>
         <form method="POST" class="flex flex-col lg:flex-row gap-10">
+            <?= Csrf::input() ?>
             <!-- Left Side: Basic Info -->
             <div class="flex-1 space-y-8">
                 <div class="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">

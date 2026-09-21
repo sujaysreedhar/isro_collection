@@ -17,6 +17,7 @@ $stmt = $pdo->prepare("
         (SELECT m.file_path FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as file_path,
         (SELECT m.caption FROM media m WHERE m.item_id = i.id AND m.media_type = 'image' ORDER BY {$orderClause} LIMIT 1) as caption
     FROM items i
+    WHERE i.is_visible = 1
     ORDER BY i.id DESC
     LIMIT " . $featuredLimit . "
 ");

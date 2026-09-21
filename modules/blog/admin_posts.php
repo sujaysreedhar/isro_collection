@@ -7,6 +7,7 @@ if (!defined('SITE_URL')) {
 
 // Ensure user is admin
 // The module system handles authentication, but double-check if needed
+global $storage;
 
 $action = $_GET['action'] ?? 'list';
 $error = '';
@@ -28,23 +29,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $author_id = $_SESSION['admin_id'] ?? null; // Assuming $_SESSION['admin_id'] exists
         
         // Handle Featured Image Upload
-        $featured_image = $_POST['existing_image'] ?? '';
-        if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = __DIR__ . '/../../uploads/blog/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            $filename = time() . '_' . basename($_FILES['featured_image']['name']);
-            $targetPath = $uploadDir . $filename;
-            if (move_uploaded_file($_FILES['featured_image']['tmp_name'], $targetPath)) {
-                $featured_image = 'blog/' . $filename;
-            } else {
-                $error = "Failed to upload image.";
+        $featured_image = '';
+        if ($id) {
+            $currentImage = $pdo->prepare('SELECT featured_image FROM blog_posts WHERE id = ?');
+            $currentImage->execute([(int)$id]);
+            $featured_image = (string)($currentImage->fetchColumn() ?: '');
+        }
+        $newImagePaths = [];
+        if (isset($_FILES['featured_image']) && ($_FILES['featured_image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            try {
+                ImageUploadValidator::uploaded($_FILES['featured_image']);
+                $base = 'blog_' . bin2hex(random_bytes(16));
+                foreach ([200, 640, 1200] as $size) {
+                    $temp = tempnam(sys_get_temp_dir(), 'blog-image-');
+                    if ($temp === false) throw new RuntimeException('Image processing unavailable.');
+                    try {
+                        if (!MediaProcessor::optimizeImage($_FILES['featured_image']['tmp_name'], $temp, $size, $size, 85, $size === 200)) {
+                            throw new RuntimeException('Image processing failed.');
+                        }
+                        $path = 'thumbnails/' . $base . '_' . $size . '.webp';
+                        if (!$storage->put($path, $temp, 'image/webp')) throw new RuntimeException('Image storage failed.');
+                        $newImagePaths[] = $path;
+                    } finally {
+                        @unlink($temp);
+                    }
+                }
+                $featured_image = 'thumbnails/' . $base . '_1200.webp';
+            } catch (Throwable $uploadError) {
+                foreach ($newImagePaths as $path) $storage->delete($path);
+                $newImagePaths = [];
+                $error = $uploadError instanceof DomainException ? $uploadError->getMessage() : 'Image upload failed. Please try again.';
+                error_log('Blog image upload failed: ' . $uploadError->getMessage());
             }
         }
 
-        if (empty($title) || empty($slug)) {
-            $error = "Title and Slug are required.";
+        if ($error !== '' || empty($title) || empty($slug)) {
+            if ($error === '') $error = "Title and Slug are required.";
+            foreach ($newImagePaths as $path) $storage->delete($path);
         } else {
             if ($status === 'published') {
                 $published_at = date('Y-m-d H:i:s');
@@ -53,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             try {
+                $pdo->beginTransaction();
                 if ($id) {
                     // Update
                     global $pdo;
@@ -83,11 +105,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute($values);
                     }
                 }
+                $pdo->commit();
             } catch (PDOException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                foreach ($newImagePaths as $path) $storage->delete($path);
+                $success = '';
                 if ($e->errorInfo[1] == 1062) {
                      $error = "A post with this slug already exists.";
                 } else {
-                     $error = "Database error: " . $e->getMessage();
+                     $error = 'Database operation failed. Please try again.';
+                     error_log('Blog save failed: ' . $e->getMessage());
                 }
             }
         }
@@ -150,6 +177,7 @@ if ($action === 'list') {
                         <div class="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                             <a href="?m=blog&action=edit&id=<?= $post['id'] ?>" class="text-blue-400 hover:text-blue-300">Edit</a>
                             <form method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this post?');">
+                                <?= Csrf::input() ?>
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="id" value="<?= $post['id'] ?>">
                                 <button type="submit" class="text-red-400 hover:text-red-300">Delete</button>
@@ -232,6 +260,7 @@ if ($action === 'list') {
     <?php endif; ?>
 
     <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <?= Csrf::input() ?>
         <input type="hidden" name="action" value="save">
         <input type="hidden" name="id" value="<?= htmlspecialchars($id ?? '') ?>">
         
@@ -333,7 +362,7 @@ if ($action === 'list') {
                 
                 <?php if ($post['featured_image']): ?>
                     <div class="mb-4 relative rounded-xl overflow-hidden border border-gray-700/50 shadow-lg group">
-                        <img src="<?= SITE_URL ?>/uploads/<?= htmlspecialchars($post['featured_image']) ?>" class="w-full h-auto aspect-video object-cover transition-transform duration-500 group-hover:scale-105" alt="Featured Image">
+                        <img src="<?= htmlspecialchars(BlogImage::url($post['featured_image'], 640, $storage ?? null)) ?>" class="w-full h-auto aspect-video object-cover transition-transform duration-500 group-hover:scale-105" alt="Featured Image">
                         <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <input type="hidden" name="existing_image" value="<?= htmlspecialchars($post['featured_image']) ?>">
                     </div>

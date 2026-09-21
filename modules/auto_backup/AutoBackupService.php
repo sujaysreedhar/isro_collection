@@ -18,6 +18,16 @@ class AutoBackupService
      */
     public function runBackupCheck(): ?array
     {
+        if (!$this->acquireLock()) return null;
+        try {
+            return $this->runDueBackupLocked();
+        } finally {
+            $this->releaseLock();
+        }
+    }
+
+    private function runDueBackupLocked(): ?array
+    {
         // 1. Check if auto backup is enabled
         if ($this->getSetting('auto_backup_enabled', '1') !== '1') {
             return null;
@@ -34,12 +44,6 @@ class AutoBackupService
             return null;
         }
 
-        // 2. Try to acquire lock
-        if (!$this->acquireLock($now)) {
-            return null; // Already running or locked
-        }
-
-        try {
             $parts = [];
             if ($dbDue) {
                 $parts[] = 'db';
@@ -48,7 +52,7 @@ class AutoBackupService
                 $parts[] = 'media';
             }
 
-            $result = $this->run($parts, 'auto');
+            $result = $this->runUnlocked($parts, 'auto');
 
             // 3. Update last run timestamps on success
             if ($result['success']) {
@@ -59,18 +63,31 @@ class AutoBackupService
                     $this->saveSetting('auto_backup_last_media_run', (string)$now);
                 }
                 $this->cleanupOldBackups();
+            } else {
+                $this->saveSetting('auto_backup_last_failure_at', (string)$now);
             }
 
             return $result;
-        } finally {
-            $this->releaseLock();
-        }
     }
 
     /**
      * Run backup manually or automatically
      */
     public function run(array $parts, string $trigger = 'manual'): array
+    {
+        if (!$this->acquireLock()) {
+            return ['success' => false, 'message' => 'A backup is already running.', 'parts' => $parts];
+        }
+        try {
+            $result = $this->runUnlocked($parts, $trigger);
+            if (!$result['success']) $this->saveSetting('auto_backup_last_failure_at', (string)time());
+            return $result;
+        } finally {
+            $this->releaseLock();
+        }
+    }
+
+    private function runUnlocked(array $parts, string $trigger): array
     {
         if (empty($parts)) {
             return [
@@ -229,16 +246,17 @@ class AutoBackupService
     /**
      * Set a lock so multiple concurrent requests don't trigger backup
      */
-    private function acquireLock(int $now): bool
+    private function lockName(): string
     {
-        $lockTime = (int)$this->getSetting('auto_backup_lock', '0');
-        // If locked less than 15 minutes ago, skip
-        if ($lockTime > 0 && ($now - $lockTime < 900)) {
-            return false;
-        }
+        $database = (string)$this->pdo->query('SELECT DATABASE()')->fetchColumn();
+        return 'collection:auto_backup:' . substr(hash('sha256', $database), 0, 16);
+    }
 
-        $this->saveSetting('auto_backup_lock', (string)$now);
-        return true;
+    private function acquireLock(): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT GET_LOCK(?, 0)');
+        $stmt->execute([$this->lockName()]);
+        return (int)$stmt->fetchColumn() === 1;
     }
 
     /**
@@ -246,7 +264,8 @@ class AutoBackupService
      */
     private function releaseLock(): void
     {
-        $this->saveSetting('auto_backup_lock', '0');
+        $stmt = $this->pdo->prepare('SELECT RELEASE_LOCK(?)');
+        $stmt->execute([$this->lockName()]);
     }
 
     private function getSetting(string $key, string $default): string

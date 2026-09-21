@@ -58,10 +58,10 @@ class SetManagerModule extends BaseModule {
         });
 
         HookRegistry::addAction('item_after_content', function($item) {
-            $setDetails = $this->getItemSetDetails($item['id']);
+            $setDetails = $this->getPublicItemSetDetails($item['id']);
             if ($setDetails) {
                 $set = $this->getSet($setDetails['set_id']);
-                $progress = $this->getSetProgress($setDetails['set_id']);
+                $progress = $this->getSetProgress($setDetails['set_id'], true);
                 require_once __DIR__ . '/views/frontend_display.php';
             }
         });
@@ -121,6 +121,18 @@ class SetManagerModule extends BaseModule {
         return $stmt->fetch();
     }
 
+    public function getPublicSetBySlug($slug) {
+        $stmt = $this->pdo->prepare('SELECT * FROM module_sets WHERE slug = ? AND is_public = 1');
+        $stmt->execute([$slug]);
+        return $stmt->fetch();
+    }
+
+    public function getPublicItemSetDetails($itemId) {
+        $stmt = $this->pdo->prepare('SELECT msi.set_id, msi.structure_id FROM module_set_items msi JOIN module_sets ms ON ms.id = msi.set_id AND ms.is_public = 1 JOIN items i ON i.id = msi.item_id AND i.is_visible = 1 WHERE msi.item_id = ?');
+        $stmt->execute([$itemId]);
+        return $stmt->fetch();
+    }
+
     public function getSetStructure($setId) {
         $stmt = $this->pdo->prepare("SELECT * FROM module_set_structure WHERE set_id = ? ORDER BY sort_order ASC, label ASC");
         $stmt->execute([$setId]);
@@ -141,9 +153,12 @@ class SetManagerModule extends BaseModule {
         }
     }
 
-    public function getSetProgress($setId) {
+    public function getSetProgress($setId, $publicOnly = false) {
         // Count actual items
-        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM module_set_items WHERE set_id = ?");
+        $countSql = $publicOnly
+            ? 'SELECT COUNT(*) FROM module_set_items msi JOIN items i ON i.id = msi.item_id AND i.is_visible = 1 WHERE msi.set_id = ?'
+            : 'SELECT COUNT(*) FROM module_set_items WHERE set_id = ?';
+        $stmt = $this->pdo->prepare($countSql);
         $stmt->execute([$setId]);
         $count = $stmt->fetchColumn();
         
@@ -161,12 +176,18 @@ class SetManagerModule extends BaseModule {
     }
 
     public function handleAdminSubmit() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['action'])) return;
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
-        $setId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        $action = $_GET['action'] ?? '';
+        $setId = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
+        $action = $_POST['action'] ?? '';
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if ($action === 'delete' && $setId > 0) {
+            $this->pdo->prepare('DELETE FROM module_sets WHERE id = ?')->execute([$setId]);
+            header('Location: ' . SITE_URL . '/admin/module_page.php?m=set_manager&msg=deleted');
+            exit;
+        }
+
+        if ($action !== 'delete') {
             $name = trim($_POST['name'] ?? '');
             $slug = trim($_POST['slug'] ?? '');
             if (!$slug) $slug = strtolower(str_replace(' ', '-', $name));
@@ -201,11 +222,6 @@ class SetManagerModule extends BaseModule {
             exit;
         }
 
-        if ($action === 'delete' && $setId > 0) {
-            $this->pdo->prepare("DELETE FROM module_sets WHERE id = ?")->execute([$setId]);
-            header("Location: " . SITE_URL . "/admin/module_page.php?m=set_manager&msg=deleted");
-            exit;
-        }
     }
 
     public function getPdo() {

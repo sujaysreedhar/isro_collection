@@ -64,7 +64,7 @@ require_once ThemeManager::getHeader();
                                 <div class="bg-white/5 backdrop-blur-xl rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden border border-white/10 transition-all duration-500 hover:-translate-y-4 hover:shadow-[0_16px_48px_rgba(0,0,0,0.5)] hover:border-glass-400/50">
                                     <div class="h-64 relative bg-slate-900">
                                         <?php if ($item['preview_file_path']): ?>
-                                            <img src="<?= SITE_URL ?>/uploads/display/<?= rawurlencode($item['preview_file_path']) ?>" 
+                                            <img src="<?= htmlspecialchars(MediaProcessor::url($item['preview_file_path'], 'card', 'image', $storage ?? null)) ?>" 
                                                  class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-85 group-hover:opacity-100" loading="lazy">
                                         <?php else: ?>
                                             <div class="w-full h-full flex items-center justify-center bg-black/30 text-slate-600">

@@ -19,7 +19,7 @@ class SetManagerFrontend {
     }
 
     public function viewSet($slug) {
-        $set = $this->module->getSetBySlug($slug);
+        $set = $this->module->getPublicSetBySlug($slug);
         if (!$set) {
             http_response_code(404);
             require_once ThemeManager::getTemplatePath('404.php');
@@ -27,14 +27,14 @@ class SetManagerFrontend {
         }
 
         $structure = $this->module->getSetStructure($set['id']);
-        $progress = $this->module->getSetProgress($set['id']);
+        $progress = $this->module->getSetProgress($set['id'], true);
         
         // Get items already in this set
         $stmt = $this->pdo->prepare("
             SELECT i.*, msi.structure_id 
             FROM items i
             JOIN module_set_items msi ON i.id = msi.item_id
-            WHERE msi.set_id = ?
+            WHERE msi.set_id = ? AND i.is_visible = 1
         ");
         $stmt->execute([$set['id']]);
         $ownedItems = $stmt->fetchAll();

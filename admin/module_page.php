@@ -3,6 +3,13 @@
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/layout.php';
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/Csrf.php';
+
+// All module mutations share this guard before any module hook can run.
+if (!moduleCsrfAllowed($_SERVER['REQUEST_METHOD'] ?? 'GET', $_POST, $_SERVER)) {
+    http_response_code(403);
+    exit('Security check failed.');
+}
 
 $moduleSlug = $_GET['m'] ?? '';
 

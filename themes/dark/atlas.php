@@ -36,6 +36,7 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
 <?php require_once ThemeManager::getFooter(); ?>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="<?= SITE_URL ?>/assets/js/atlas_text.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var map = L.map('frontendAtlasMap').setView([20.5937, 78.9629], 5);
@@ -59,13 +60,13 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
         rawData.forEach(function(loc) {
             if (loc.latitude && loc.longitude) {
                 var isAcquired = parseInt(loc.is_acquired, 10) === 1;
-                var markerTitle = loc.post_office + ' - ' + loc.district;
+                var markerTitle = AtlasText.escape(loc.post_office + ' - ' + loc.district);
                 var statusHtml = isAcquired ?
                     '<span style="background: #064e3b; color: #6ee7b7; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">In Collection</span>' :
                     '<span style="background: #1f2937; color: #9ca3af; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">Not Acquired</span>';
                 var popupHtml = '<div style="font-family: Inter, sans-serif;">' +
-                    '<h3 style="font-size:14px; font-weight:bold; margin:0 0 4px 0;">' + loc.post_office + '</h3>' +
-                    '<p style="margin: 0 0 6px 0; color: #6b7280; font-size:12px;">' + loc.district + ', ' + loc.state + ' - ' + loc.pin_code + '</p>' +
+                    '<h3 style="font-size:14px; font-weight:bold; margin:0 0 4px 0;">' + AtlasText.escape(loc.post_office) + '</h3>' +
+                    '<p style="margin: 0 0 6px 0; color: #6b7280; font-size:12px;">' + AtlasText.escape(loc.district) + ', ' + AtlasText.escape(loc.state) + ' - ' + AtlasText.escape(loc.pin_code) + '</p>' +
                     statusHtml + '</div>';
                 var iconToUse = isAcquired ? greenIcon : greyIcon;
                 L.marker([parseFloat(loc.latitude), parseFloat(loc.longitude)], {icon: iconToUse})

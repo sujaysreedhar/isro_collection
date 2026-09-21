@@ -49,6 +49,7 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="<?= SITE_URL ?>/assets/js/atlas_text.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var map = L.map('frontendAtlasMap').setView([20.5937, 78.9629], 5);
@@ -75,15 +76,15 @@ if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); }
         rawData.forEach(function(loc) {
             if (loc.latitude && loc.longitude) {
                 var isAcquired = parseInt(loc.is_acquired, 10) === 1;
-                var markerTitle = loc.post_office + ' - ' + loc.district;
+                var markerTitle = AtlasText.escape(loc.post_office + ' - ' + loc.district);
                 
                 var statusHtml = isAcquired ? 
                     '<span style="background: rgba(34,197,94,0.2); color: #86efac; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; display: inline-block; margin-top: 4px; border: 1px solid rgba(34,197,94,0.3);">✓ Collected</span>' : 
                     '<span style="background: rgba(255,255,255,0.05); color: #94a3b8; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; display: inline-block; margin-top: 4px; border: 1px solid rgba(255,255,255,0.1);">Seeking</span>';
 
                 var popupHtml = '<div style="font-family: \'Plus Jakarta Sans\', sans-serif; padding: 4px;">' +
-                                '<h3 style="font-size:15px; font-weight:800; margin:0 0 4px 0; color: #f8fafc;">' + loc.post_office + '</h3>' +
-                                '<p style="margin: 0 0 8px 0; color: #94a3b8; font-size:13px;">' + loc.district + ', ' + loc.state + ' - ' + loc.pin_code + '</p>' +
+                                '<h3 style="font-size:15px; font-weight:800; margin:0 0 4px 0; color: #f8fafc;">' + AtlasText.escape(loc.post_office) + '</h3>' +
+                                '<p style="margin: 0 0 8px 0; color: #94a3b8; font-size:13px;">' + AtlasText.escape(loc.district) + ', ' + AtlasText.escape(loc.state) + ' - ' + AtlasText.escape(loc.pin_code) + '</p>' +
                                 statusHtml +
                                 '</div>';
 

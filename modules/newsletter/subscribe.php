@@ -1,9 +1,9 @@
 <?php
 // modules/newsletter/subscribe.php
 require_once __DIR__ . '/../../config/config.php';
-require_once __DIR__ . '/../../includes/csrf.php';
+require_once __DIR__ . '/../../includes/Csrf.php';
 
-session_start();
+Csrf::initSession();
 
 header('Content-Type: application/json; charset=utf-8');
 

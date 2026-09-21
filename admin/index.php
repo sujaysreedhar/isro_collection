@@ -13,9 +13,27 @@ $itemsShortDesc = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE LENGTH(phys
 $itemsNoImage = (int)$pdo->query("SELECT COUNT(*) FROM items i WHERE NOT EXISTS (SELECT 1 FROM media m WHERE m.item_id = i.id)")->fetchColumn();
 $itemsHidden = (int)$pdo->query("SELECT COUNT(*) FROM items WHERE is_visible = 0")->fetchColumn();
 
-$mp = new MediaProcessor($pdo, $storage ?? null);
-$orphanedFiles = $mp->orphanedFiles();
-$orphanedFilesCount = count($orphanedFiles);
+// Orphaned files with 15-minute cache to avoid expensive filesystem scans on every page view
+$orphanedCacheKey = 'dashboard_orphaned_count';
+$orphanedCacheTimeKey = 'dashboard_orphaned_time';
+
+$cachedOrphaned = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+$cachedOrphaned->execute([$orphanedCacheKey]);
+$cachedOrphanedVal = $cachedOrphaned->fetchColumn();
+
+$cachedOrphanedTime = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+$cachedOrphanedTime->execute([$orphanedCacheTimeKey]);
+$cachedOrphanedTimeVal = (int)$cachedOrphanedTime->fetchColumn();
+
+if ($cachedOrphanedVal !== false && (time() - $cachedOrphanedTimeVal) < 900) {
+    $orphanedFilesCount = (int)$cachedOrphanedVal;
+} else {
+    $mp = new MediaProcessor($pdo, $storage ?? null);
+    $orphanedFilesCount = count($mp->orphanedFiles());
+    $upsertOrphan = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+    $upsertOrphan->execute([$orphanedCacheKey, $orphanedFilesCount, $orphanedFilesCount]);
+    $upsertOrphan->execute([$orphanedCacheTimeKey, time(), time()]);
+}
 
 // Recent activity
 $recentItems = $pdo->query("

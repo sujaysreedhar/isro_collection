@@ -41,10 +41,12 @@ class LocalStorage implements StorageInterface {
     }
 
     public function exists(string $storagePath): bool {
+        $storagePath = MediaProcessor::normalizeStoragePath($storagePath);
         return file_exists($this->basePath . str_replace('/', DIRECTORY_SEPARATOR, $storagePath));
     }
 
     public function url(string $storagePath): string {
+        $storagePath = MediaProcessor::normalizeStoragePath($storagePath);
         return $this->baseUrl . str_replace(DIRECTORY_SEPARATOR, '/', $storagePath);
     }
 

@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_mapping'])) {
 <?php endif; ?>
 
 <form method="POST" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <?= Csrf::input() ?>
     <input type="hidden" name="save_mapping" value="1">
     <table class="w-full text-left border-collapse">
         <thead class="bg-gray-50 border-b border-gray-200">

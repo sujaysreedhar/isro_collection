@@ -518,6 +518,7 @@ require_once ThemeManager::getHeader();
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($gmapsKey) ?>&libraries=places,geometry&callback=initMap"></script>
 <?php endif; ?>
 
+<script src="<?= SITE_URL ?>/assets/js/atlas_text.js"></script>
 <script>
     const PO_DATA = <?= $jsonAllLocations ?>;
     const SITE_URL = '<?= SITE_URL ?>';
@@ -839,8 +840,8 @@ require_once ThemeManager::getHeader();
             const infoWindow = new google.maps.InfoWindow({
                 content: `
                 <div style="font-family:Inter,sans-serif; padding:4px;">
-                    <strong style="display:block;font-size:13px; margin-bottom:2px;">${s.post_office}</strong>
-                    <span style="font-size:11px;color:#64748b;">${s.district}, ${s.state}</span>
+                    <strong style="display:block;font-size:13px; margin-bottom:2px;">${AtlasText.escape(s.post_office)}</strong>
+                    <span style="font-size:11px;color:#64748b;">${AtlasText.escape(s.district)}, ${AtlasText.escape(s.state)}</span>
                     <hr style="margin:8px 0; border:0; border-top:1px solid #eee;">
                     <span class="rp-badge" style="background:${isAcq ? '#dcfce7' : '#fef3c7'}; color:${isAcq ? '#166534' : '#92400e'}">${isAcq ? 'Collected' : 'To Collect'}</span>
                 </div>`
@@ -925,11 +926,11 @@ require_once ThemeManager::getHeader();
                             ? '<i class="fa-solid fa-circle-check mr-1"></i>Collected'
                             : `<i class="fa-solid fa-circle-dot mr-1"></i>#${visibleIdx}`}
                     </div>
-                    <h3 class="font-bold text-slate-800 text-sm leading-tight">${s.post_office}</h3>
-                    <div class="text-[11px] text-slate-500 font-medium mt-0.5">${s.district}, ${s.state} &middot; ${s.pin_code}</div>
+                    <h3 class="font-bold text-slate-800 text-sm leading-tight">${AtlasText.escape(s.post_office)}</h3>
+                    <div class="text-[11px] text-slate-500 font-medium mt-0.5">${AtlasText.escape(s.district)}, ${AtlasText.escape(s.state)} &middot; ${AtlasText.escape(s.pin_code)}</div>
                 </div>
                 <div class="flex flex-col items-end gap-1">
-                    ${s.linked_item_title ? `<a href="${SITE_URL}/item/${s.item_link_id}" class="text-[10px] font-bold text-sky-600 hover:underline">VIEW ITEM</a>` : ''}
+                    ${s.linked_item_title && AtlasText.itemId(s.item_link_id) ? `<a href="${SITE_URL}/item/${AtlasText.itemId(s.item_link_id)}" class="text-[10px] font-bold text-sky-600 hover:underline">VIEW ITEM</a>` : ''}
                     <button class="focus-btn p-2 rounded-full bg-slate-100 text-slate-400 hover:text-sky-500 transition-colors" title="Focus on map">
                         <i class="fa-solid fa-crosshairs"></i>
                     </button>

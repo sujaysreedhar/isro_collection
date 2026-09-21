@@ -33,7 +33,7 @@ class MediaProcessor
             @mkdir($this->uploadRoot, 0755, true);
         }
 
-        foreach (['thumbnails', 'display', 'original', 'pdfs'] as $dir) {
+        foreach (['thumbnails', 'original', 'pdfs'] as $dir) {
             $path = $this->uploadRoot . $dir;
             if (!is_dir($path)) {
                 @mkdir($path, 0755, true);
@@ -49,6 +49,11 @@ class MediaProcessor
      */
     public static function optimizeImage(string $srcPath, string $destPath, int $maxW = 1920, int $maxH = 1920, int $quality = 85, bool $cropSquare = false): bool
     {
+        try {
+            ImageUploadValidator::inspect($srcPath, false);
+        } catch (DomainException) {
+            return false;
+        }
         $finfo = new finfo(FILEINFO_MIME_TYPE);
         $mime = $finfo->file($srcPath);
         $src = self::gdLoadStatic($srcPath, $mime);
@@ -121,10 +126,14 @@ class MediaProcessor
         if ($runtimeError !== null)
             return ['success' => false, 'message' => $runtimeError];
 
-        if ($file['error'] !== UPLOAD_ERR_OK)
-            return ['success' => false, 'message' => $this->uploadError($file['error'])];
-        if ($file['size'] > self::MAX_IMG_BYTES)
-            return ['success' => false, 'message' => 'File exceeds the 5 MB maximum.'];
+        try {
+            $imageInfo = ImageUploadValidator::uploaded($file);
+            if ($croppedFile && ($croppedFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                ImageUploadValidator::uploaded($croppedFile);
+            }
+        } catch (DomainException $error) {
+            return ['success' => false, 'message' => $error->getMessage()];
+        }
 
         $finfo = new finfo(FILEINFO_MIME_TYPE);
         $mime = $finfo->file($file['tmp_name']);
@@ -142,34 +151,29 @@ class MediaProcessor
         // Save untouched original
         $origExt = $this->mimeExt($mime);
         $origPath = $this->uploadRoot . 'original' . DIRECTORY_SEPARATOR . $baseName . '.' . $origExt;
-        move_uploaded_file($file['tmp_name'], $origPath);
-        // Upload original to storage backend
-        if ($this->storage) {
-            $this->storage->put('original/' . $baseName . '.' . $origExt, $origPath, $mime);
+        if (!move_uploaded_file($file['tmp_name'], $origPath)) {
+            imagedestroy($src);
+            return ['success' => false, 'message' => 'Unable to store original image.'];
         }
-
-        // WebP variants
-        $webpName = $baseName . '.webp';
-        
-        if ($croppedFile && $croppedFile['error'] === UPLOAD_ERR_OK) {
-            $croppedMime = $finfo->file($croppedFile['tmp_name']);
-            $cropSrc = $this->gdLoad($croppedFile['tmp_name'], $croppedMime);
-            if ($cropSrc) {
-                $cropW = imagesx($cropSrc);
-                $cropH = imagesy($cropSrc);
-                $this->saveVariant($cropSrc, $cropW, $cropH, 'thumbnails', $webpName, 200, true);
-                imagedestroy($cropSrc);
-            } else {
-                $this->saveVariant($src, $origW, $origH, 'thumbnails', $webpName, 200, true);
-            }
-        } else {
-            $this->saveVariant($src, $origW, $origH, 'thumbnails', $webpName, 200, true);
-        }
-
-        $this->saveVariant($src, $origW, $origH, 'display', $webpName, $origW, false);
-        imagedestroy($src);
-
+        $webpName = $baseName . '_1200.webp';
+        $variantNames = [$baseName . '_200.webp', $baseName . '_640.webp', $webpName];
         try {
+            if ($this->storage && !$this->storage->put('original/' . $baseName . '.' . $origExt, $origPath, $mime)) {
+                throw new RuntimeException('Original storage failed.');
+            }
+            $thumbnailSource = $src;
+            if ($croppedFile && $croppedFile['error'] === UPLOAD_ERR_OK) {
+                $croppedMime = $finfo->file($croppedFile['tmp_name']);
+                $thumbnailSource = $this->gdLoad($croppedFile['tmp_name'], $croppedMime);
+                if (!$thumbnailSource) throw new RuntimeException('Cropped image could not be decoded.');
+            }
+            try {
+                $this->saveVariant($thumbnailSource, imagesx($thumbnailSource), imagesy($thumbnailSource), 'thumbnails', $variantNames[0], 200, true);
+            } finally {
+                if ($thumbnailSource !== $src) imagedestroy($thumbnailSource);
+            }
+            $this->saveVariant($src, $origW, $origH, 'thumbnails', $variantNames[1], 640, false);
+            $this->saveVariant($src, $origW, $origH, 'thumbnails', $variantNames[2], 1200, false);
             if ($this->hasIsPrimary && $isPrimary) {
                 $this->db->prepare('UPDATE media SET is_primary = 0 WHERE item_id = ?')->execute([$itemId]);
             }
@@ -179,18 +183,27 @@ class MediaProcessor
                     INSERT INTO media (item_id, file_path, caption, license_type, is_primary,
                                        file_size, mime_type, dimensions, media_type, upload_date)
                     VALUES (?, ?, ?, ?, ?, ?, 'image/webp', ?, 'image', NOW())
-                ")->execute([$itemId, $webpName, $caption, $license, $isPrimary ? 1 : 0, $file['size'], "{$origW}x{$origH}"]);
+                ")->execute([$itemId, $webpName, $caption, $license, $isPrimary ? 1 : 0, $imageInfo['bytes'], "{$origW}x{$origH}"]);
             } else {
                 $this->db->prepare("
                     INSERT INTO media (item_id, file_path, caption, license_type,
                                        file_size, mime_type, dimensions, media_type, upload_date)
                     VALUES (?, ?, ?, ?, ?, 'image/webp', ?, 'image', NOW())
-                ")->execute([$itemId, $webpName, $caption, $license, $file['size'], "{$origW}x{$origH}"]);
+                ")->execute([$itemId, $webpName, $caption, $license, $imageInfo['bytes'], "{$origW}x{$origH}"]);
             }
 
-            return ['success' => true, 'message' => 'Image saved in three sizes (thumbnail, display, original).', 'file' => $webpName];
-        } catch (\PDOException $e) {
-            return ['success' => false, 'message' => 'DB error: ' . $e->getMessage()];
+            return ['success' => true, 'message' => 'Image saved in three WebP sizes and original.', 'file' => $webpName];
+        } catch (Throwable $error) {
+            foreach ($variantNames as $variant) {
+                $this->deleteFileIfExists($this->uploadRoot . 'thumbnails' . DIRECTORY_SEPARATOR . $variant);
+                if ($this->storage) $this->storage->delete('thumbnails/' . $variant);
+            }
+            $this->deleteFileIfExists($origPath);
+            if ($this->storage) $this->storage->delete('original/' . $baseName . '.' . $origExt);
+            error_log('Media processing failed: ' . $error->getMessage());
+            return ['success' => false, 'message' => 'Image could not be saved.'];
+        } finally {
+            imagedestroy($src);
         }
     }
 
@@ -301,6 +314,19 @@ class MediaProcessor
                         $this->storage->delete('pdfs/' . $filePath);
                     }
                 } elseif ($mediaType === 'image') {
+                    if (preg_match('/^(img_\d+_[a-f0-9]{16})_1200\.webp$/', $filePath, $newMedia)) {
+                        foreach ([200, 640, 1200] as $size) {
+                            $path = 'thumbnails/' . $newMedia[1] . '_' . $size . '.webp';
+                            $this->deleteFileIfExists($this->uploadRoot . str_replace('/', DIRECTORY_SEPARATOR, $path));
+                            if ($this->storage) $this->storage->delete($path);
+                        }
+                        foreach (['jpg', 'png', 'gif', 'webp'] as $ext) {
+                            $path = 'original/' . $newMedia[1] . '.' . $ext;
+                            $this->deleteFileIfExists($this->uploadRoot . str_replace('/', DIRECTORY_SEPARATOR, $path));
+                            if ($this->storage) $this->storage->delete($path);
+                        }
+                        return ['success' => true, 'message' => 'Media deleted successfully.'];
+                    }
                     foreach (['thumbnails', 'display', 'original'] as $dir) {
                         foreach (glob($this->uploadRoot . $dir . DIRECTORY_SEPARATOR . pathinfo($filePath, PATHINFO_FILENAME) . '.*') ?: [] as $candidate) {
                             $this->deleteFileIfExists($candidate);
@@ -347,24 +373,50 @@ class MediaProcessor
             return 'https://www.youtube.com/embed/' . htmlspecialchars($filename);
         }
 
-        $subdir = match ($mediaType) {
-            'pdf' => 'pdfs',
-            default => $variant,
-        };
+        $storagePath = $mediaType === 'pdf' ? 'pdfs/' . $filename : self::variantStoragePath($filename, $variant);
+        if ($mediaType === 'image' && $variant === 'thumbnails'
+            && !preg_match('/^img_\d+_[a-f0-9]{16}_1200\.webp$/', $filename)) {
+            if ($storage && !$storage->exists($storagePath) && $storage->exists('thumbs/' . $filename)) {
+                $storagePath = 'thumbs/' . $filename;
+            } elseif (!$storage && !is_file(__DIR__ . '/../uploads/' . $storagePath)
+                && is_file(__DIR__ . '/../uploads/thumbs/' . $filename)) {
+                $storagePath = 'thumbs/' . $filename;
+            }
+        }
+        if ($storage) return $storage->url($storagePath);
+        return SITE_URL . '/uploads/' . implode('/', array_map('rawurlencode', explode('/', $storagePath)));
+    }
+
+    public static function variantStoragePath(string $filename, string $variant = 'display'): string
+    {
+        if (preg_match('/^img_\d+_[a-f0-9]{16}_1200\.webp$/', $filename)) {
+            $size = match ($variant) {
+                'thumbnails', 'thumbnail' => 200,
+                'card' => 640,
+                default => 1200,
+            };
+            return 'thumbnails/' . substr($filename, 0, -10) . '_' . $size . '.webp';
+        }
+
+        $subdir = $variant === 'card' ? 'display' : $variant;
 
         // Fallback for renamed folder: thumbnails -> thumbs
         if ($subdir === 'thumbnails' && !is_dir(__DIR__ . '/../uploads/thumbnails')) {
             $subdir = 'thumbs';
         }
 
-        $storagePath = $subdir . '/' . $filename;
+        return $subdir . '/' . $filename;
+    }
 
-        if ($storage) {
-            return $storage->url($storagePath);
+    public static function normalizeStoragePath(string $path): string
+    {
+        if (preg_match('#^thumbnails/(img_\d+_[a-f0-9]{16}_1200\.webp)$#', $path, $match)) {
+            return self::variantStoragePath($match[1], 'thumbnails');
         }
-
-        // Fallback to local URL
-        return SITE_URL . '/uploads/' . $subdir . '/' . htmlspecialchars($filename);
+        if (preg_match('#^display/(img_\d+_[a-f0-9]{16}_1200\.webp)$#', $path, $match)) {
+            return 'thumbnails/' . $match[1];
+        }
+        return $path;
     }
 
     /**
@@ -374,6 +426,12 @@ class MediaProcessor
     {
         $known = $this->db->query("SELECT file_path FROM media")->fetchAll(\PDO::FETCH_COLUMN);
         $knownSet = array_flip($known);
+        foreach ($known as $filename) {
+            if (preg_match('/^(img_\d+_[a-f0-9]{16})_1200\.webp$/', $filename, $newMedia)) {
+                foreach ([200, 640] as $size) $knownSet[$newMedia[1] . '_' . $size . '.webp'] = true;
+                foreach (['jpg', 'png', 'gif', 'webp'] as $ext) $knownSet[$newMedia[1] . '.' . $ext] = true;
+            }
+        }
         $orphans = [];
         foreach (['thumbnails', 'display', 'original', 'pdfs'] as $dir) {
             foreach (glob($this->uploadRoot . $dir . DIRECTORY_SEPARATOR . '*.*') ?: [] as $f) {
@@ -417,12 +475,15 @@ class MediaProcessor
             $img = HookRegistry::applyFilters('after_image_resize', $img, $folder);
         }
 
-        imagewebp($img, $path, 85);
+        $saved = imagewebp($img, $path, 85);
         imagedestroy($img);
+        if (!$saved) throw new RuntimeException('WebP encoding failed.');
 
         // Upload the variant to storage backend
         if ($this->storage) {
-            $this->storage->put($folder . '/' . $fn, $path, 'image/webp');
+            if (!$this->storage->put($folder . '/' . $fn, $path, 'image/webp')) {
+                throw new RuntimeException('Variant storage failed.');
+            }
         }
     }
 

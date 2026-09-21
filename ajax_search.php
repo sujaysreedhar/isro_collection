@@ -2,7 +2,14 @@
 // ajax_search.php
 require_once __DIR__ . '/config/config.php';
 
-$q = trim($_GET['q'] ?? '');
+$rawQuery = $_GET['q'] ?? '';
+if (!is_string($rawQuery) || (function_exists('mb_strlen') ? mb_strlen($rawQuery, 'UTF-8') : strlen($rawQuery)) > 200
+    || preg_match_all('/\S+/u', $rawQuery) > 10) {
+    header('Content-Type: application/json');
+    http_response_code(400);
+    exit(json_encode(['error' => 'Invalid search query.']));
+}
+$q = trim($rawQuery);
 
 if (empty($q) || strlen($q) < 2) {
     header('Content-Type: application/json');
@@ -32,7 +39,7 @@ try {
     foreach ($items as $item) {
         $previewUrl = '';
         if (!empty($item['preview_file_path'])) {
-            $previewUrl = SITE_URL . '/uploads/display/' . rawurlencode($item['preview_file_path']);
+            $previewUrl = MediaProcessor::url($item['preview_file_path'], 'thumbnails', 'image', $storage ?? null);
         }
         $formattedResults[] = [
             'id' => 'item_' . $item['id'],
@@ -53,7 +60,7 @@ try {
                 'id' => 'blog_' . $post['id'],
                 'title' => $post['title'],
                 'reg_number' => 'Blog Post',
-                'image_url' => $post['featured_image'] ? SITE_URL . '/uploads/' . rawurlencode($post['featured_image']) : '',
+                'image_url' => $post['featured_image'] ? BlogImage::url($post['featured_image'], 200, $storage ?? null) : '',
                 'url' => SITE_URL . '/blog/' . $post['slug']
             ];
         }

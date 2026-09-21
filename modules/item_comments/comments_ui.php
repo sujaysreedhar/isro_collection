@@ -62,7 +62,7 @@ unset($_SESSION['comment_success'], $_SESSION['comment_error']);
                 <p class="text-sm text-slate-500 mb-6">Do you have historical context, a memory, or more information about this artifact? Share it here.</p>
 
                 <form action="<?= SITE_URL ?>/modules/item_comments/submit.php" method="POST" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
                     <input type="hidden" name="item_id" value="<?= $item['id'] ?>">
 
                     <!-- Honeypot -->

@@ -5,11 +5,10 @@ foreach ($mediaItems as $media): ?>
     <a href="<?= SITE_URL ?>/item/<?= $media['item_id'] ?>" class="masonry-item group block relative bg-gray-100 rounded-lg overflow-hidden border border-gray-200 hover:shadow-xl transition-all duration-300">
         <?php if ($media['media_type'] === 'image'): ?>
             <?php 
-                $imgSrc = isset($storage) 
-                    ? $storage->url('display/' . $media['file_path']) 
-                    : SITE_URL . '/uploads/display/' . $media['file_path'];
+                $imgSrc = MediaProcessor::url($media['file_path'], 'card', 'image', $storage ?? null);
+                $displaySrc = MediaProcessor::url($media['file_path'], 'display', 'image', $storage ?? null);
             ?>
-            <img src="<?= htmlspecialchars($imgSrc) ?>" alt="<?= htmlspecialchars($media['title']) ?>" class="w-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">
+            <img src="<?= htmlspecialchars($imgSrc) ?>" srcset="<?= htmlspecialchars($imgSrc) ?> 640w, <?= htmlspecialchars($displaySrc) ?> 1200w" sizes="(max-width: 768px) 100vw, 33vw" alt="<?= htmlspecialchars($media['title']) ?>" class="w-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">
         <?php elseif ($media['media_type'] === 'youtube'): ?>
             <?php $ytId = MediaProcessor::extractYoutubeId($media['youtube_url']); ?>
             <div class="relative w-full pb-[56.25%] bg-black">

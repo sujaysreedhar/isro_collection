@@ -60,7 +60,7 @@
                                 <div class="bg-slate-900/40 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/5 transition-all duration-700 hover:-translate-y-6 hover:shadow-purple-500/20 hover:border-purple-500/30">
                                     <div class="h-80 relative bg-black">
                                         <?php if ($item['preview_file_path']): ?>
-                                            <img src="<?= SITE_URL ?>/uploads/display/<?= rawurlencode($item['preview_file_path']) ?>" 
+                                            <img src="<?= htmlspecialchars(MediaProcessor::url($item['preview_file_path'], 'card', 'image', $storage ?? null)) ?>" 
                                                  class="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110 opacity-70 group-hover:opacity-100 grayscale-[0.5] group-hover:grayscale-0" loading="lazy">
                                         <?php else: ?>
                                             <div class="w-full h-full flex items-center justify-center bg-slate-900 text-slate-800">

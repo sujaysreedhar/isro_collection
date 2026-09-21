@@ -59,6 +59,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif ($action === 'change_password') {
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $currentPassword = $_POST['current_password'] ?? '';
+        $newPassword = $_POST['new_password'] ?? '';
+        $confirmPassword = $_POST['confirm_password'] ?? '';
+        $currentAdminId = (int)($_SESSION['admin_id'] ?? 0);
+
+        if ($targetUserId <= 0) {
+            $error = 'Invalid administrator selected.';
+        } elseif (strlen($newPassword) < 8) {
+            $error = 'New password must be at least 8 characters long.';
+        } elseif ($newPassword !== $confirmPassword) {
+            $error = 'New password and confirmation do not match.';
+        } else {
+            // Fetch target admin
+            $adminStmt = $pdo->prepare("SELECT id, username, password_hash FROM admins WHERE id = ?");
+            $adminStmt->execute([$targetUserId]);
+            $targetAdmin = $adminStmt->fetch();
+
+            if (!$targetAdmin) {
+                $error = 'Administrator not found.';
+            } else {
+                $isSelf = ($targetUserId === $currentAdminId);
+                $canProceed = true;
+
+                if ($isSelf) {
+                    if (empty($currentPassword) || !password_verify($currentPassword, $targetAdmin['password_hash'])) {
+                        $error = 'Current password is incorrect.';
+                        $canProceed = false;
+                    }
+                }
+
+                if ($canProceed) {
+                    $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+                    $updateStmt = $pdo->prepare("UPDATE admins SET password_hash = ? WHERE id = ?");
+                    if ($updateStmt->execute([$newHash, $targetUserId])) {
+                        $name = htmlspecialchars($targetAdmin['username']);
+                        $success = $isSelf
+                            ? 'Your password has been updated successfully.'
+                            : "Password for administrator '{$name}' has been updated.";
+                    } else {
+                        $error = 'Failed to update password.';
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -123,6 +169,7 @@ echo renderAdminHeader('Manage Administrators');
                             <?= date('M j, Y, g:i a', strtotime($admin['created_at'])) ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button type="button" onclick="selectPasswordUser(<?= (int)$admin['id'] ?>)" class="text-blue-600 hover:text-blue-900 transition-colors mr-3">Password</button>
                             <?php if ($admin['id'] != ($_SESSION['admin_id'] ?? 0)): ?>
                             <form method="POST" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this administrator?');">
                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
@@ -141,8 +188,9 @@ echo renderAdminHeader('Manage Administrators');
         </div>
     </div>
 
-    <!-- Add New User Form -->
-    <div class="lg:col-span-1">
+    <!-- Right Column: Add User & Change Password -->
+    <div class="lg:col-span-1 space-y-6">
+        <!-- Add New User Form -->
         <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
             <div class="p-5 border-b border-gray-200 bg-gray-50">
                 <h3 class="font-semibold text-gray-800">Add Administrator</h3>
@@ -160,9 +208,9 @@ echo renderAdminHeader('Manage Administrators');
                     </div>
                     <div>
                         <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                        <input type="password" name="password" id="password" required
+                        <input type="password" name="password" id="password" required minlength="8"
                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
-                               placeholder="••••••••">
+                               placeholder="Minimum 8 characters">
                     </div>
                     <div class="pt-2">
                         <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors">
@@ -172,7 +220,96 @@ echo renderAdminHeader('Manage Administrators');
                 </form>
             </div>
         </div>
+
+        <!-- Change Password Form -->
+        <div id="password-card" class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-gray-200 bg-gray-50">
+                <h3 class="font-semibold text-gray-800">Change Password</h3>
+            </div>
+            <div class="p-5">
+                <form method="POST" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ensureCsrfToken()) ?>">
+                    <input type="hidden" name="action" value="change_password">
+                    
+                    <div>
+                        <label for="pwd_user_id" class="block text-sm font-medium text-gray-700 mb-1">Administrator</label>
+                        <select name="user_id" id="pwd_user_id" required class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900" onchange="toggleCurrentPassword(this.value)">
+                            <?php foreach ($admins as $adm): ?>
+                                <option value="<?= (int)$adm['id'] ?>" <?= $adm['id'] == ($_SESSION['admin_id'] ?? 0) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($adm['username']) ?> <?= $adm['id'] == ($_SESSION['admin_id'] ?? 0) ? '(You)' : '' ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div id="current_pwd_group">
+                        <label for="current_password" class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                        <input type="password" name="current_password" id="current_password"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                               placeholder="••••••••">
+                    </div>
+
+                    <div>
+                        <label for="new_password" class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                        <input type="password" name="new_password" id="new_password" required minlength="8"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                               placeholder="Minimum 8 characters">
+                    </div>
+
+                    <div>
+                        <label for="confirm_password" class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                        <input type="password" name="confirm_password" id="confirm_password" required minlength="8"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                               placeholder="••••••••">
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition-colors">
+                            Update Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+const currentLoggedInAdminId = <?= (int)($_SESSION['admin_id'] ?? 0) ?>;
+
+function toggleCurrentPassword(selectedUserId) {
+    const grp = document.getElementById('current_pwd_group');
+    const input = document.getElementById('current_password');
+    if (!grp || !input) return;
+    if (parseInt(selectedUserId) === currentLoggedInAdminId) {
+        grp.style.display = 'block';
+        input.required = true;
+    } else {
+        grp.style.display = 'none';
+        input.required = false;
+        input.value = '';
+    }
+}
+
+function selectPasswordUser(userId) {
+    const sel = document.getElementById('pwd_user_id');
+    if (!sel) return;
+    sel.value = userId;
+    toggleCurrentPassword(userId);
+    const card = document.getElementById('password-card');
+    if (card) {
+        card.scrollIntoView({ behavior: 'smooth' });
+    }
+    const focusTarget = document.getElementById(parseInt(userId) === currentLoggedInAdminId ? 'current_password' : 'new_password');
+    if (focusTarget) focusTarget.focus();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const sel = document.getElementById('pwd_user_id');
+    if (sel) {
+        toggleCurrentPassword(sel.value);
+    }
+});
+</script>
 
 <?= renderAdminFooter(); ?>

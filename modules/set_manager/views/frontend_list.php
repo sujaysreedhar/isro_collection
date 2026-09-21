@@ -44,7 +44,7 @@ require_once ThemeManager::getHeader(); ?>
     <div class="container mx-auto px-6 -mt-10 relative z-10">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <?php foreach ($sets as $set): ?>
-                <?php $prog = $this->module->getSetProgress($set['id']); ?>
+                <?php $prog = $this->module->getSetProgress($set['id'], true); ?>
                 <a href="<?= SITE_URL ?>/checklist/<?= $set['slug'] ?>" class="group bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col">
                     <!-- Banner -->
                     <div class="relative h-48 bg-slate-100 overflow-hidden">

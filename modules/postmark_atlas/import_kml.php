@@ -354,6 +354,7 @@ function renderWizardPage(string $view, array $data, array $errors, int $totalCh
             </div>
         </div>
         <form method="POST" action="<?= SITE_URL ?>/admin/module_page.php?m=postmark_atlas&page=import">
+            <?= Csrf::input() ?>
             <input type="hidden" name="step" value="prepare">
             <button type="submit" class="inline-flex items-center gap-2 px-8 py-3 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl transition-colors text-base">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
@@ -458,6 +459,7 @@ function renderWizardPage(string $view, array $data, array $errors, int $totalCh
             ← Cancel
         </a>
         <form method="POST" action="<?= SITE_URL ?>/admin/module_page.php?m=postmark_atlas&page=import">
+            <?= Csrf::input() ?>
             <input type="hidden" name="step" value="confirm">
             <button type="submit"
                     onclick="this.disabled=true;this.textContent='Applying…';this.form.submit();"

@@ -1,8 +1,10 @@
 <?php
 // modules/user_galleries/my_galleries.php
 require_once __DIR__ . '/../../config/config.php';
+$galleryCsrf = Csrf::getToken();
 
 $userToken = $_COOKIE['gallery_user_token'] ?? null;
+if (!is_string($userToken) || !preg_match('/^[a-f0-9]{64}$/', $userToken)) $userToken = null;
 $galleries = [];
 
 if ($userToken) {
@@ -77,6 +79,7 @@ if ($userToken) {
             const formData = new FormData();
             formData.append('action', 'delete_gallery');
             formData.append('gallery_id', id);
+            formData.append('csrf_token', <?= json_encode($galleryCsrf) ?>);
             
             fetch('<?= SITE_URL ?>/modules/user_galleries/api.php', { method: 'POST', body: formData })
                 .then(res => res.json())

@@ -40,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
 <?php if ($success): ?><div class="mb-4 bg-emerald-50 text-emerald-700 p-4 rounded-xl border border-emerald-100"><?= htmlspecialchars($success) ?></div><?php endif; ?>
 
 <form method="POST">
+    <?= Csrf::input() ?>
     <input type="hidden" name="bulk_action" value="1">
     
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">

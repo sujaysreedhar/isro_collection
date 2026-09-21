@@ -69,6 +69,7 @@ function addToGallery(galleryId) {
     formData.append('action', 'add_item');
     formData.append('gallery_id', galleryId);
     formData.append('item_id', currentItemId);
+    formData.append('csrf_token', window.GALLERY_CSRF);
     
     fetch(`${SITE_URL}/modules/user_galleries/api.php`, {
         method: 'POST',
@@ -89,6 +90,7 @@ function removeFromGallery(galleryId) {
     formData.append('action', 'remove_item');
     formData.append('gallery_id', galleryId);
     formData.append('item_id', currentItemId);
+    formData.append('csrf_token', window.GALLERY_CSRF);
     
     fetch(`${SITE_URL}/modules/user_galleries/api.php`, {
         method: 'POST',
@@ -112,6 +114,7 @@ function createGallery() {
     const formData = new FormData();
     formData.append('action', 'create');
     formData.append('title', title);
+    formData.append('csrf_token', window.GALLERY_CSRF);
     
     fetch(`${SITE_URL}/modules/user_galleries/api.php`, {
         method: 'POST',

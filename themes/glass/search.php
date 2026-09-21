@@ -210,7 +210,7 @@ require_once ThemeManager::getHeader();
                                 <!-- Image Thumbnail -->
                                 <div class="w-full h-56 bg-black/20 relative overflow-hidden flex-shrink-0">
                                     <?php if (!empty($item['preview_file_path'])): ?>
-                                        <img src="<?= SITE_URL ?>/uploads/display/<?= rawurlencode($item['preview_file_path']) ?>" alt="<?= htmlspecialchars($item['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out opacity-90 group-hover:opacity-100" loading="lazy">
+                                        <img src="<?= htmlspecialchars(MediaProcessor::url($item['preview_file_path'], 'card', 'image', $storage ?? null)) ?>" alt="<?= htmlspecialchars($item['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out opacity-90 group-hover:opacity-100" loading="lazy">
                                     <?php else: ?>
                                         <div class="w-full h-full flex flex-col items-center justify-center text-slate-500">
                                             <svg class="h-10 w-10 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>

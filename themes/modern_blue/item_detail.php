@@ -95,7 +95,7 @@ require_once ThemeManager::getHeader();
                                 $thumbSrc = '';
                                 $isVid = false;
                                 if ($m['media_type'] === 'image' || $m['media_type'] === 'document') {
-                                    $thumbSrc = isset($storage) ? $storage->url('thumbnails/' . $m['file_path']) : SITE_URL . '/uploads/thumbnails/' . $m['file_path'];
+                                    $thumbSrc = MediaProcessor::url($m['file_path'], 'thumbnails', 'image', $storage ?? null);
                                 } elseif ($m['media_type'] === 'youtube') {
                                     preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i', $m['youtube_url'] ?? '', $matches);
                                     $ytId = $matches[1] ?? '';

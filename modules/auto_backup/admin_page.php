@@ -6,9 +6,11 @@ $history = $service->getBackupHistory();
 $enabled = ($GLOBALS['appSettings']['auto_backup_enabled'] ?? '1') === '1';
 $lastDbRun = (int)($GLOBALS['appSettings']['auto_backup_last_db_run'] ?? 0);
 $lastMediaRun = (int)($GLOBALS['appSettings']['auto_backup_last_media_run'] ?? 0);
+$lastFailureAt = (int)($GLOBALS['appSettings']['auto_backup_last_failure_at'] ?? 0);
 
 $lastDbRunStr = $lastDbRun > 0 ? date('Y-m-d H:i:s', $lastDbRun) : 'Never';
 $lastMediaRunStr = $lastMediaRun > 0 ? date('Y-m-d H:i:s', $lastMediaRun) : 'Never';
+$backupStale = $enabled && (($lastDbRun === 0 || time() - $lastDbRun > 86400) || ($lastMediaRun === 0 || time() - $lastMediaRun > 604800));
 
 function formatBytes($bytes, $precision = 2) {
     $units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -25,7 +27,9 @@ function formatBytes($bytes, $precision = 2) {
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5">
         <div>
             <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Automatic Backups</h1>
-            <p class="text-sm text-slate-500 mt-1">Configure automated maintenance intervals. Backups trigger seamlessly when administrators browse the workspace.</p>
+            <p class="text-sm text-slate-500 mt-1">Configure automated maintenance intervals. Schedule the CLI runner hourly to execute due backups.</p>
+            <?php if ($backupStale): ?><p class="text-sm text-amber-700 mt-1">A backup is due. Check the scheduled runner and its logs.</p><?php endif; ?>
+            <?php if ($lastFailureAt > max($lastDbRun, $lastMediaRun)): ?><p class="text-sm text-red-700 mt-1">The last backup attempt failed at <?= htmlspecialchars(date('Y-m-d H:i:s', $lastFailureAt)) ?>. Check the protected runner log.</p><?php endif; ?>
         </div>
         <div class="flex items-center gap-3">
             <span class="text-sm font-semibold text-slate-600">Auto Backups Status:</span>
@@ -173,7 +177,7 @@ function formatBytes($bytes, $precision = 2) {
                     <li><strong>Database backup:</strong> Runs automatically once every 24 hours.</li>
                     <li><strong>Uploads backup:</strong> Runs automatically once every 7 days (excludes `thumbs/` cache folder).</li>
                     <li><strong>Pruning:</strong> Keeps only the last 5 updates. Older folders are completely deleted.</li>
-                    <li><strong>No Cronjob Needed:</strong> Checked and executed in the background of page loads when any administrator browses the admin panel.</li>
+                    <li><strong>Scheduler required:</strong> Run <code>scripts/run_auto_backup.php</code> hourly from Task Scheduler or cron.</li>
                 </ul>
             </section>
         </div>

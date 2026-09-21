@@ -15,6 +15,7 @@ $GLOBALS['admin_settings_whitelist'] = [
     'auto_backup_enabled',
     'auto_backup_last_db_run',
     'auto_backup_last_media_run',
+    'auto_backup_last_failure_at',
 ];
 
 // Validate we have an action parameter
@@ -233,16 +234,29 @@ switch ($action) {
         echo json_encode(['success' => true, 'deleted' => count($ids)]);
         break;
 
-    // --- Items Search (for Select2 in Narrative editor) ---
+    // --- Items Search (for Select2 in Narrative editor and TomSelect in Item editor) ---
     case 'search_items':
         $q = trim($_GET['q'] ?? '');
-        $sql = "SELECT id, title as text FROM items";
+        $exclude = (int)($_GET['exclude'] ?? 0);
+        $sql = "SELECT id, title, reg_number, CONCAT('[', COALESCE(reg_number, ''), '] ', title) as text FROM items";
         $params = [];
+        $whereClauses = [];
+
+        if ($exclude > 0) {
+            $whereClauses[] = "id != :exclude";
+            $params[':exclude'] = $exclude;
+        }
+
         if ($q !== '') {
-            $sql .= " WHERE title LIKE :q1 OR reg_number LIKE :q2";
+            $whereClauses[] = "(title LIKE :q1 OR reg_number LIKE :q2)";
             $params[':q1'] = '%' . $q . '%';
             $params[':q2'] = '%' . $q . '%';
         }
+
+        if (!empty($whereClauses)) {
+            $sql .= " WHERE " . implode(' AND ', $whereClauses);
+        }
+
         $sql .= " ORDER BY title ASC LIMIT 30";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -348,6 +362,12 @@ switch ($action) {
             }
         }
 
+        // Cache scan results in settings for dashboard
+        $orphanCount = count($orphans);
+        $upsertOrphan = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+        $upsertOrphan->execute(['dashboard_orphaned_count', $orphanCount, $orphanCount]);
+        $upsertOrphan->execute(['dashboard_orphaned_time', time(), time()]);
+
         echo json_encode(['success' => true, 'orphans' => $orphans]);
         break;
 
@@ -387,8 +407,12 @@ switch ($action) {
             }
         }
 
+        // Invalidate dashboard orphaned files cache
+        $pdo->prepare("DELETE FROM settings WHERE setting_key IN ('dashboard_orphaned_count', 'dashboard_orphaned_time')")->execute();
+
         echo json_encode(['success' => true, 'deleted' => $deleted, 'message' => "$deleted file(s) deleted."]);
         break;
+
 
 
     default:

@@ -87,13 +87,7 @@ require_once ThemeManager::getHeader();
                         <div class="relative w-full pt-[60%] bg-slate-100 overflow-hidden">
                             <?php if (!empty($item['primary_media_path'])): ?>
                                 <?php
-                                    if (isset($storage)) {
-                                        $mediaSrc = $storage->url('display/' . $item['primary_media_path']);
-                                    } else {
-                                        $mediaSrc = file_exists(realpath(__DIR__ . '/../../uploads/display/' . $item['primary_media_path'])) 
-                                            ? SITE_URL . '/uploads/display/' . rawurlencode($item['primary_media_path'])
-                                            : SITE_URL . '/uploads/originals/' . rawurlencode($item['primary_media_path']);
-                                    }
+                                    $mediaSrc = MediaProcessor::url($item['primary_media_path'], 'card', 'image', $storage ?? null);
                                     
                                     // Determine if it's a YouTube video to show an icon
                                     $isYoutube = ($item['primary_media_type'] === 'youtube');

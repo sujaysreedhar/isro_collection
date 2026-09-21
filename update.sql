@@ -25,3 +25,18 @@ INSERT IGNORE INTO museum_exhibition_sources (exhibition_id, source_type, source
 SELECT id, source_type, source_id, 0
 FROM museum_exhibitions
 WHERE source_type IN ('category','collection','tag') AND source_id IS NOT NULL;
+
+-- Security audit: atomic fixed-window counters for login and public writes.
+CREATE TABLE IF NOT EXISTS request_rate_limits (
+    scope VARCHAR(64) NOT NULL,
+    key_hash CHAR(64) NOT NULL,
+    window_start BIGINT UNSIGNED NOT NULL,
+    attempts INT UNSIGNED NOT NULL DEFAULT 0,
+    expires_at BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (scope, key_hash, window_start),
+    KEY idx_request_rate_limits_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Automatic backup scheduler: initialize the last failed attempt timestamp for admin status display.
+INSERT INTO settings (setting_key, setting_value) VALUES ('auto_backup_last_failure_at', '0')
+ON DUPLICATE KEY UPDATE setting_value = setting_value;

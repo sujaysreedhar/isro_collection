@@ -171,12 +171,7 @@
             <button onclick="window.location.reload()" class="btn btn-primary">Try Again</button>
         </div>
 
-        <?php if (defined('DEBUG_MODE') && DEBUG_MODE && isset($errorMessage)): ?>
-        <details class="debug-info">
-            <summary>Technical Details</summary>
-            <pre><?= htmlspecialchars($errorMessage) ?></pre>
-        </details>
-        <?php endif; ?>
+        <p class="text-sm">Reference: <?= htmlspecialchars($publicError['error_id'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
     </div>
 </body>
 </html>

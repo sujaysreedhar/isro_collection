@@ -1,6 +1,7 @@
 <?php
 // modules/user_galleries/api.php
 require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../includes/Csrf.php';
 
 header('Content-Type: application/json');
 
@@ -8,15 +9,54 @@ header('Content-Type: application/json');
 $tokenName = 'gallery_user_token';
 $userToken = $_COOKIE[$tokenName] ?? null;
 
-if (!$userToken) {
+if (!is_string($userToken) || !preg_match('/^[a-f0-9]{64}$/', $userToken)) {
     $userToken = bin2hex(random_bytes(32));
-    // Set cookie for 1 year
-    setcookie($tokenName, $userToken, time() + (365 * 24 * 60 * 60), '/');
+    setcookie($tokenName, $userToken, [
+        'expires' => time() + 365 * 86400,
+        'path' => '/',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
 }
 
 $action = $_POST['action'] ?? ($_GET['action'] ?? '');
 
+function galleryLock(PDO $pdo, string $key): bool {
+    $name = 'gallery:' . substr(hash('sha256', $key), 0, 48);
+    $stmt = $pdo->prepare('SELECT GET_LOCK(?, 0)');
+    $stmt->execute([$name]);
+    return (int)$stmt->fetchColumn() === 1;
+}
+function galleryUnlock(PDO $pdo, string $key): void {
+    $stmt = $pdo->prepare('SELECT RELEASE_LOCK(?)');
+    $stmt->execute(['gallery:' . substr(hash('sha256', $key), 0, 48)]);
+}
+function galleryPositiveId($raw): int {
+    if (!is_string($raw) || !ctype_digit($raw) || (int)$raw <= 0) throw new DomainException('Invalid ID.');
+    return (int)$raw;
+}
+
 try {
+    if (!is_string($action)) throw new DomainException('Invalid action.');
+    if ($action !== 'list') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') throw new DomainException('Invalid method.');
+        $csrf = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+        if (!Csrf::verify(is_string($csrf) ? $csrf : null)) {
+            http_response_code(403);
+            exit(json_encode(['success' => false, 'error' => 'Security check failed.']));
+        }
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $ownerLimit = RateLimiter::consume($pdo, 'gallery_owner', $userToken, 60, 600);
+        $ipLimit = RateLimiter::consume($pdo, 'gallery_ip', $ip, 120, 600);
+        if (!$ownerLimit['allowed'] || !$ipLimit['allowed']) {
+            http_response_code(429);
+            header('Retry-After: ' . max($ownerLimit['retry_after'], $ipLimit['retry_after']));
+            exit(json_encode(['success' => false, 'error' => 'Too many requests.']));
+        }
+    } elseif (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+        throw new DomainException('Invalid method.');
+    }
     switch ($action) {
         case 'list':
             $stmt = $pdo->prepare("SELECT id, title, description, share_token FROM user_galleries WHERE user_token = ? ORDER BY created_at DESC");
@@ -37,53 +77,87 @@ try {
             break;
 
         case 'create':
-            $title = trim($_POST['title'] ?? '');
+            if (!is_string($_POST['title'] ?? null) || strlen($_POST['title']) > 200 || !is_string($_POST['description'] ?? '')) throw new DomainException('Invalid gallery details.');
+            $title = trim($_POST['title']);
             $description = trim($_POST['description'] ?? '');
+            if (strlen($description) > 2000) throw new DomainException('Description is too long.');
             
             if (empty($title)) {
-                throw new Exception('Gallery title is required.');
+                throw new DomainException('Gallery title is required.');
             }
-            
+            $createLimit = RateLimiter::consume($pdo, 'gallery_create_ip', $ip, 10, 3600);
+            if (!$createLimit['allowed']) {
+                http_response_code(429);
+                header('Retry-After: ' . $createLimit['retry_after']);
+                exit(json_encode(['success' => false, 'error' => 'Too many galleries created.']));
+            }
+            if (!galleryLock($pdo, $userToken)) throw new DomainException('Gallery is busy. Please retry.');
+            try {
+                $pdo->beginTransaction();
+                $count = $pdo->prepare('SELECT COUNT(*) FROM user_galleries WHERE user_token = ?');
+                $count->execute([$userToken]);
+                if ((int)$count->fetchColumn() >= 50) throw new DomainException('Gallery limit reached.');
             $shareToken = bin2hex(random_bytes(16));
             $stmt = $pdo->prepare("INSERT INTO user_galleries (user_token, title, description, share_token) VALUES (?, ?, ?, ?)");
             $stmt->execute([$userToken, $title, $description, $shareToken]);
-            
-            echo json_encode(['success' => true, 'gallery_id' => $pdo->lastInsertId(), 'share_token' => $shareToken]);
+            $newId = $pdo->lastInsertId();
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            } finally {
+                galleryUnlock($pdo, $userToken);
+            }
+            echo json_encode(['success' => true, 'gallery_id' => $newId, 'share_token' => $shareToken]);
             break;
 
         case 'add_item':
-            $galleryId = (int)($_POST['gallery_id'] ?? 0);
-            $itemId = (int)($_POST['item_id'] ?? 0);
+            $galleryId = galleryPositiveId($_POST['gallery_id'] ?? null);
+            $itemId = galleryPositiveId($_POST['item_id'] ?? null);
             
             // Verify ownership
             $check = $pdo->prepare("SELECT id FROM user_galleries WHERE id = ? AND user_token = ?");
             $check->execute([$galleryId, $userToken]);
             if (!$check->fetch()) {
-                throw new Exception('Gallery not found or access denied.');
+                throw new DomainException('Gallery not found or access denied.');
             }
-            
+            $visible = $pdo->prepare('SELECT id FROM items WHERE id = ? AND is_visible = 1');
+            $visible->execute([$itemId]);
+            if (!$visible->fetchColumn()) throw new DomainException('Item unavailable.');
+            if (!galleryLock($pdo, 'items:' . $galleryId)) throw new DomainException('Gallery is busy. Please retry.');
+            try {
+                $pdo->beginTransaction();
+                $count = $pdo->prepare('SELECT COUNT(*) FROM user_gallery_items WHERE gallery_id = ?');
+                $count->execute([$galleryId]);
+                if ((int)$count->fetchColumn() >= 500) throw new DomainException('Gallery item limit reached.');
             // Check if already in gallery
             $dup = $pdo->prepare("SELECT id FROM user_gallery_items WHERE gallery_id = ? AND item_id = ?");
             $dup->execute([$galleryId, $itemId]);
             if ($dup->fetch()) {
-                throw new Exception('Item is already in this gallery.');
+                throw new DomainException('Item is already in this gallery.');
             }
             
             $stmt = $pdo->prepare("INSERT INTO user_gallery_items (gallery_id, item_id) VALUES (?, ?)");
             $stmt->execute([$galleryId, $itemId]);
-            
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            } finally {
+                galleryUnlock($pdo, 'items:' . $galleryId);
+            }
             echo json_encode(['success' => true]);
             break;
 
         case 'remove_item':
-            $galleryId = (int)($_POST['gallery_id'] ?? 0);
-            $itemId = (int)($_POST['item_id'] ?? 0);
+            $galleryId = galleryPositiveId($_POST['gallery_id'] ?? null);
+            $itemId = galleryPositiveId($_POST['item_id'] ?? null);
             
             // Verify ownership
             $check = $pdo->prepare("SELECT id FROM user_galleries WHERE id = ? AND user_token = ?");
             $check->execute([$galleryId, $userToken]);
             if (!$check->fetch()) {
-                throw new Exception('Gallery not found or access denied.');
+                throw new DomainException('Gallery not found or access denied.');
             }
             
             $stmt = $pdo->prepare("DELETE FROM user_gallery_items WHERE gallery_id = ? AND item_id = ?");
@@ -93,12 +167,12 @@ try {
             break;
             
         case 'delete_gallery':
-            $galleryId = (int)($_POST['gallery_id'] ?? 0);
+            $galleryId = galleryPositiveId($_POST['gallery_id'] ?? null);
             
             $check = $pdo->prepare("SELECT id FROM user_galleries WHERE id = ? AND user_token = ?");
             $check->execute([$galleryId, $userToken]);
             if (!$check->fetch()) {
-                throw new Exception('Gallery not found or access denied.');
+                throw new DomainException('Gallery not found or access denied.');
             }
             
             // Cascade delete will handle items if FK was set up, but let's manual delete to be safe
@@ -112,9 +186,12 @@ try {
             break;
 
         default:
-            throw new Exception('Invalid action.');
+            throw new DomainException('Invalid action.');
     }
-} catch (Exception $e) {
+} catch (DomainException $e) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+} catch (Throwable $e) {
+    http_response_code(503);
+    echo json_encode(PublicError::payload($e));
 }

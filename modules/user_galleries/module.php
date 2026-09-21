@@ -4,6 +4,7 @@
 class UserGalleriesModule extends BaseModule {
     
     public function boot() {
+        $galleryCsrf = Csrf::getToken();
         // 1. Inject User Galleries link into frontend navigation
         HookRegistry::addFilter('frontend_nav_links', function($links) {
             $links['user_galleries'] = ['url' => SITE_URL . '/modules/user_galleries/my_galleries.php', 'label' => 'My Galleries'];
@@ -11,7 +12,7 @@ class UserGalleriesModule extends BaseModule {
         });
 
         // 2. Inject CSS/JS into frontend head
-        HookRegistry::addAction('frontend_head', function() {
+        HookRegistry::addAction('frontend_head', function() use ($galleryCsrf) {
             echo '<style>
                 .gallery-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500; font-size: 0.875rem; background-color: #f3f4f6; color: #374151; transition: all 0.2s; border: 1px solid #d1d5db; cursor: pointer; }
                 .gallery-btn:hover { background-color: #e5e7eb; color: #111827; }
@@ -20,8 +21,8 @@ class UserGalleriesModule extends BaseModule {
                 #ug-modal.active { display: flex; }
                 #ug-modal-content { background: white; padding: 1.5rem; border-radius: 0.75rem; width: 100%; max-width: 24rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
             </style>';
+            echo '<script>const SITE_URL = ' . json_encode(SITE_URL) . '; window.GALLERY_CSRF = ' . json_encode($galleryCsrf) . ';</script>';
             echo '<script src="' . SITE_URL . '/modules/user_galleries/gallery.js" defer></script>';
-            echo '<script>const SITE_URL = "' . SITE_URL . '";</script>';
         });
 
         // 3. Inject Add to Gallery button on item detail pages

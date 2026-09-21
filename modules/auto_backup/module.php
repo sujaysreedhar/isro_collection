@@ -6,19 +6,8 @@ class AutoBackupModule extends BaseModule
 {
     public function boot()
     {
-        // 1. Hook into admin page rendering to trigger automatic backup if due
-        HookRegistry::addAction('admin_head', function () {
-            // Run the check. If something is due, it runs.
-            // Wrap in a try-catch to ensure any backup issue does not break the admin page load.
-            try {
-                $service = $this->getService();
-                $service->runBackupCheck();
-            } catch (\Throwable $e) {
-                // Log or ignore so the admin page doesn't crash
-            }
-        });
-
-        // 2. Add sidebar link to the admin panel
+        // Backups are run by scripts/run_auto_backup.php, outside web requests.
+        // Add sidebar link to the admin panel.
         HookRegistry::addFilter('admin_sidebar_links', function (array $sections) {
             $sections['system']['links']['auto_backup'] = [
                 'url' => SITE_URL . '/admin/module_page.php?m=' . $this->slug,

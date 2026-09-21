@@ -55,17 +55,34 @@ class PeopleModule extends BaseModule
 
         // Search Integration
         $pdo = $this->pdo;
+        HookRegistry::addFilter('search_provider_counts', function ($counts, $params) use ($pdo) {
+            $q = trim((string)($params['q'] ?? ''));
+            if ($q === '') return $counts;
+            $term = '%' . $q . '%';
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM people WHERE is_public = 1 AND (name LIKE ? OR short_description LIKE ? OR biography LIKE ?)');
+            $stmt->execute([$term, $term, $term]);
+            $counts['people'] = (int)$stmt->fetchColumn();
+            return $counts;
+        }, 10, 2);
         HookRegistry::addFilter('search_results', function ($results, $params) use ($pdo) {
             $q = trim($params['q'] ?? '');
-            if (!$q)
+            $limit = max(0, min(100, (int)($params['people_limit'] ?? 0)));
+            $offset = max(0, (int)($params['people_offset'] ?? 0));
+            if (!$q || $limit === 0)
                 return $results;
 
             $searchTerm = '%' . $q . '%';
             $stmt = $pdo->prepare("
                 SELECT * FROM people 
                 WHERE is_public = 1 AND (name LIKE ? OR short_description LIKE ? OR biography LIKE ?)
+                ORDER BY id DESC LIMIT ? OFFSET ?
             ");
-            $stmt->execute([$searchTerm, $searchTerm, $searchTerm]);
+            $stmt->bindValue(1, $searchTerm);
+            $stmt->bindValue(2, $searchTerm);
+            $stmt->bindValue(3, $searchTerm);
+            $stmt->bindValue(4, $limit, PDO::PARAM_INT);
+            $stmt->bindValue(5, $offset, PDO::PARAM_INT);
+            $stmt->execute();
             $people = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($people as $person) {

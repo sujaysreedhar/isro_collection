@@ -3,6 +3,13 @@ Options -Indexes
 # Enable the rewrite engine
 RewriteEngine On
 
+# Deny repository metadata and agent workspaces before public routes or files.
+RewriteRule (^|/)(\.git|\.svn|\.hg|\.codex|\.agents)(/|$) - [F,L,NC]
+RewriteRule (^|/)(\.env(?:\.[^/]*)?|[^/]+\.(?:bak|backup|sql|sql\.gz))$ - [F,L,NC]
+
+# Existing display URLs continue to resolve for newly named item variants.
+RewriteRule ^uploads/display/(img_[0-9]+_[a-f0-9]{16}_1200\.webp)$ uploads/thumbnails/$1 [END,NC]
+
 # Set the base path for this subdirectory install (removed to support root domains)
 # RewriteBase /collection/
 

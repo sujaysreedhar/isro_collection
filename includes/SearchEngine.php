@@ -7,11 +7,41 @@
 class SearchEngine {
     private PDO $db;
 
+    public static function paginationPlan(int $itemCount, int $limit, int $offset): array {
+        $itemLimit = max(0, min($limit, $itemCount - $offset));
+        return [
+            'item_limit' => $itemLimit,
+            'item_offset' => $offset,
+            'blog_limit' => $limit - $itemLimit,
+            'blog_offset' => max(0, $offset - $itemCount),
+        ];
+    }
+
+    public static function validateParams(array $params): ?string {
+        foreach (['q', 'category', 'tag', 'page', 'year_start', 'year_end', 'has_images', 'exact'] as $key) {
+            if (isset($params[$key]) && !is_scalar($params[$key])) return "Invalid $key.";
+        }
+        $query = (string)($params['q'] ?? '');
+        if ((function_exists('mb_strlen') ? mb_strlen($query, 'UTF-8') : strlen($query)) > 200
+            || preg_match_all('/\S+/u', $query) > 10) return 'Search query is too long.';
+        foreach (['category_ids', 'category_slugs', 'materials', 'tags'] as $key) {
+            if (!isset($params[$key])) continue;
+            if (!is_array($params[$key]) || count($params[$key]) > 50) return "Invalid $key.";
+            foreach ($params[$key] as $value) if (!is_scalar($value) || strlen((string)$value) > 200) return "Invalid $key.";
+        }
+        if (isset($params['page']) && (!ctype_digit((string)$params['page']) || (int)$params['page'] < 1 || (int)$params['page'] > 10000)) return 'Invalid page.';
+        if (isset($params['limit']) && (!is_int($params['limit']) || $params['limit'] < 1 || $params['limit'] > 100)) return 'Invalid limit.';
+        if (isset($params['offset']) && (!is_int($params['offset']) || $params['offset'] < 0 || $params['offset'] > 1000000)) return 'Invalid offset.';
+        return null;
+    }
+
     public function __construct(PDO $db) {
         $this->db = $db;
     }
 
     private ?array $vocabulary = null;
+    private array $vocabularyMembership = [];
+    private array $vocabularyByLength = [];
 
     private function buildBooleanSearchTerm(string $searchTerm): ?string {
         $searchTerm = trim($searchTerm);
@@ -26,6 +56,23 @@ class SearchEngine {
     }
 
     public function rebuildVocabularyCache(): void {
+        if (!is_dir(CACHE_DIR) && !mkdir(CACHE_DIR, 0755, true) && !is_dir(CACHE_DIR)) {
+            throw new RuntimeException('Search cache directory unavailable.');
+        }
+        $lock = fopen(CACHE_DIR . '/vocabulary.lock', 'c');
+        if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+            if ($lock) fclose($lock);
+            throw new RuntimeException('Search vocabulary rebuild already running.');
+        }
+        try {
+            $this->writeVocabularyCache();
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    private function writeVocabularyCache(): void {
         $vocab = [];
         $stmt = $this->db->query("SELECT name FROM categories");
         while ($row = $stmt->fetchColumn()) foreach (str_word_count(strtolower($row), 1) as $w) if (strlen($w) > 2) $vocab[$w] = true;
@@ -38,8 +85,26 @@ class SearchEngine {
         
         $vocabulary = array_keys($vocab);
         $cacheFile = CACHE_DIR . '/vocabulary.json';
-        file_put_contents($cacheFile, json_encode($vocabulary));
-        $this->vocabulary = $vocabulary;
+        $temp = tempnam(CACHE_DIR, 'vocabulary-');
+        if ($temp === false) throw new RuntimeException('Cannot stage search vocabulary.');
+        try {
+            if (file_put_contents($temp, json_encode($vocabulary, JSON_THROW_ON_ERROR), LOCK_EX) === false
+                || !rename($temp, $cacheFile)) {
+                throw new RuntimeException('Cannot publish search vocabulary.');
+            }
+        } finally {
+            if (is_file($temp)) @unlink($temp);
+        }
+        $this->indexVocabulary($vocabulary);
+    }
+
+    private function indexVocabulary(array $words): void {
+        $this->vocabulary = $words;
+        $this->vocabularyMembership = array_fill_keys($words, true);
+        $this->vocabularyByLength = [];
+        foreach ($words as $word) {
+            if (is_string($word)) $this->vocabularyByLength[strlen($word)][] = $word;
+        }
     }
 
     private function getVocabulary(): array {
@@ -49,24 +114,31 @@ class SearchEngine {
         $cacheFile = CACHE_DIR . '/vocabulary.json';
 
         if ($enableCache && file_exists($cacheFile)) {
-            $this->vocabulary = json_decode(file_get_contents($cacheFile), true);
-            if (is_array($this->vocabulary)) return $this->vocabulary;
+            $cached = json_decode((string)file_get_contents($cacheFile), true);
+            if (is_array($cached) && array_is_list($cached)) {
+                $this->indexVocabulary(array_values(array_filter($cached, 'is_string')));
+                return $this->vocabulary;
+            }
         }
 
-        $this->rebuildVocabularyCache();
-        return $this->vocabulary;
+        // Search remains available without suggestions until the CLI job rebuilds the cache.
+        $this->indexVocabulary([]);
+        return [];
     }
 
     private function correctWord(string $word): string {
         $word = strtolower($word);
         if (strlen($word) <= 2) return $word;
         $vocab = $this->getVocabulary();
-        if (in_array($word, $vocab)) return $word;
+        if (isset($this->vocabularyMembership[$word])) return $word;
         
         $bestMatch = $word;
         $shortestDist = -1;
         $wordLen = strlen($word);
-        foreach ($vocab as $v) {
+        $candidateCount = 0;
+        foreach (range(max(1, $wordLen - 2), $wordLen + 2) as $length) {
+        foreach ($this->vocabularyByLength[$length] ?? [] as $v) {
+            if (++$candidateCount > 200) break 2;
             // Length pre-filter: skip words that can't possibly be within edit distance
             if (abs(strlen($v) - $wordLen) > 2) continue;
             $dist = levenshtein($word, $v);
@@ -76,6 +148,7 @@ class SearchEngine {
                 $bestMatch = $v;
                 $shortestDist = $dist;
             }
+        }
         }
         return $bestMatch;
     }
@@ -96,8 +169,14 @@ class SearchEngine {
     /** Helper to build where clauses to avoid repetition */
     private function buildWhere(array $params, bool $excludeHasImages = false): array {
         $where = [];
-        $bindings = [];
+        $joinBindings = [];
+        $whereBindings = [];
         $joinSql = "";
+
+        // Enforce catalog visibility unless explicitly requested (e.g. by admin preview)
+        if (empty($params['include_hidden'])) {
+            $where[] = "i.is_visible = 1";
+        }
 
         $searchTerm = $params['q'] ?? '';
         $categoryIds = $params['category_ids'] ?? [];
@@ -121,26 +200,26 @@ class SearchEngine {
             $placeholders = implode(',', array_fill(0, count($tags), '?'));
             $joinSql .= " INNER JOIN item_tag it_filter ON i.id = it_filter.item_id ";
             $joinSql .= " INNER JOIN tags t_filter ON it_filter.tag_id = t_filter.id AND t_filter.slug IN ({$placeholders}) ";
-            foreach ($tags as $t) $bindings[] = $t;
+            foreach ($tags as $t) $joinBindings[] = $t;
         }
 
         if (!empty($searchTerm)) {
             $boolTerm = $this->buildBooleanSearchTerm($searchTerm);
             if ($boolTerm !== null) {
                 $where[] = "(MATCH(i.title, i.physical_description) AGAINST(? IN BOOLEAN MODE) OR MATCH(i.title, i.physical_description) AGAINST(? IN NATURAL LANGUAGE MODE) OR i.title LIKE ? OR i.physical_description LIKE ? OR i.production_date LIKE ? OR i.credit_line LIKE ?)";
-                array_push($bindings, $boolTerm, $searchTerm);
+                array_push($whereBindings, $boolTerm, $searchTerm);
             } else {
                 $where[] = "(MATCH(i.title, i.physical_description) AGAINST(? IN NATURAL LANGUAGE MODE) OR i.title LIKE ? OR i.physical_description LIKE ? OR i.production_date LIKE ? OR i.credit_line LIKE ?)";
-                $bindings[] = $searchTerm;
+                $whereBindings[] = $searchTerm;
             }
             $likeTerm = '%' . $searchTerm . '%';
-            array_push($bindings, $likeTerm, $likeTerm, $likeTerm, $likeTerm);
+            array_push($whereBindings, $likeTerm, $likeTerm, $likeTerm, $likeTerm);
         }
 
         if (!empty($categoryIds)) {
             $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
             $joinSql .= " INNER JOIN item_category ic_filter ON i.id = ic_filter.item_id AND ic_filter.category_id IN ({$placeholders}) ";
-            foreach ($categoryIds as $cid) $bindings[] = $cid;
+            foreach ($categoryIds as $cid) $joinBindings[] = $cid;
         }
 
         // Add support for category slugs (clean URLs)
@@ -152,30 +231,31 @@ class SearchEngine {
             $placeholders = implode(',', array_fill(0, count($categorySlugs), '?'));
             $joinSql .= " INNER JOIN item_category ic_slug_filter ON i.id = ic_slug_filter.item_id ";
             $joinSql .= " INNER JOIN categories c_slug_filter ON ic_slug_filter.category_id = c_slug_filter.id AND c_slug_filter.slug IN ({$placeholders}) ";
-            foreach ($categorySlugs as $cs) $bindings[] = $cs;
+            foreach ($categorySlugs as $cs) $joinBindings[] = $cs;
         }
 
         if (!empty($materials)) {
             $placeholders = implode(',', array_fill(0, count($materials), '?'));
             $where[] = "i.material IN ({$placeholders})";
-            foreach ($materials as $m) $bindings[] = $m;
+            foreach ($materials as $m) $whereBindings[] = $m;
         }
 
         if ($yearStart !== null) {
             $where[] = "i.year_start >= ?";
-            $bindings[] = $yearStart;
+            $whereBindings[] = $yearStart;
         }
 
         if ($yearEnd !== null) {
             $where[] = "i.year_end <= ?";
-            $bindings[] = $yearEnd;
+            $whereBindings[] = $yearEnd;
         }
 
-        return ['where' => $where, 'bindings' => $bindings, 'join' => $joinSql];
+        return ['where' => $where, 'bindings' => array_merge($joinBindings, $whereBindings), 'join' => $joinSql];
     }
 
 
     public function search(array $params = []): array {
+        if ($validation = self::validateParams($params)) throw new InvalidArgumentException($validation);
         $originalSearchTerm = trim($params['q'] ?? '');
         $isExact = !empty($params['exact']);
         
@@ -198,7 +278,16 @@ class SearchEngine {
         
         $countStmt = $this->db->prepare($countSql);
         $countStmt->execute($baseParts['bindings']);
-        $totalResults = (int)$countStmt->fetchColumn();
+        $itemCount = (int)$countStmt->fetchColumn();
+        $providerCounts = ['blog' => 0, 'people' => 0];
+        if (class_exists('HookRegistry')) {
+            $providerCounts = HookRegistry::applyFilters('search_provider_counts', $providerCounts, $params);
+        }
+        $blogCount = max(0, (int)($providerCounts['blog'] ?? 0));
+        $peopleCount = max(0, (int)($providerCounts['people'] ?? 0));
+        $totalResults = $itemCount + $blogCount + $peopleCount;
+        $pagePlan = self::paginationPlan($itemCount, (int)($params['limit'] ?? 20), (int)($params['offset'] ?? 0));
+        $extraPlan = self::paginationPlan($blogCount, $pagePlan['blog_limit'], $pagePlan['blog_offset']);
 
         // ── 2. Items query with pagination ───────────────────────────────
         $hasIsPrimary = AppConfig::get('media_has_is_primary', '0') === '1';
@@ -214,25 +303,18 @@ class SearchEngine {
         // Add sorting and limiting
         $sql .= " ORDER BY i.id DESC"; // Default sort
         
-        if (isset($params['limit'])) {
+        if ($pagePlan['item_limit'] > 0) {
             $sql .= " LIMIT ? OFFSET ?";
         }
-
-        $stmt = $this->db->prepare($sql);
-        
-        // Bind original bindings
-        foreach ($baseParts['bindings'] as $k => $v) {
-            $stmt->bindValue($k + 1, $v);
+        $items = [];
+        if ($pagePlan['item_limit'] > 0) {
+            $stmt = $this->db->prepare($sql);
+            foreach ($baseParts['bindings'] as $k => $v) $stmt->bindValue($k + 1, $v);
+            $stmt->bindValue(count($baseParts['bindings']) + 1, $pagePlan['item_limit'], PDO::PARAM_INT);
+            $stmt->bindValue(count($baseParts['bindings']) + 2, $pagePlan['item_offset'], PDO::PARAM_INT);
+            $stmt->execute();
+            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-        
-        // Bind limit/offset if present as positional parameters
-        if (isset($params['limit'])) {
-            $stmt->bindValue(count($baseParts['bindings']) + 1, (int)$params['limit'], PDO::PARAM_INT);
-            $stmt->bindValue(count($baseParts['bindings']) + 2, (int)($params['offset'] ?? 0), PDO::PARAM_INT);
-        }
-
-        $stmt->execute();
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // ── 3. Category facet counts ─────────────────────────────────────
         $facetSql = "SELECT c.id, c.name, COUNT(DISTINCT i.id) as facet_count FROM categories c INNER JOIN item_category ic ON c.id = ic.category_id INNER JOIN items i ON ic.item_id = i.id " . $baseParts['join'];
@@ -272,6 +354,10 @@ class SearchEngine {
         $tagFacets = $tagFacetStmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (class_exists('HookRegistry')) {
+            $params['blog_limit'] = $extraPlan['item_limit'];
+            $params['blog_offset'] = $extraPlan['item_offset'];
+            $params['people_limit'] = $extraPlan['blog_limit'];
+            $params['people_offset'] = $extraPlan['blog_offset'];
             $items = HookRegistry::applyFilters('search_results', $items, $params);
         }
 

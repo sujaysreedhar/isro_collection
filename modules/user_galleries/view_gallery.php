@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../config/config.php';
 
 $token = $_GET['token'] ?? '';
+if (!is_string($token) || !preg_match('/^[a-f0-9]{32}$/', $token)) $token = '';
 $stmt = $pdo->prepare("SELECT * FROM user_galleries WHERE share_token = ?");
 $stmt->execute([$token]);
 $gallery = $stmt->fetch();
@@ -14,6 +15,7 @@ if (!$gallery) {
 
 // Check if the current user is the owner
 $userToken = $_COOKIE['gallery_user_token'] ?? null;
+if (!is_string($userToken) || !preg_match('/^[a-f0-9]{64}$/', $userToken)) $userToken = null;
 $isOwner = ($userToken === $gallery['user_token']);
 
 // Fetch items

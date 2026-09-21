@@ -5,11 +5,10 @@ foreach ($mediaItems as $media): ?>
     <a href="<?= SITE_URL ?>/item/<?= $media['item_id'] ?>" class="masonry-item group block relative bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-2xl hover:shadow-modern-500/20 transition-all duration-500 hover:-translate-y-1">
         <?php if ($media['media_type'] === 'image'): ?>
             <?php 
-                $imgSrc = isset($storage) 
-                    ? $storage->url('display/' . $media['file_path']) 
-                    : SITE_URL . '/uploads/display/' . $media['file_path'];
+                $imgSrc = MediaProcessor::url($media['file_path'], 'card', 'image', $storage ?? null);
+                $displaySrc = MediaProcessor::url($media['file_path'], 'display', 'image', $storage ?? null);
             ?>
-            <img src="<?= htmlspecialchars($imgSrc) ?>" alt="<?= htmlspecialchars($media['title']) ?>" class="w-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out" loading="lazy">
+            <img src="<?= htmlspecialchars($imgSrc) ?>" srcset="<?= htmlspecialchars($imgSrc) ?> 640w, <?= htmlspecialchars($displaySrc) ?> 1200w" sizes="(max-width: 768px) 100vw, 33vw" alt="<?= htmlspecialchars($media['title']) ?>" class="w-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out" loading="lazy">
         <?php elseif ($media['media_type'] === 'youtube'): ?>
             <?php 
                 preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i', $media['youtube_url'] ?? '', $matches);

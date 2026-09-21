@@ -45,9 +45,9 @@ foreach ($imageMedia as $img) {
     $fp = $img['file_path'] ?? '';
     if ($fp === '') continue;
     $galleryImages[] = [
-        'thumb'      => $mvUrl('thumbnails', $fp),
-        'display'    => $mvDisplay($fp),
-        'full'       => $mvFull($fp),
+        'thumb'      => MediaProcessor::url($fp, 'thumbnails', 'image', $storage ?? null),
+        'display'    => MediaProcessor::url($fp, 'display', 'image', $storage ?? null),
+        'full'       => MediaProcessor::variantStoragePath($fp, 'display') !== 'display/' . $fp ? MediaProcessor::url($fp, 'display', 'image', $storage ?? null) : $mvFull($fp),
         'caption'    => $img['caption'] ?? '',
         'license'    => $img['license_type'] ?? '',
         'dimensions' => $img['dimensions'] ?? '',
