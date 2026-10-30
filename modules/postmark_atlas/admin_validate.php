@@ -23,6 +23,7 @@ $statesWithCounts = $stateStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ── Total for info bar ────────────────────────────────────────────────────────
 $totalLocations = $pdo->query("SELECT COUNT(*) FROM postmark_locations WHERE latitude != 0 AND longitude != 0")->fetchColumn();
+$totalAllLocations = (int) $pdo->query("SELECT COUNT(*) FROM postmark_locations")->fetchColumn();
 ?>
 
 <style>
@@ -339,6 +340,33 @@ tr.row-updated {
     font-weight: 600;
 }
 
+/* Error banner */
+.vld-error-banner {
+    background: #fef2f2;
+    border: 1.5px solid #fecaca;
+    border-radius: 14px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.08);
+}
+.vld-btn-switch-osm {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    background: #0284c7;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.18s;
+}
+.vld-btn-switch-osm:hover {
+    background: #0369a1;
+}
+
 /* No-API warning */
 .vld-no-api {
     background: #fff7ed;
@@ -366,8 +394,8 @@ tr.row-updated {
 <div class="vld-hero">
     <h2><i class="fa-solid fa-satellite-dish mr-2 text-sky-400"></i>Coordinate Validator</h2>
     <p>
-        Cross-check stored GPS coordinates against Google's Geocoding API — by state.
-        Select a state, then click <strong style="color:#e2e8f0">Validate</strong> to start. No data is loaded until you do.
+        Cross-check stored GPS coordinates against Google Geocoding or OpenStreetMap — by state.
+        Select a state and provider, then click <strong style="color:#e2e8f0">Validate</strong> to start.
     </p>
     <div style="display:flex; gap:20px; margin-top:18px; flex-wrap:wrap;">
         <div style="font-size:13px; color:#94a3b8;">
@@ -381,35 +409,74 @@ tr.row-updated {
     </div>
 </div>
 
+<!-- ── Diagnostic Error Banner (shown on REQUEST_DENIED etc.) ──────────────── -->
+<div id="vld-error-banner" style="display:none;" class="vld-error-banner">
+    <div style="display:flex; align-items:flex-start; gap:14px;">
+        <i class="fa-solid fa-triangle-exclamation" style="font-size:24px; color:#ef4444; margin-top:2px;"></i>
+        <div style="flex:1;">
+            <div style="font-size:15px; font-weight:800; color:#991b1b; margin-bottom:4px;" id="vld-error-title">
+                Geocoding Request Denied
+            </div>
+            <div style="font-size:13px; color:#7f1d1d; margin-bottom:8px; line-height:1.5;" id="vld-error-msg"></div>
+            <div id="vld-error-help" style="font-size:12px; color:#991b1b; background:rgba(255,255,255,0.7); border:1px solid #fecaca; padding:10px 14px; border-radius:8px; margin-bottom:12px; line-height:1.6;">
+                <strong>Why this happened and how to resolve:</strong>
+                <ul style="margin:6px 0 0 18px; padding:0;">
+                    <li><strong>Billing Required:</strong> Google Maps Platform requires an active billing account linked to your project. Link billing at <a href="https://console.cloud.google.com/project/_/billing/enable" target="_blank" style="color:#2563eb; text-decoration:underline; font-weight:700;">Google Cloud Billing</a> (Google provides $200 free monthly credit).</li>
+                    <li><strong>Enable Geocoding API:</strong> Verify that the <a href="https://console.cloud.google.com/apis/library/geocoding-backend.googleapis.com" target="_blank" style="color:#2563eb; text-decoration:underline; font-weight:700;">Geocoding API</a> is turned ON in your Google Cloud Console.</li>
+                    <li><strong>Key Restrictions:</strong> If your API key is restricted by HTTP Referrer, Google will reject web service REST requests. Use IP restrictions or create an unrestricted key for geocoding services.</li>
+                </ul>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button type="button" class="vld-btn-switch-osm" id="vld-switch-osm-btn" onclick="switchToOsmAndRetry()">
+                    <i class="fa-solid fa-map-location-dot"></i> Switch to OpenStreetMap (Free, No Key Required)
+                </button>
+                <button type="button" style="background:transparent; border:none; color:#6b7280; font-size:12px; cursor:pointer; text-decoration:underline;" onclick="dismissErrorBanner()">
+                    Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php if (empty($gmapsKey)): ?>
 <div class="vld-no-api">
-    <i class="fa-solid fa-triangle-exclamation mr-2"></i>
-    <strong>Google Maps API Key Missing.</strong>
-    The Geocoding API requires the same key used for the Route Planner.
-    Add <code>route_planner_google_maps_key</code> to your database settings to enable validation.
+    <i class="fa-solid fa-circle-info mr-2"></i>
+    <strong>Google Maps API Key Not Configured.</strong>
+    Google Maps Geocoding is disabled, but you can validate coordinates for free using <strong>OpenStreetMap (Nominatim)</strong> without an API key or billing account.
 </div>
 <?php endif; ?>
 
 <!-- ── Controls ──────────────────────────────────────────────────────────────── -->
 <div class="vld-controls">
     <div class="vld-field">
-        <label for="vld-state-select"><i class="fa-solid fa-map mr-1"></i>State / UT</label>
+        <label for="vld-state-select"><i class="fa-solid fa-map mr-1"></i>State / Selection</label>
         <select id="vld-state-select" class="vld-select">
-            <option value="">— Select a State or UT —</option>
+            <option value="">— Select a State or All —</option>
+            <option value="ALL" style="font-weight: 800; color: #4338ca;">🌐 All (All States / UTs — <?= number_format($totalAllLocations) ?> locations)</option>
+            <optgroup label="Individual States / UTs">
             <?php foreach ($statesWithCounts as $row): ?>
             <option value="<?= htmlspecialchars($row['state']) ?>">
                 <?= htmlspecialchars($row['state']) ?> (<?= number_format($row['cnt']) ?> locations)
             </option>
             <?php endforeach; ?>
+            </optgroup>
+        </select>
+    </div>
+
+    <div class="vld-field">
+        <label for="vld-provider-select"><i class="fa-solid fa-satellite mr-1"></i>Geocoding Provider</label>
+        <select id="vld-provider-select" class="vld-select" style="min-width: 230px;">
+            <option value="google" <?= empty($gmapsKey) ? 'disabled' : '' ?>>Google Maps Geocoding <?= empty($gmapsKey) ? '(No API Key)' : '' ?></option>
+            <option value="osm" <?= empty($gmapsKey) ? 'selected' : '' ?>>OpenStreetMap / Nominatim (Free)</option>
         </select>
     </div>
 
     <div class="vld-field">
         <label for="vld-threshold"><i class="fa-solid fa-bullseye mr-1"></i>Tolerance (km)</label>
-        <input type="number" id="vld-threshold" class="vld-threshold" value="5" min="0.5" max="100" step="0.5" title="Locations within this distance of Google's result are marked OK">
+        <input type="number" id="vld-threshold" class="vld-threshold" value="5" min="0.5" max="100" step="0.5" title="Locations within this distance of result are marked OK">
     </div>
 
-    <button id="vld-btn" class="vld-btn-validate" disabled <?= empty($gmapsKey) ? 'title="API key required"' : '' ?>>
+    <button id="vld-btn" class="vld-btn-validate" disabled>
         <i class="fa-solid fa-circle-check"></i> Validate Coordinates
     </button>
 
@@ -461,10 +528,10 @@ tr.row-updated {
                     <th>District</th>
                     <th>PIN</th>
                     <th>Stored Coords</th>
-                    <th>Google Coords</th>
+                    <th id="th-result-coords">Geocoded Coords</th>
                     <th>Deviation</th>
                     <th>Status</th>
-                    <th>Google Result</th>
+                    <th id="th-result-label">Geocoded Result</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -474,18 +541,33 @@ tr.row-updated {
     <div class="vld-table-footer" id="vld-footer">—</div>
 </div>
 
-<!-- ── Google Maps + Geocoding JS ─────────────────────────────────────────── -->
-<?php if (!empty($gmapsKey)): ?>
+<!-- ── Geocoding JS ─────────────────────────────────────────────────────────── -->
 <script>
 /* ── Constants ── */
-const GMAPS_KEY = '<?= htmlspecialchars($gmapsKey) ?>';
-const AJAX_URL  = '<?= SITE_URL ?>/admin/ajax.php';
+const GMAPS_KEY  = '<?= htmlspecialchars($gmapsKey) ?>';
+const AJAX_URL   = '<?= SITE_URL ?>/admin/ajax.php';
 const CSRF_TOKEN = '<?= htmlspecialchars(ensureCsrfToken()) ?>';
 
-/* ── Geocoding via REST (no Maps JS SDK needed for geocoding) ── */
-async function geocodeAddress(address) {
+/* ── Google Maps REST Geocoding ── */
+async function geocodeAddressGoogle(address) {
+    if (!GMAPS_KEY) throw new Error('Google Maps API key is missing.');
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GMAPS_KEY}`;
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json();
+}
+
+/* ── OpenStreetMap (Nominatim via backend AJAX proxy) ── */
+async function geocodeAddressOSM(loc) {
+    const fd = new FormData();
+    fd.append('action', 'postmark_atlas_geocode_osm');
+    fd.append('csrf_token', CSRF_TOKEN);
+    fd.append('pin_code', loc.pin_code || '');
+    fd.append('post_office', loc.post_office || '');
+    fd.append('district', loc.district || '');
+    fd.append('state', loc.state || '');
+
+    const resp = await fetch(AJAX_URL, { method: 'POST', body: fd });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
 }
@@ -500,30 +582,81 @@ function haversineKm(lat1, lng1, lat2, lng2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+/* ── Error banner helpers ── */
+function showErrorBanner(title, msg, showSwitchToOsm = false) {
+    const banner = document.getElementById('vld-error-banner');
+    const titleEl = document.getElementById('vld-error-title');
+    const msgEl = document.getElementById('vld-error-msg');
+    const switchBtn = document.getElementById('vld-switch-osm-btn');
+    if (banner && titleEl && msgEl) {
+        titleEl.textContent = title;
+        msgEl.textContent = msg;
+        if (switchBtn) {
+            switchBtn.style.display = showSwitchToOsm ? 'inline-flex' : 'none';
+        }
+        banner.style.display = 'block';
+        banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function dismissErrorBanner() {
+    const banner = document.getElementById('vld-error-banner');
+    if (banner) banner.style.display = 'none';
+}
+
+function switchToOsmAndRetry() {
+    dismissErrorBanner();
+    const providerSelect = document.getElementById('vld-provider-select');
+    if (providerSelect) {
+        providerSelect.value = 'osm';
+        checkValidationReady();
+    }
+    if (!validateBtn.disabled) {
+        validateBtn.click();
+    }
+}
+
 /* ── State ── */
-let locations  = [];
-let results    = [];   // { loc, status, deviation, googleLat, googleLng, googleLabel }
-let stopped    = false;
+let locations    = [];
+let results      = [];   // { loc, status, deviation, googleLat, googleLng, googleLabel }
+let stopped      = false;
 let activeFilter = 'all';
 
 /* ── DOM refs ── */
-const stateSelect   = document.getElementById('vld-state-select');
-const thresholdInput= document.getElementById('vld-threshold');
-const validateBtn   = document.getElementById('vld-btn');
-const stopBtn       = document.getElementById('vld-stop-btn');
-const progressWrap  = document.getElementById('vld-progress-wrap');
-const progressText  = document.getElementById('vld-progress-text');
-const progressPct   = document.getElementById('vld-progress-pct');
-const barFill       = document.getElementById('vld-bar-fill');
-const summaryEl     = document.getElementById('vld-summary');
-const resultsWrap   = document.getElementById('vld-results-wrap');
-const tbody         = document.getElementById('vld-tbody');
-const footerEl      = document.getElementById('vld-footer');
+const stateSelect    = document.getElementById('vld-state-select');
+const providerSelect = document.getElementById('vld-provider-select');
+const thresholdInput = document.getElementById('vld-threshold');
+const validateBtn    = document.getElementById('vld-btn');
+const stopBtn        = document.getElementById('vld-stop-btn');
+const progressWrap   = document.getElementById('vld-progress-wrap');
+const progressText   = document.getElementById('vld-progress-text');
+const progressPct    = document.getElementById('vld-progress-pct');
+const barFill        = document.getElementById('vld-bar-fill');
+const summaryEl      = document.getElementById('vld-summary');
+const resultsWrap    = document.getElementById('vld-results-wrap');
+const tbody          = document.getElementById('vld-tbody');
+const footerEl       = document.getElementById('vld-footer');
 
-/* ── Enable Validate button when a state is selected ── */
-stateSelect.addEventListener('change', () => {
-    validateBtn.disabled = !stateSelect.value;
-});
+function checkValidationReady() {
+    const state = stateSelect.value;
+    const provider = providerSelect ? providerSelect.value : 'google';
+    if (!state) {
+        validateBtn.disabled = true;
+        validateBtn.title = 'Select a state';
+    } else if (provider === 'google' && !GMAPS_KEY) {
+        validateBtn.disabled = true;
+        validateBtn.title = 'Google Maps API key is required for Google provider';
+    } else {
+        validateBtn.disabled = false;
+        validateBtn.title = '';
+    }
+}
+
+stateSelect.addEventListener('change', checkValidationReady);
+if (providerSelect) {
+    providerSelect.addEventListener('change', checkValidationReady);
+}
+checkValidationReady();
 
 /* ── Filter tabs ── */
 document.getElementById('vld-tabs').addEventListener('click', (e) => {
@@ -543,7 +676,9 @@ validateBtn.addEventListener('click', async () => {
     const state = stateSelect.value;
     if (!state) return;
 
+    const provider = providerSelect ? providerSelect.value : 'google';
     const threshold = parseFloat(thresholdInput.value) || 5;
+    const stateLabel = state === 'ALL' ? 'All States' : state;
 
     // Reset
     stopped = false;
@@ -552,10 +687,11 @@ validateBtn.addEventListener('click', async () => {
     tbody.innerHTML = '';
     summaryEl.style.display = 'none';
     resultsWrap.style.display = 'none';
+    dismissErrorBanner();
 
     // Show progress
     progressWrap.style.display = 'block';
-    progressText.textContent = `Loading locations for ${state}…`;
+    progressText.textContent = `Loading locations for ${stateLabel}…`;
     barFill.style.width = '0%';
     progressPct.textContent = '0%';
     validateBtn.disabled = true;
@@ -576,19 +712,20 @@ validateBtn.addEventListener('click', async () => {
     } catch (err) {
         progressText.textContent = `❌ Error: ${err.message}`;
         stopBtn.style.display = 'none';
-        validateBtn.disabled = false;
+        checkValidationReady();
         return;
     }
 
     if (!locs.length) {
-        progressText.textContent = `No locations with coordinates found for "${state}".`;
+        progressText.textContent = `No locations found for "${stateLabel}".`;
         stopBtn.style.display = 'none';
-        validateBtn.disabled = false;
+        checkValidationReady();
         return;
     }
 
     locations = locs;
-    progressText.textContent = `Validating 0 / ${locs.length} for ${state}…`;
+    const providerLabel = provider === 'google' ? 'Google Maps' : 'OpenStreetMap';
+    progressText.textContent = `Validating 0 / ${locs.length} for ${stateLabel} via ${providerLabel}…`;
     resultsWrap.style.display = 'block';
 
     /* ── Validate each location ── */
@@ -608,70 +745,113 @@ validateBtn.addEventListener('click', async () => {
             && !isNaN(storedLat) && !isNaN(storedLng)
             && !(storedLat === 0 && storedLng === 0);
 
-        // Build geocoding query
-        const query = `${loc.post_office} Post Office, ${loc.district}, ${loc.state}, India ${loc.pin_code}`;
-
         let result = { loc, status: 'skip', deviation: null, googleLat: null, googleLng: null, googleLabel: '—' };
+        let geoLat = null;
+        let geoLng = null;
+        let geoLabel = '—';
+        let isFatalAuthError = false;
+        let fatalErrorMsg = '';
 
-        try {
-            const geo = await geocodeAddress(query);
+        if (provider === 'google') {
+            const query = `${loc.post_office} Post Office, ${loc.district}, ${loc.state}, India ${loc.pin_code}`;
+            try {
+                const geo = await geocodeAddressGoogle(query);
 
-            if (geo.status === 'OK' && geo.results.length > 0) {
-                const top = geo.results[0];
-                const gLat = top.geometry.location.lat;
-                const gLng = top.geometry.location.lng;
-
-                result.googleLat   = gLat;
-                result.googleLng   = gLng;
-                result.googleLabel = top.formatted_address;
-
-                if (!hasStoredCoords) {
-                    // No stored coords — can offer to set them
-                    result.status    = 'nocoords';
-                    result.deviation = null;
+                if (geo.status === 'OK' && geo.results && geo.results.length > 0) {
+                    const top = geo.results[0];
+                    geoLat = top.geometry.location.lat;
+                    geoLng = top.geometry.location.lng;
+                    geoLabel = top.formatted_address;
+                } else if (geo.status === 'ZERO_RESULTS') {
+                    geoLabel = 'No result from Google';
+                } else if (geo.status === 'REQUEST_DENIED' || geo.status === 'OVER_QUERY_LIMIT') {
+                    isFatalAuthError = true;
+                    fatalErrorMsg = geo.error_message || `Google Geocoding error: ${geo.status}`;
+                    geoLabel = `Denied: ${geo.error_message || geo.status}`;
                 } else {
-                    const dist = haversineKm(storedLat, storedLng, gLat, gLng);
-                    result.deviation = dist;
-
-                    if (dist <= threshold) {
-                        result.status = 'ok';
-                    } else if (dist <= threshold * 5) {
-                        result.status = 'warn';
-                    } else {
-                        result.status = 'bad';
-                    }
+                    geoLabel = geo.error_message ? `${geo.status}: ${geo.error_message}` : geo.status;
                 }
-            } else if (geo.status === 'ZERO_RESULTS') {
-                result.status      = !hasStoredCoords ? 'nocoords' : 'skip';
-                result.googleLabel = 'No result from Google';
-            } else {
-                result.status      = 'skip';
-                result.googleLabel = geo.status;
+            } catch (e) {
+                geoLabel = e.message;
             }
-        } catch (e) {
-            result.status      = 'skip';
-            result.googleLabel = e.message;
+        } else {
+            // OpenStreetMap (Nominatim)
+            try {
+                const osm = await geocodeAddressOSM(loc);
+                if (osm.success && osm.status === 'OK') {
+                    geoLat = osm.lat;
+                    geoLng = osm.lng;
+                    geoLabel = osm.display_name;
+                } else if (osm.status === 'ZERO_RESULTS') {
+                    geoLabel = 'No result from OpenStreetMap';
+                } else {
+                    geoLabel = osm.message || osm.error || 'OSM lookup failed';
+                }
+            } catch (e) {
+                geoLabel = e.message;
+            }
+        }
+
+        // Fatal auth/billing error from Google: halt early and show diagnostic card
+        if (isFatalAuthError) {
+            stopped = true;
+            result.googleLabel = geoLabel;
+            results.push(result);
+            appendRow(result, i);
+            updateSummary(threshold);
+
+            showErrorBanner(
+                'Google Geocoding API Request Denied',
+                fatalErrorMsg,
+                true // show "Switch to OpenStreetMap" button
+            );
+            progressText.textContent = `❌ Stopped: ${fatalErrorMsg}`;
+            break;
+        }
+
+        if (geoLat !== null && geoLng !== null) {
+            result.googleLat   = geoLat;
+            result.googleLng   = geoLng;
+            result.googleLabel = geoLabel;
+
+            if (!hasStoredCoords) {
+                result.status    = 'nocoords';
+                result.deviation = null;
+            } else {
+                const dist = haversineKm(storedLat, storedLng, geoLat, geoLng);
+                result.deviation = dist;
+
+                if (dist <= threshold) {
+                    result.status = 'ok';
+                } else if (dist <= threshold * 5) {
+                    result.status = 'warn';
+                } else {
+                    result.status = 'bad';
+                }
+            }
+        } else {
+            result.status      = !hasStoredCoords ? 'nocoords' : 'skip';
+            result.googleLabel = geoLabel;
         }
 
         results.push(result);
-
-        // Append row immediately
         appendRow(result, i);
         updateSummary(threshold);
 
-        // Rate-limit: ~200ms delay to stay within Geocoding API quota
-        await new Promise(res => setTimeout(res, 210));
+        // Rate-limiting: ~210ms for Google, ~1050ms for OSM (as per Nominatim policy)
+        const delayMs = provider === 'osm' ? 1050 : 210;
+        await new Promise(res => setTimeout(res, delayMs));
     }
 
     /* ── Done ── */
     if (!stopped) {
         barFill.style.width = '100%';
         progressPct.textContent = '100%';
-        progressText.textContent = `✅ Done — validated ${results.length} location(s) in "${state}".`;
+        progressText.textContent = `✅ Done — validated ${results.length} location(s) in "${stateLabel}".`;
     }
 
     stopBtn.style.display = 'none';
-    validateBtn.disabled = false;
+    checkValidationReady();
 });
 
 /* ── Append a single row to table and respect active filter ── */
@@ -703,7 +883,7 @@ function appendRow(result, idx) {
     if (status === 'bad')      devColour = 'color:#dc2626; font-weight:700;';
     if (status === 'nocoords') devColour = 'color:#ea580c; font-weight:700;';
 
-    // Show Update button for any row Google returned coords for
+    // Show Update button for any row geocoding returned coords for
     const canUpdate = (googleLat !== null && status !== 'skip');
     const updateLabel = status === 'nocoords' ? 'Set Coords' : 'Update';
     const updateBtn = canUpdate
@@ -732,7 +912,7 @@ function appendRow(result, idx) {
         </td>
         <td style="${devColour} font-size:13px;">${distStr}</td>
         <td class="status-cell"><span class="vld-status ${status}">${statusLabel}</span></td>
-        <td style="font-size:11px; color:#64748b; max-width:180px; word-break:break-word;">${escHtml(googleLabel)}</td>
+        <td style="font-size:11px; color:#64748b; max-width:220px; word-break:break-word;" title="${escHtml(googleLabel)}">${escHtml(googleLabel)}</td>
         <td>${updateBtn}</td>
     `;
 
@@ -800,7 +980,7 @@ async function bulkUpdateFlagged() {
         (r.status === 'warn' || r.status === 'bad' || r.status === 'nocoords') && r.googleLat !== null
     );
     if (!flagged.length) { alert('No flagged rows to update.'); return; }
-    if (!confirm(`Update coordinates for ${flagged.length} flagged location(s) from Google's results?\n\nThis overwrites stored lat/lng. Locked locations will be skipped by the server.`)) return;
+    if (!confirm(`Update coordinates for ${flagged.length} flagged location(s) from geocoded results?\n\nThis overwrites stored lat/lng. Locked locations will be skipped by the server.`)) return;
 
     const bulkBtn = document.getElementById('vld-bulk-update-btn');
     const bulkStatus = document.getElementById('vld-bulk-status');
@@ -809,16 +989,15 @@ async function bulkUpdateFlagged() {
 
     let done = 0;
     for (const result of flagged) {
-        // Find the Update button in the table row and click it programmatically
         const tr = document.querySelector(`#vld-tbody tr[data-id="${result.loc.id}"]`);
         if (!tr) { done++; continue; }
         const btn = tr.querySelector('.vld-btn-update');
-        if (!btn || btn.disabled) { done++; continue; }  // already updated
+        if (!btn || btn.disabled) { done++; continue; }
 
         await updateCoords(btn, result.loc.id, result.googleLat, result.googleLng);
         done++;
         bulkStatus.textContent = `Updated ${done} / ${flagged.length}…`;
-        await new Promise(res => setTimeout(res, 80));  // small delay between DB writes
+        await new Promise(res => setTimeout(res, 80));
     }
 
     bulkStatus.textContent = `✅ Done — ${done} location(s) updated.`;
@@ -863,7 +1042,6 @@ function updateSummary(threshold) {
         ${updated > 0 ? `<span class="vld-pill" style="background:#dbeafe;color:#1e40af;"><i class="fa-solid fa-pen-to-square"></i> ${updated} Updated</span>` : ''}
     `;
 
-    // Bulk-update bar: include nocoords rows that have Google results
     const bulkBar   = document.getElementById('vld-bulk-bar');
     const bulkLabel = document.getElementById('vld-bulk-label');
     if (flagged > 0) {
@@ -883,12 +1061,3 @@ function escHtml(str) {
         .replace(/"/g, '&quot;');
 }
 </script>
-<?php else: ?>
-<script>
-// No API key — keep button disabled
-document.getElementById('vld-btn').title = 'Google Maps API key is required';
-document.getElementById('vld-state-select').addEventListener('change', function() {
-    document.getElementById('vld-btn').disabled = true;
-});
-</script>
-<?php endif; ?>

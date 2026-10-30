@@ -122,16 +122,101 @@ class PostmarkAtlasModule extends BaseModule {
                 return true;
             }
 
-            $stmt = $pdo->prepare("
-                SELECT id, pin_code, post_office, ppc_name, district, state, latitude, longitude, is_acquired
-                FROM postmark_locations
-                WHERE state = ?
-                ORDER BY district ASC, post_office ASC
-            ");
-            $stmt->execute([$state]);
-            $locs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if ($state === 'ALL' || strtolower($state) === 'all') {
+                $stmt = $pdo->query("
+                    SELECT id, pin_code, post_office, ppc_name, district, state, latitude, longitude, is_acquired
+                    FROM postmark_locations
+                    ORDER BY state ASC, district ASC, post_office ASC
+                ");
+                $locs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT id, pin_code, post_office, ppc_name, district, state, latitude, longitude, is_acquired
+                    FROM postmark_locations
+                    WHERE state = ?
+                    ORDER BY district ASC, post_office ASC
+                ");
+                $stmt->execute([$state]);
+                $locs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
 
             echo json_encode(['success' => true, 'locations' => $locs, 'count' => count($locs)]);
+            return true;
+        });
+
+        // AJAX: Geocode via OpenStreetMap (Nominatim proxy for Coordinate Validator)
+        HookRegistry::addFilter('admin_ajax_postmark_atlas_geocode_osm', function($handled) {
+            $csrfToken = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+            if (!verifyCsrfToken($csrfToken)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
+                return true;
+            }
+
+            $pinCode    = trim($_POST['pin_code'] ?? '');
+            $postOffice = trim($_POST['post_office'] ?? '');
+            $district   = trim($_POST['district'] ?? '');
+            $state      = trim($_POST['state'] ?? '');
+
+            $fetchJson = function($url) {
+                if (function_exists('curl_init')) {
+                    $ch = curl_init($url);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_USERAGENT, 'ISROPostmarkAtlas/1.0 (internal admin validator)');
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    $resp = curl_exec($ch);
+                    curl_close($ch);
+                    return $resp ? json_decode($resp, true) : null;
+                } else {
+                    $ctx = stream_context_create([
+                        'http' => [
+                            'header'  => "User-Agent: ISROPostmarkAtlas/1.0\r\nAccept: application/json\r\n",
+                            'timeout' => 10,
+                        ]
+                    ]);
+                    $resp = @file_get_contents($url, false, $ctx);
+                    return $resp ? json_decode($resp, true) : null;
+                }
+            };
+
+            $result = null;
+
+            // 1. Try search by postalcode in India
+            if ($pinCode !== '') {
+                $url = 'https://nominatim.openstreetmap.org/search?postalcode=' . urlencode($pinCode) . '&country=India&format=json&limit=1';
+                $arr = $fetchJson($url);
+                if (!empty($arr) && isset($arr[0]['lat'], $arr[0]['lon'])) {
+                    $result = $arr[0];
+                }
+            }
+
+            // 2. Fallback: try search by post office + district + state if no postalcode hit
+            if (!$result && ($postOffice !== '' || $district !== '')) {
+                $q = trim("{$postOffice} Post Office, {$district}, {$state}, India");
+                $url = 'https://nominatim.openstreetmap.org/search?q=' . urlencode($q) . '&format=json&limit=1';
+                $arr = $fetchJson($url);
+                if (!empty($arr) && isset($arr[0]['lat'], $arr[0]['lon'])) {
+                    $result = $arr[0];
+                }
+            }
+
+            if ($result) {
+                echo json_encode([
+                    'success'      => true,
+                    'status'       => 'OK',
+                    'lat'          => (float) $result['lat'],
+                    'lng'          => (float) $result['lon'],
+                    'display_name' => $result['display_name'] ?? 'OpenStreetMap result',
+                ]);
+            } else {
+                echo json_encode([
+                    'success' => true,
+                    'status'  => 'ZERO_RESULTS',
+                    'message' => 'No result found from OpenStreetMap',
+                ]);
+            }
+
             return true;
         });
     }
