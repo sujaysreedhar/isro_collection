@@ -40,3 +40,19 @@ CREATE TABLE IF NOT EXISTS request_rate_limits (
 -- Automatic backup scheduler: initialize the last failed attempt timestamp for admin status display.
 INSERT INTO settings (setting_key, setting_value) VALUES ('auto_backup_last_failure_at', '0')
 ON DUPLICATE KEY UPDATE setting_value = setting_value;
+
+-- Virtual Museum centerpiece: preserve the selectable focal-point model on existing exhibitions.
+ALTER TABLE museum_exhibitions
+    ADD COLUMN IF NOT EXISTS centerpiece VARCHAR(32) NOT NULL DEFAULT 'auto' AFTER layout;
+
+-- Postmark Atlas: store the permanent pictorial cancellation name alongside the post office.
+ALTER TABLE postmark_locations
+    ADD COLUMN IF NOT EXISTS ppc_name VARCHAR(200) DEFAULT NULL AFTER post_office;
+
+-- Postmark Atlas: link an acquired postmark location to its collection item.
+ALTER TABLE postmark_locations
+    ADD COLUMN IF NOT EXISTS linked_item_id INT DEFAULT NULL AFTER is_acquired;
+
+-- Postmark Atlas: preserve manual location overrides with a lock flag.
+ALTER TABLE postmark_locations
+    ADD COLUMN IF NOT EXISTS is_locked TINYINT(1) DEFAULT 0 AFTER linked_item_id;
