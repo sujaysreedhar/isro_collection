@@ -1,0 +1,7 @@
+Decorative archive hero, generated with the built-in image_gen tool on 2026-11-02.
+This is illustrative theme artwork, not a catalog image or scan of an owned item.
+The selected image is encoded as archive-hero.webp for delivery. Item images
+continue to use the existing MediaProcessor pipeline and uploads/thumbnails/.
+
+Generation prompt:
+Create one premium photorealistic editorial website hero background, very wide landscape approximately 2.7:1. Subject: a collector's small overlapping arrangement of vintage Indian postage stamps on textured deep midnight navy paper. Stamp pile concentrated entirely in right half, left 45 percent is beautifully simple dark navy paper with subtle fibers and negative space for live white heading. Main stamp slightly rotated clockwise on right: warm ivory perforated border, deep navy printed Indian space exploration theme with slender rocket ascending toward moon, small gold/orange rocket flame, authentic tactile engraved print texture. Other partially visible stamps in muted plum, terracotta and warm ivory behind it. Close macro photography, rich analog paper texture, warm directional light, tiny natural shadows, sophisticated heritage collection mood. Objects and print illustrative only, no website UI, no large text, no slogans, no watermark. Image fills frame edge-to-edge, use dark navy #102044 for paper.

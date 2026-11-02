@@ -1,493 +1,173 @@
 <?php
-// themes/custom/item_detail.php — styled entirely with tc-* CSS vars from the custom theme.
-
-$pageTitle = $item['title'] . ' — ' . SITE_TITLE;
+require_once __DIR__ . '/partials/archive_helpers.php';
+$pageTitle = $item['title'] . ' - ' . SITE_TITLE;
 $currentMenu = '';
-
+$bodyClass = 'archive-ui';
+$primaryImageUrl = $primaryMedia ? MediaProcessor::url($primaryMedia['file_path'], 'display', 'image', $storage ?? null) : '';
+$primaryLicense = $primaryMedia['license_type'] ?? '';
 require_once ThemeManager::getHeader();
 ?>
-
-<div class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12">
-
-    <!-- Breadcrumbs -->
-    <nav class="flex text-xs font-semibold uppercase tracking-wider tc-text-muted mb-8" aria-label="Breadcrumb">
-        <ol class="inline-flex items-center space-x-2">
-            <li><a href="<?= SITE_URL ?>" class="tc-accent-text hover:underline transition-colors">Archive</a></li>
-            <?php if (!empty($itemCategories)): ?>
-                <?php foreach ($itemCategories as $cat): ?>
-                <li class="flex items-center">
-                    <span class="mx-2">/</span>
-                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $cat['id'] ?>"
-                        class="tc-accent-text hover:underline transition-colors"><?= htmlspecialchars($cat['name']) ?></a>
-                </li>
-                <?php endforeach; ?>
-            <?php endif; ?>
-            <li class="flex items-center tc-text">
-                <span class="mx-2">/</span>
-                <span><?= htmlspecialchars($item['reg_number']) ?></span>
-            </li>
+<main class="archive-page archive-detail">
+    <nav class="archive-breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            <li><a href="<?= SITE_URL ?>" aria-label="Home"><?= archiveUiIcon('home') ?></a></li>
+            <li><?= archiveUiIcon('chevron-right') ?><a href="<?= SITE_URL ?>/search.php">Collections</a></li>
+            <?php foreach ($itemCategories as $cat): ?>
+            <li><?= archiveUiIcon('chevron-right') ?><a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></a></li>
+            <?php endforeach; ?>
+            <li aria-current="page"><?= archiveUiIcon('chevron-right') ?><span><?= htmlspecialchars($item['title']) ?></span></li>
         </ol>
     </nav>
+    <?php if (class_exists('HookRegistry')) HookRegistry::doAction('item_before_content', $item); ?>
 
-    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_before_content', $item); } ?>
-
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-16">
-
-        <!-- ── Left: Gallery & Media ─────────────────────────────────────── -->
-        <div class="lg:col-span-7">
-
-            <!-- Main Viewer -->
-            <div class="main-image-container tc-surface tc-border mb-4 relative min-h-[400px] flex items-center justify-center overflow-hidden">
-                <?php if ($primaryMedia):
-                    $displaySrc = MediaProcessor::url($primaryMedia['file_path'], 'display', 'image', $storage ?? null);
-                    $imageAlt = htmlspecialchars($item['title'] . ' — Registration: ' . $item['reg_number']);
-                    ?>
-                    <figure class="w-full h-full flex items-center justify-center">
-                        <img id="main-viewer" src="<?= $displaySrc ?>" alt="<?= $imageAlt ?>"
-                            data-caption="<?= htmlspecialchars($primaryMedia['caption'] ?? '') ?>" class="max-h-[680px] w-auto transition-opacity duration-300 mv-zoomable" style="cursor: zoom-in;">
-                        <figcaption class="sr-only"><?= $imageAlt ?></figcaption>
-                    </figure>
-                    <span class="mv-zoom-hint" aria-hidden="true">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 8v6M8 11h6m5 0a8 8 0 11-16 0 8 8 0 0116 0z"/></svg>
-                        Click to zoom
-                    </span>
+    <div class="archive-detail-grid">
+        <section class="archive-gallery archive-panel" aria-label="Item images">
+            <div class="main-image-container archive-main-image">
+                <?php if ($primaryMedia): ?>
+                <figure>
+                    <img id="main-viewer" src="<?= htmlspecialchars($primaryImageUrl) ?>" alt="<?= htmlspecialchars($item['title'] . ' - ' . $item['reg_number']) ?>" data-caption="<?= htmlspecialchars($primaryMedia['caption'] ?? '') ?>" tabindex="0" role="button" aria-label="View full size image of <?= htmlspecialchars($item['title']) ?>" width="1200" height="800" fetchpriority="high">
+                    <figcaption class="sr-only"><?= htmlspecialchars($item['title']) ?></figcaption>
+                </figure>
+                <button class="archive-expand" type="button" data-open-viewer aria-label="Expand image"><?= archiveUiIcon('arrows-pointing-out') ?></button>
                 <?php else: ?>
-                    <img id="main-viewer" style="display:none;" />
-                    <div class="flex flex-col items-center justify-center h-80 tc-text-muted">
-                        <svg class="w-14 h-14 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
-                            </path>
-                        </svg>
-                        <span class="text-sm">Digitization Pending</span>
-                    </div>
+                <img id="main-viewer" style="display:none" alt="">
+                <div class="archive-empty"><?= archiveUiIcon('photo') ?><p>Digitization Pending</p></div>
                 <?php endif; ?>
-                
-                <!-- 360 Viewer (Hidden by default) -->
                 <div id="panorama-viewer" class="absolute inset-0 w-full h-full hidden"></div>
             </div>
-
-            <!-- Secondary Thumbnails -->
-            <?php if (count($imageMedia) > 1): ?>
-                <div class="flex flex-wrap gap-3 mb-5">
-                    <?php foreach ($imageMedia as $i => $img):
-                        $thumbSrc = MediaProcessor::url($img['file_path'], 'thumbnails', 'image', $storage ?? null);
-                        $fullSrc = MediaProcessor::url($img['file_path'], 'display', 'image', $storage ?? null);
-                        $active = ($img['id'] === ($primaryMedia['id'] ?? null)) ? 'active' : '';
-                        $thumbAlt = htmlspecialchars($item['title'] . ' - View ' . ($i + 1));
-                        ?>
-                        <img src="<?= $thumbSrc ?>" class="gallery-thumbnail <?= $active ?>" data-full="<?= $fullSrc ?>"
-                            data-mv-index="<?= $i ?>"
-                            data-caption="<?= htmlspecialchars($img['caption'] ?? '') ?>" onclick="switchImage(this)"
-                            alt="<?= $thumbAlt ?>" loading="lazy">
-                    <?php endforeach; ?>
-                    
-                    <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('item_gallery_thumbnails', $item); } ?>
-                </div>
-            <?php endif; ?>
-
-            <!-- Caption Block -->
-            <div id="caption-box" class="tc-surface tc-border tc-radius p-5">
-                <p id="image-caption" class="text-sm tc-text-muted italic leading-relaxed">
-                    <?= htmlspecialchars($primaryMedia['caption'] ?? 'No caption available for this view.') ?>
-                </p>
-                <?php if ($primaryMedia && !empty($primaryMedia['license_type'])): ?>
-                    <div class="mt-3 pt-3 border-t tc-border flex items-center justify-between">
-                        <span class="text-xs tc-text-muted uppercase tracking-wider font-medium">License</span>
-                        <span
-                            class="text-xs font-semibold tc-primary-text tc-surface tc-border px-3 py-1 tc-radius"><?= htmlspecialchars($primaryMedia['license_type']) ?></span>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Description (Moved from right column) -->
-            <?php
-            $descClean = trim(strip_tags($item['physical_description'] ?? ''));
-            if (!empty($descClean)):
+            <div class="archive-thumbnails" aria-label="Choose an image">
+                <?php foreach ($imageMedia as $index => $img):
+                    $thumbSrc = MediaProcessor::url($img['file_path'], 'thumbnails', 'image', $storage ?? null);
+                    $fullSrc = MediaProcessor::url($img['file_path'], 'display', 'image', $storage ?? null);
                 ?>
-                <div class="mt-8 tc-text text-base leading-relaxed serif quill-content">
-                    <h3 class="text-xs font-bold uppercase tracking-widest tc-text-muted mb-4 opacity-70">Physical
-                        Description</h3>
-                    <?= $item['physical_description'] ?>
-                </div>
-            <?php endif; ?>
+                <button type="button" class="archive-thumbnail-button" aria-label="View image <?= $index + 1 ?> of <?= count($imageMedia) ?>" aria-pressed="<?= $index === 0 ? 'true' : 'false' ?>" onclick="switchImage(this.querySelector('img'))">
+                    <img src="<?= htmlspecialchars($thumbSrc) ?>" class="gallery-thumbnail<?= $index === 0 ? ' active' : '' ?>" data-full="<?= htmlspecialchars($fullSrc) ?>" data-mv-index="<?= $index ?>" data-caption="<?= htmlspecialchars($img['caption'] ?? '') ?>" data-license="<?= htmlspecialchars($img['license_type'] ?? '') ?>" alt="<?= htmlspecialchars($item['title'] . ' - View ' . ($index + 1)) ?>" width="88" height="58" loading="lazy">
+                </button>
+                <?php endforeach; ?>
+                <?php if (class_exists('HookRegistry')) HookRegistry::doAction('item_gallery_thumbnails', $item); ?>
+            </div>
+            <p id="image-caption" class="archive-image-caption"<?= empty($primaryMedia['caption']) ? ' hidden' : '' ?>><?= htmlspecialchars($primaryMedia['caption'] ?? '') ?></p>
+        </section>
 
-            <!-- YouTube Embeds -->
-            <?php foreach ($youtubeMedia as $yt): ?>
-                <div class="mt-8 aspect-video tc-radius overflow-hidden tc-border">
-                    <iframe class="w-full h-full"
-                        src="https://www.youtube.com/embed/<?= htmlspecialchars($yt['file_path']) ?>"
-                        title="<?= htmlspecialchars($yt['caption'] ?? $item['title']) ?>" frameborder="0"
-                        allowfullscreen></iframe>
-                </div>
-            <?php endforeach; ?>
-
-            <!-- PDF Documents -->
-            <?php foreach ($pdfMedia as $pdf): ?>
-                <a href="<?= SITE_URL ?>/uploads/pdfs/<?= rawurlencode($pdf['file_path']) ?>" target="_blank"
-                    class="mt-4 flex items-center gap-4 p-5 tc-surface tc-border tc-radius hover:shadow-md transition-shadow group block">
-                    <div class="w-12 h-12 tc-radius flex items-center justify-center tc-text-muted">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z">
-                            </path>
-                        </svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-semibold tc-text truncate">
-                            <?= htmlspecialchars($pdf['caption'] ?: 'Download Document') ?></p>
-                        <p class="text-xs tc-text-muted">PDF · <?= round(($pdf['file_size'] ?? 0) / 1024, 1) ?> KB</p>
-                    </div>
-                    <svg class="w-4 h-4 tc-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                    </svg>
-                </a>
-            <?php endforeach; ?>
-        </div>
-
-        <!-- ── Right: Item Information ─────────────────────────────────── -->
-        <div class="lg:col-span-5">
-
-            <!-- Title & Tags -->
-            <header class="mb-10">
-                <h1 class="text-4xl font-extrabold tc-primary-text serif leading-tight mb-5">
-                    <?= htmlspecialchars($item['title']) ?>
-                </h1>
-                <?php if ($itemTags): ?>
-                    <div class="flex flex-wrap gap-2">
-                        <?php foreach ($itemTags as $tag): ?>
-                            <a href="<?= SITE_URL ?>/tag/<?= htmlspecialchars($tag['slug']) ?>"
-                                class="inline-flex items-center px-3 py-1 text-xs font-bold tc-text-muted tc-radius transition-all hover:tc-accent-bg hover:text-white group"
-                                style="background:color-mix(in srgb, var(--color-accent, #2563eb) 8%, transparent);">
-                                <span class="mr-0.5 tc-accent-text group-hover:text-white transition-colors">#</span><?= htmlspecialchars($tag['name']) ?>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
+        <section class="archive-item-info" aria-labelledby="item-title">
+            <header class="archive-item-heading">
+                <?php if ($itemCategories): ?><span class="archive-category-badge"><?= archiveUiIcon('tag') ?> <?= htmlspecialchars($itemCategories[0]['name']) ?></span><?php endif; ?>
+                <h1 id="item-title"><?= htmlspecialchars($item['title']) ?></h1>
+                <span class="archive-title-rule" aria-hidden="true"></span>
             </header>
-
-            <!-- Specifications Table -->
-            <div class="tc-surface tc-border tc-radius overflow-hidden mb-10">
-                <div class="p-5 border-b tc-border">
-                    <h3 class="text-xs font-bold uppercase tracking-widest tc-text-muted">Specifications</h3>
-                </div>
-                <dl class="divide-y" style="border-color: var(--color-border, #e5e7eb);">
-                    <div class="p-5 grid grid-cols-3 gap-4">
-                        <dt class="spec-label col-span-1">Reg #</dt>
-                        <dd class="spec-value col-span-2 font-mono tc-accent-text">
-                            <?= htmlspecialchars($item['reg_number']) ?></dd>
-                    </div>
-                    <?php if (!empty($itemCategories)): ?>
-                        <div class="p-5 grid grid-cols-3 gap-4">
-                            <dt class="spec-label col-span-1">Categories</dt>
-                            <dd class="col-span-2 flex flex-wrap gap-2">
-                                <?php foreach ($itemCategories as $idx => $cat): ?>
-                                    <a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $cat['id'] ?>"
-                                        class="spec-value tc-accent-text hover:underline"><?= htmlspecialchars($cat['name']) ?></a><?= ($idx < count($itemCategories) - 1) ? ',' : '' ?>
-                                <?php endforeach; ?>
-                            </dd>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (!empty($item['production_date'])): ?>
-                        <div class="p-5 grid grid-cols-3 gap-4">
-                            <dt class="spec-label col-span-1">Date</dt>
-                            <dd class="spec-value col-span-2"><?= htmlspecialchars($item['production_date']) ?></dd>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (!empty($item['material'])): ?>
-                        <div class="p-5 grid grid-cols-3 gap-4">
-                            <dt class="spec-label col-span-1">Material</dt>
-                            <dd class="spec-value col-span-2"><?= htmlspecialchars($item['material']) ?></dd>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (!empty($item['credit_line'])): ?>
-                        <div class="p-5 flex flex-col sm:flex-row sm:items-center">
-                            <span class="spec-label sm:w-1/3 mb-1 sm:mb-0">Provenance</span>
-                            <span
-                                class="spec-value sm:w-2/3 tc-text-muted text-sm font-normal"><?= htmlspecialchars($item['credit_line']) ?></span>
-                        </div>
-                    <?php endif; ?>
-                    <div class="p-5 flex flex-col sm:flex-row sm:items-center bg-tc-accent-bg/5">
-                        <span class="spec-label sm:w-1/3 mb-1 sm:mb-0">Total Views</span>
-                        <span
-                            class="spec-value sm:w-2/3 tc-accent-text font-bold"><?= number_format(($item['view_count'] ?? 0) + 1) ?></span>
-                    </div>
-                    <?php
-                    $histClean = trim(strip_tags($item['historical_significance'] ?? ''));
-                    if (!empty($histClean)):
-                        ?>
-                        <div class="p-5">
-                            <dt class="spec-label mb-2">Historical Significance</dt>
-                            <dd class="tc-text text-sm leading-relaxed quill-content">
-                                <?= $item['historical_significance'] ?></dd>
-                        </div>
-                    <?php endif; ?>
+            <div class="archive-specs archive-panel">
+                <dl class="archive-spec-column">
+                    <div><?= archiveUiIcon('clipboard-document-check') ?><dt>Registration No.</dt><dd><?= htmlspecialchars($item['reg_number']) ?></dd></div>
+                    <?php if (!empty($item['production_date'])): ?><div><?= archiveUiIcon('calendar-days') ?><dt>Date</dt><dd><?= htmlspecialchars(archiveUiDate($item['production_date'])) ?></dd></div><?php endif; ?>
+                    <div><?= archiveUiIcon('eye') ?><dt>Total Views</dt><dd><?= number_format(($item['view_count'] ?? 0) + 1) ?></dd></div>
+                    <?php if (!empty($item['material'])): ?><div><?= archiveUiIcon('square-3-stack-3d') ?><dt>Material</dt><dd><?= htmlspecialchars($item['material']) ?></dd></div><?php endif; ?>
+                </dl>
+                <dl class="archive-spec-column">
+                    <div><?= archiveUiIcon('tag') ?><dt>Category</dt><dd><?php foreach ($itemCategories as $index => $cat): ?><?= $index ? ', ' : '' ?><a href="<?= SITE_URL ?>/search.php?category_ids[]=<?= (int) $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></a><?php endforeach; ?><?= !$itemCategories ? 'Uncategorized' : '' ?></dd></div>
+                    <?php if ($imageMedia): ?><div><?= archiveUiIcon('square-3-stack-3d') ?><dt>Image License</dt><dd id="archive-image-license"><?= htmlspecialchars($primaryLicense ?: 'Not specified') ?></dd></div><?php endif; ?>
+                    <?php if (!empty($item['credit_line'])): ?><div><?= archiveUiIcon('book-open') ?><dt>Provenance</dt><dd><?= htmlspecialchars($item['credit_line']) ?></dd></div><?php endif; ?>
                 </dl>
             </div>
-
-            <!-- Related Stories -->
-            <?php if ($stories): ?>
-                <div class="mb-10">
-                    <h3 class="text-lg font-bold tc-primary-text serif mb-5">Related Stories</h3>
-                    <div class="space-y-3">
-                        <?php foreach ($stories as $story): ?>
-                            <a href="<?= SITE_URL ?>/story/<?= (int) $story['id'] ?>"
-                                class="block p-5 tc-surface tc-border tc-radius hover:shadow-md transition-shadow">
-                                <h4 class="font-semibold tc-accent-text hover:underline mb-1">
-                                    <?= htmlspecialchars($story['title']) ?></h4>
-                                <p class="text-sm tc-text-muted line-clamp-2">
-                                    <?= htmlspecialchars(substr(strip_tags($story['content_body']), 0, 140)) ?>…</p>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
+            <div class="archive-actions">
+                <?php if ($primaryMedia): ?>
+                <button type="button" class="archive-button archive-button--primary" data-open-viewer><?= archiveUiIcon('magnifying-glass-plus') ?> View Full Size</button>
+                <a id="archive-download" class="archive-button" href="<?= htmlspecialchars($primaryImageUrl) ?>" download target="_blank" rel="noopener"><?= archiveUiIcon('arrow-down-tray') ?> Download</a>
+                <?php endif; ?>
+                <button type="button" class="archive-button" data-archive-favorite aria-pressed="false"><?= archiveUiIcon('heart') ?><span data-favorite-label>Add to Favorites</span></button>
+                <button type="button" class="archive-button" data-archive-share><?= archiveUiIcon('share') ?> Share</button>
+            </div>
+            <p class="archive-action-status" role="status" aria-live="polite" data-archive-status></p>
+            <div class="archive-share-fallback" hidden><label for="archive-share-url">Copy this item link</label><input id="archive-share-url" type="url" readonly value="<?= htmlspecialchars(SITE_URL . '/item/' . (int) $item['id']) ?>"></div>
+            <?php if ($itemTags): ?>
+            <div class="archive-tags" aria-label="Item tags"><?php foreach ($itemTags as $tag): ?><a href="<?= SITE_URL ?>/tag/<?= htmlspecialchars($tag['slug']) ?>">#<?= htmlspecialchars($tag['name']) ?></a><?php endforeach; ?></div>
             <?php endif; ?>
-
-            <!-- Citation -->
-            <?php if (AppConfig::get('site_show_citation', '1') === '1'): ?>
-                <div class="tc-surface tc-border tc-radius p-5">
-                    <h4 class="text-xs font-bold uppercase tracking-widest tc-text-muted mb-3">How to Cite</h4>
-                    <div class="text-xs font-mono tc-text leading-relaxed cursor-text select-all"><?= $citation ?></div>
-                </div>
-            <?php endif; ?>
-        </div>
+        </section>
     </div>
 
-    <!-- Related Items Section (Full Width) -->
-    <?php if (!empty($relatedItems)): ?>
-        <div class="mt-16 mb-12">
-            <div class="flex items-center justify-between mb-8">
-                <h3 class="text-2xl font-bold tc-primary-text serif uppercase tracking-wider">Related</h3>
-                <div class="h-px flex-1 bg-tc-border ml-8 opacity-30"></div>
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                <?php foreach (array_slice($relatedItems, 0, 4) as $ri): ?>
-                    <a href="<?= SITE_URL ?>/item/<?= $ri['id'] ?>" class="group block h-full">
-                        <div
-                            class="tc-surface tc-border tc-radius overflow-hidden h-full flex flex-col hover:shadow-lg transition-all hover:-translate-y-1">
-                            <div class="aspect-[4/3] bg-tc-accent-bg/5 flex items-center justify-center overflow-hidden">
-                                <?php if ($ri['thumb']): ?>
-                                    <img src="<?= MediaProcessor::url($ri['thumb'], 'thumbnails', 'image', $storage ?? null) ?>"
-                                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                        alt="<?= htmlspecialchars($ri['title']) ?>" loading="lazy">
-                                <?php else: ?>
-                                    <div class="w-full h-full flex items-center justify-center bg-gray-100">
-                                        <svg class="w-10 h-10 tc-text-muted opacity-30" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
-                                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
-                                            </path>
-                                        </svg>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                            <div class="p-4 flex-1">
-                                <span
-                                    class="text-[9px] font-bold uppercase tracking-widest tc-text-muted mb-1 block"><?= htmlspecialchars($ri['reg_number']) ?></span>
-                                <h4 class="text-xs font-bold tc-text group-hover:tc-accent-text line-clamp-2 leading-snug">
-                                    <?= htmlspecialchars($ri['title']) ?></h4>
-                            </div>
-                        </div>
-                    </a>
-                <?php endforeach; ?>
-            </div>
+    <div class="archive-description-grid">
+        <?php if (trim(strip_tags($item['physical_description'] ?? '')) !== ''): ?>
+        <section class="archive-description archive-panel" aria-labelledby="description-title">
+            <h2 id="description-title"><?= archiveUiIcon('book-open') ?> Physical Description</h2>
+            <div class="quill-content"><?= $item['physical_description'] ?></div>
+        </section>
+        <?php endif; ?>
+        <?php if (trim(strip_tags($item['historical_significance'] ?? '')) !== ''): ?>
+        <section class="archive-description archive-description--history archive-panel" aria-labelledby="history-title">
+            <h2 id="history-title"><?= archiveUiIcon('globe-alt') ?> Historical Significance</h2>
+            <div class="quill-content"><?= $item['historical_significance'] ?></div>
+        </section>
+        <?php endif; ?>
+    </div>
+
+    <?php if ($youtubeMedia || $pdfMedia): ?>
+    <section class="archive-section" aria-labelledby="media-title">
+        <div class="archive-section-heading"><h2 id="media-title"><?= archiveUiIcon('document-text') ?> Related Media</h2></div>
+        <div class="archive-media-grid">
+            <?php foreach ($youtubeMedia as $yt): ?>
+            <div class="archive-video archive-panel"><iframe src="https://www.youtube.com/embed/<?= htmlspecialchars($yt['file_path']) ?>" title="<?= htmlspecialchars($yt['caption'] ?: $item['title']) ?>" loading="lazy" allowfullscreen></iframe></div>
+            <?php endforeach; ?>
+            <?php foreach ($pdfMedia as $pdf): ?>
+            <a href="<?= htmlspecialchars(MediaProcessor::url($pdf['file_path'], 'pdfs', 'pdf', $storage ?? null)) ?>" target="_blank" rel="noopener" class="archive-document archive-panel"><?= archiveUiIcon('document-text') ?><span><strong><?= htmlspecialchars($pdf['caption'] ?: 'Download Document') ?></strong><small>PDF · <?= round(($pdf['file_size'] ?? 0) / 1024, 1) ?> KB</small></span><?= archiveUiIcon('arrow-down-tray') ?></a>
+            <?php endforeach; ?>
         </div>
+    </section>
     <?php endif; ?>
-</div>
 
-<script>
-    function switchImage(el) {
-        const main = document.getElementById('main-viewer');
-        const panoContainer = document.getElementById('panorama-viewer');
-        const caption = document.getElementById('image-caption');
+    <?php if ($stories): ?>
+    <section class="archive-section" aria-labelledby="stories-title">
+        <div class="archive-section-heading"><h2 id="stories-title"><?= archiveUiIcon('book-open') ?> Related Stories</h2></div>
+        <div class="archive-media-grid">
+            <?php foreach ($stories as $story): ?>
+            <a class="archive-story archive-panel" href="<?= SITE_URL ?>/story/<?= (int) $story['id'] ?>"><h3><?= htmlspecialchars($story['title']) ?></h3><p><?= htmlspecialchars(archiveUiExcerpt($story['content_body'])) ?></p></a>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php endif; ?>
+    <?php if (AppConfig::get('site_show_citation', '1') === '1'): ?>
+    <section class="archive-citation archive-panel"><h2>How to Cite</h2><div><?= $citation ?></div></section>
+    <?php endif; ?>
 
-        if (panoContainer) {
-            panoContainer.classList.add('hidden');
-        }
-
-        if (el.dataset.mvIndex !== undefined) window.__mvCurrent = parseInt(el.dataset.mvIndex, 10) || 0;
-
-        if (main) {
-            const itemAlt = <?= json_encode($item['title'] . ' — Registration: ' . $item['reg_number']) ?>;
-            main.style.display = 'block';
-            main.style.opacity = '0';
-            setTimeout(() => {
-                if (el.dataset.full) {
-                    main.src = el.dataset.full;
-                    main.alt = itemAlt;
-                    // Update figcaption if it exists
-                    const figcap = main.closest('figure')?.querySelector('figcaption');
-                    if (figcap) figcap.innerText = itemAlt;
-                }
-                caption.innerText = el.dataset.caption || 'No caption available for this view.';
-                
-                document.querySelectorAll('.gallery-thumbnail').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.pano-thumbnail img').forEach(img => img.classList.remove('border-blue-500'));
-                
-                el.classList.add('active');
-                main.style.opacity = '1';
-            }, 200);
-        }
-    }
-</script>
+    <?php if ($relatedItems): ?>
+    <section class="archive-section" aria-labelledby="related-title">
+        <div class="archive-section-heading"><h2 id="related-title"><?= archiveUiIcon('square-3-stack-3d') ?> Related Items</h2></div>
+        <div class="archive-related-grid">
+            <?php foreach (array_slice($relatedItems, 0, 4) as $ri): ?>
+            <a class="archive-related-card archive-panel" href="<?= SITE_URL ?>/item/<?= (int) $ri['id'] ?>">
+                <div><?php if (!empty($ri['thumb'])): ?><img src="<?= htmlspecialchars(MediaProcessor::url($ri['thumb'], 'card', 'image', $storage ?? null)) ?>" alt="<?= htmlspecialchars($ri['title']) ?>" width="360" height="230" loading="lazy"><?php else: ?><?= archiveUiIcon('photo') ?><?php endif; ?></div>
+                <span class="archive-reg"><?= htmlspecialchars($ri['reg_number']) ?></span><h3><?= htmlspecialchars($ri['title']) ?></h3>
+            </a>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php endif; ?>
+</main>
 
 <?php
-// Full-resolution set for the zoom lightbox
-$zoomImages = [];
-foreach ($imageMedia as $img) {
-    // Mirror the thumbnail loop 1:1 so lightbox indices stay aligned with data-mv-index.
-    $fp = $img['file_path'] ?? '';
-    $zoomImages[] = [
-        'full'    => MediaProcessor::url($fp, 'originals', 'image', $storage ?? null),
-        'display' => MediaProcessor::url($fp, 'display', 'image', $storage ?? null),
-        'caption' => $img['caption'] ?? '',
-        'alt'     => trim($item['title'] . ' — ' . $item['reg_number']),
-    ];
-}
+$viewerImages = array_map(static fn($img) => [
+    'src' => MediaProcessor::url($img['file_path'], 'display', 'image', $storage ?? null),
+    'caption' => $img['caption'] ?? '',
+    'license' => $img['license_type'] ?? '',
+], $imageMedia);
+$archiveItemData = [
+    'id' => (int) $item['id'],
+    'title' => $item['title'],
+    'reg' => $item['reg_number'],
+    'image' => $primaryImageUrl,
+    'remember' => !empty($item['is_visible']),
+    'images' => $viewerImages,
+];
 ?>
-<?php if (!empty($zoomImages)): ?>
-<!-- ── Zoom lightbox ───────────────────────────────────────────────────── -->
-<style>
-    .main-image-container .mv-zoom-hint {
-        position: absolute; bottom: .75rem; right: .75rem; z-index: 5;
-        display: inline-flex; align-items: center; gap: .3rem;
-        background: rgba(17,24,39,.78); color: #fff;
-        font-size: .72rem; font-weight: 600; letter-spacing: .02em;
-        padding: .28rem .6rem; border-radius: 999px;
-        opacity: 0; transition: opacity .18s ease; pointer-events: none;
-    }
-    .main-image-container:hover .mv-zoom-hint { opacity: 1; }
-    .mv-lightbox {
-        position: fixed; inset: 0; z-index: 100;
-        background: rgba(15,17,21,.94);
-        display: none; align-items: center; justify-content: center;
-        overscroll-behavior: contain;
-    }
-    .mv-lightbox.open { display: flex; }
-    .mv-lightbox-img {
-        max-width: 94vw; max-height: 90vh; object-fit: contain;
-        cursor: zoom-in; transition: transform .12s ease-out;
-        transform: scale(1); user-select: none; -webkit-user-drag: none;
-    }
-    .mv-lightbox-img.zoomed { cursor: zoom-out; transition: none; }
-    .mv-lb-btn {
-        position: absolute; top: 50%; transform: translateY(-50%);
-        width: 48px; height: 48px; border-radius: 999px; border: none;
-        background: rgba(255,255,255,.12); color: #fff; cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        transition: background .15s ease;
-    }
-    .mv-lb-btn:hover { background: rgba(255,255,255,.25); }
-    .mv-lb-prev { left: 1.25rem; } .mv-lb-next { right: 1.25rem; }
-    .mv-lb-close { top: 1.1rem; right: 1.25rem; transform: none; }
-    .mv-lb-counter {
-        position: absolute; bottom: 1.1rem; left: 50%; transform: translateX(-50%);
-        color: #e5e7eb; font-size: .8rem; letter-spacing: .03em;
-        background: rgba(0,0,0,.4); padding: .3rem .8rem; border-radius: 999px;
-    }
-    @media (max-width: 640px) {
-        .mv-lb-prev { left: .4rem; } .mv-lb-next { right: .4rem; }
-        .mv-lb-btn { width: 42px; height: 42px; }
-    }
-</style>
-
-<div class="mv-lightbox" id="mvLightbox" aria-modal="true" role="dialog" aria-label="Image viewer">
-    <button type="button" class="mv-lb-btn mv-lb-close" id="mvClose" aria-label="Close">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-    </button>
-    <button type="button" class="mv-lb-btn mv-lb-prev" id="mvPrev" aria-label="Previous image">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-    </button>
-    <img class="mv-lightbox-img" id="mvLightboxImg" src="" alt="">
-    <button type="button" class="mv-lb-btn mv-lb-next" id="mvNext" aria-label="Next image">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-    </button>
-    <div class="mv-lb-counter" id="mvCounter"></div>
-</div>
-
-<script>
-(function () {
-    var images = <?= json_encode($zoomImages, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    if (!images.length) return;
-    if (typeof window.__mvCurrent !== 'number') window.__mvCurrent = 0;
-    var single = images.length < 2;
-
-    var lb      = document.getElementById('mvLightbox');
-    var lbImg   = document.getElementById('mvLightboxImg');
-    var counter = document.getElementById('mvCounter');
-    var prevBtn = document.getElementById('mvPrev');
-    var nextBtn = document.getElementById('mvNext');
-    var mainImg = document.getElementById('main-viewer');
-
-    function resetZoom() {
-        lbImg.classList.remove('zoomed');
-        lbImg.style.transform = 'scale(1)';
-        lbImg.style.transformOrigin = 'center center';
-    }
-    function render() {
-        var g = images[window.__mvCurrent] || images[0];
-        resetZoom();
-        lbImg.onerror = function () { lbImg.onerror = null; lbImg.src = g.display; };
-        lbImg.src = g.full || g.display;
-        lbImg.alt = g.alt || '';
-        counter.textContent = single ? '' : (window.__mvCurrent + 1) + ' / ' + images.length;
-    }
-    function open() {
-        if (window.__mvCurrent < 0 || window.__mvCurrent >= images.length) window.__mvCurrent = 0;
-        render();
-        lb.classList.add('open');
-        document.body.style.overflow = 'hidden';
-    }
-    function close() {
-        lb.classList.remove('open');
-        document.body.style.overflow = '';
-        resetZoom();
-    }
-    function step(delta) {
-        window.__mvCurrent = (window.__mvCurrent + delta + images.length) % images.length;
-        // keep the inline main viewer in sync with the lightbox
-        var t = document.querySelector('.gallery-thumbnail[data-mv-index="' + window.__mvCurrent + '"]');
-        if (t && typeof switchImage === 'function') switchImage(t);
-        render();
-    }
-
-    if (mainImg) mainImg.addEventListener('click', open);
-    document.getElementById('mvClose').addEventListener('click', close);
-    prevBtn.addEventListener('click', function (e) { e.stopPropagation(); step(-1); });
-    nextBtn.addEventListener('click', function (e) { e.stopPropagation(); step(1); });
-    if (single) { prevBtn.style.display = 'none'; nextBtn.style.display = 'none'; }
-    lb.addEventListener('click', function (e) { if (e.target === lb) close(); });
-
-    lbImg.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (lbImg.classList.contains('zoomed')) { resetZoom(); return; }
-        lbImg.classList.add('zoomed');
-        applyZoom(e);
-    });
-    function applyZoom(e) {
-        var r = lbImg.getBoundingClientRect();
-        var x = ((e.clientX - r.left) / r.width) * 100;
-        var y = ((e.clientY - r.top) / r.height) * 100;
-        lbImg.style.transformOrigin = x + '% ' + y + '%';
-        lbImg.style.transform = 'scale(2.6)';
-    }
-    lbImg.addEventListener('mousemove', function (e) {
-        if (lbImg.classList.contains('zoomed')) applyZoom(e);
-    });
-    document.addEventListener('keydown', function (e) {
-        if (!lb.classList.contains('open')) return;
-        if (e.key === 'Escape') close();
-        else if (e.key === 'ArrowLeft' && !single) step(-1);
-        else if (e.key === 'ArrowRight' && !single) step(1);
-    });
-})();
-</script>
+<script type="application/json" id="archive-item-data"><?= json_encode($archiveItemData, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
+<?php if ($imageMedia): ?>
+<dialog class="archive-lightbox" id="archive-lightbox" aria-label="Full size item images">
+    <div class="archive-lightbox-toolbar"><span><?= htmlspecialchars($item['title']) ?></span><button type="button" data-viewer-close aria-label="Close image viewer"><?= archiveUiIcon('x-mark') ?></button></div>
+    <button type="button" class="archive-lightbox-prev" data-viewer-step="-1" aria-label="Previous image"><?= archiveUiIcon('chevron-left') ?></button>
+    <div class="archive-lightbox-stage"><img id="archive-lightbox-image" alt="<?= htmlspecialchars($item['title']) ?>"></div>
+    <button type="button" class="archive-lightbox-next" data-viewer-step="1" aria-label="Next image"><?= archiveUiIcon('chevron-right') ?></button>
+    <p class="archive-lightbox-caption" id="archive-lightbox-caption"></p>
+</dialog>
 <?php endif; ?>
-
 <?php
-if (class_exists('HookRegistry')) {
-    HookRegistry::doAction('item_after_content', $item);
-}
+if (class_exists('HookRegistry')) HookRegistry::doAction('item_after_content', $item);
 require_once ThemeManager::getFooter();
 ?>

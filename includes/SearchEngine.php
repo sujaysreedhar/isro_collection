@@ -7,6 +7,14 @@
 class SearchEngine {
     private PDO $db;
 
+    // Only these fixed expressions may reach ORDER BY from public controls.
+    public const SORT_ORDERS = [
+        'recent' => 'i.id DESC',
+        'oldest' => 'i.id ASC',
+        'title_asc' => 'i.title ASC, i.id ASC',
+        'title_desc' => 'i.title DESC, i.id DESC',
+    ];
+
     public static function paginationPlan(int $itemCount, int $limit, int $offset): array {
         $itemLimit = max(0, min($limit, $itemCount - $offset));
         return [
@@ -18,9 +26,11 @@ class SearchEngine {
     }
 
     public static function validateParams(array $params): ?string {
-        foreach (['q', 'category', 'tag', 'page', 'year_start', 'year_end', 'has_images', 'exact'] as $key) {
+        foreach (['q', 'category', 'tag', 'page', 'year_start', 'year_end', 'has_images', 'exact', 'sort', 'view'] as $key) {
             if (isset($params[$key]) && !is_scalar($params[$key])) return "Invalid $key.";
         }
+        if (isset($params['sort']) && !isset(self::SORT_ORDERS[(string)$params['sort']])) return 'Invalid sort.';
+        if (isset($params['view']) && !in_array($params['view'], ['grid', 'list'], true)) return 'Invalid view.';
         $query = (string)($params['q'] ?? '');
         if ((function_exists('mb_strlen') ? mb_strlen($query, 'UTF-8') : strlen($query)) > 200
             || preg_match_all('/\S+/u', $query) > 10) return 'Search query is too long.';
@@ -301,7 +311,7 @@ class SearchEngine {
         if ($baseParts['where']) $sql .= " WHERE " . implode(" AND ", $baseParts['where']);
         
         // Add sorting and limiting
-        $sql .= " ORDER BY i.id DESC"; // Default sort
+        $sql .= ' ORDER BY ' . self::SORT_ORDERS[$params['sort'] ?? 'recent'];
         
         if ($pagePlan['item_limit'] > 0) {
             $sql .= " LIMIT ? OFFSET ?";

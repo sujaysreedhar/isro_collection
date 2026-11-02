@@ -16,6 +16,8 @@ $params = [
     'materials'    => array_values(array_filter(array_map('trim', (array)($_GET['materials'] ?? [])))),
     'has_images'   => isset($_GET['has_images']) && $_GET['has_images'] === '1',
     'exact'        => isset($_GET['exact']) && $_GET['exact'] === '1',
+    'sort'         => $_GET['sort'] ?? 'recent',
+    'view'         => $_GET['view'] ?? 'grid',
     'tags'         => array_values(array_filter(array_map('trim', (array)($_GET['tags'] ?? [])))),
     'tag'          => trim($_GET['tag'] ?? ''),
     'year_start'   => (isset($_GET['year_start']) && is_numeric($_GET['year_start'])) ? (int)$_GET['year_start'] : null,
@@ -90,6 +92,7 @@ function buildFilterUrl(array $currentParams, string $key, $value): string {
 function buildQuery(array $p): string {
     $out = [];
     if (!empty($p['q']))           $out[] = 'q=' . urlencode($p['q']);
+    if (!empty($p['category']))    $out[] = 'category=' . urlencode($p['category']);
     if (!empty($p['category_ids'])) {
         foreach (array_unique($p['category_ids']) as $id) {
             $out[] = 'category_ids[]=' . (int)$id;
@@ -104,6 +107,8 @@ function buildQuery(array $p): string {
     if ($p['year_end'] !== null)   $out[] = 'year_end=' . $p['year_end'];
     if (!empty($p['has_images']))  $out[] = 'has_images=1';
     if (!empty($p['exact']))       $out[] = 'exact=1';
+    if (!empty($p['sort']) && $p['sort'] !== 'recent') $out[] = 'sort=' . urlencode($p['sort']);
+    if (($p['view'] ?? 'grid') === 'list') $out[] = 'view=list';
     if (!empty($p['tag']))         $out[] = 'tags[]=' . urlencode($p['tag']);
     if (!empty($p['tags'])) {
         foreach (array_unique($p['tags']) as $t) {

@@ -1,5 +1,6 @@
 <?php
 // themes/custom/header.php
+require_once __DIR__ . '/partials/archive_helpers.php';
 // CSS-variable driven header — inherits logic from default but uses tc-* classes
 
 $pageTitle      = $pageTitle      ?? SITE_TITLE;
@@ -108,90 +109,70 @@ $searchParams   = $searchParams   ?? ['q' => ''];
 
     <!-- Module hooks (Theme Studio injects :root CSS vars here) -->
     <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_head'); } ?>
+    <link rel="stylesheet" href="<?= SITE_URL ?>/themes/custom/archive.css?v=<?= filemtime(__DIR__ . '/archive.css') ?>">
+    <script src="<?= SITE_URL ?>/themes/custom/archive.js?v=<?= filemtime(__DIR__ . '/archive.js') ?>" defer></script>
 </head>
 
-<body>
-    <!-- Global Header -->
-    <header class="tc-header sticky top-0 z-50">
-        <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('frontend_header'); } ?>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center flex-shrink-0">
-                <a href="<?= SITE_URL ?>" class="flex items-center gap-3">
-                    <?php
-                    $siteLogo = $GLOBALS['appSettings']['site_logo'] ?? '';
-                    if ($siteLogo && file_exists(dirname(__DIR__, 2) . '/uploads/branding/' . $siteLogo)):
-                    ?>
-                        <img src="<?= SITE_URL ?>/uploads/branding/<?= rawurlencode($siteLogo) ?>" alt="<?= SITE_TITLE ?>" class="h-10 w-auto object-contain">
-                    <?php else: ?>
-                        <span class="text-2xl font-bold serif tracking-tight tc-primary-text"><?= SITE_TITLE ?></span>
-                    <?php endif; ?>
-                </a>
-            </div>
-
-            <?php if (!$hideHeaderSearch): ?>
-                <div class="flex-1 max-w-2xl ml-8 hidden md:block">
-                    <form action="<?= SITE_URL ?>/search.php" method="GET" class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                            </svg>
-                        </div>
-                        <?php foreach ($searchParams['category_ids'] ?? [] as $cid): ?>
-                            <input type="hidden" name="category_ids[]" value="<?= htmlspecialchars($cid) ?>">
-                        <?php endforeach; ?>
-                        <?php if (!empty($searchParams['has_images'])): ?>
-                            <input type="hidden" name="has_images" value="1">
-                        <?php endif; ?>
-                        <?php if (!empty($searchParams['tag'])): ?>
-                            <input type="hidden" name="tag" value="<?= htmlspecialchars($searchParams['tag']) ?>">
-                        <?php endif; ?>
-                        <input type="text" name="q" data-autocomplete="true" autocomplete="off"
-                               value="<?= htmlspecialchars($searchParams['q'] ?? '') ?>"
-                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:ring-2 focus:border-transparent sm:text-sm tc-input"
-                               placeholder="Search the collections...">
-                    </form>
-                </div>
-            <?php endif; ?>
-
-            <div class="flex items-center gap-4">
-                <?php if (function_exists('renderFrontendNav')) {
-                    renderFrontendNav($currentMenu);
-                } ?>
-
-                <!-- Mobile Menu Button -->
-                <button type="button" onclick="toggleMobileMenu()" class="lg:hidden inline-flex items-center justify-center p-2 rounded-xl tc-text-muted hover:tc-primary-text hover:bg-black/5 transition-all outline-none">
-                    <span class="sr-only">Open main menu</span>
-                    <svg id="menu-icon-open" class="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                    <svg id="menu-icon-close" class="hidden h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- Mobile Menu Container -->
-        <div id="mobile-menu" class="hidden lg:hidden tc-header border-b tc-border shadow-2xl">
-            <div class="px-4 py-8">
-                <?php if (!$hideHeaderSearch): ?>
-                    <form action="<?= SITE_URL ?>/search.php" method="GET" class="relative mb-8">
-                        <input type="text" name="q" class="block w-full pl-4 pr-3 py-3 border tc-border rounded-xl bg-black/5 tc-text text-sm transition-all focus:ring-2 focus:ring-black/10" placeholder="Search...">
-                    </form>
+<body class="<?= htmlspecialchars($bodyClass ?? '') ?>" data-archive-base="<?= htmlspecialchars(SITE_URL) ?>">
+    <a class="archive-skip-link" href="#archive-main">Skip to content</a>
+    <header class="tc-header archive-header">
+        <?php if (class_exists('HookRegistry')) HookRegistry::doAction('frontend_header'); ?>
+        <div class="archive-header-inner">
+            <a href="<?= SITE_URL ?>" class="archive-brand">
+                <?php
+                $siteLogo = $appSettings['site_logo'] ?? '';
+                if ($siteLogo && is_file(dirname(__DIR__, 2) . '/uploads/branding/' . $siteLogo)):
+                ?>
+                    <img src="<?= SITE_URL ?>/uploads/branding/<?= rawurlencode($siteLogo) ?>" alt="<?= htmlspecialchars(SITE_TITLE) ?>" width="160" height="56">
+                    <span class="archive-brand-title"><?= htmlspecialchars(SITE_TITLE) ?></span>
+                <?php else: ?>
+                    <span class="archive-brand-name"><?= htmlspecialchars(SITE_TITLE) ?></span>
                 <?php endif; ?>
-                <?php renderFrontendNav($currentMenu, true); ?>
+            </a>
+            <div class="archive-desktop-nav">
+                <?php if (function_exists('renderFrontendNav')) renderFrontendNav($currentMenu); ?>
             </div>
+            <?php if (!$hideHeaderSearch): ?>
+                <form action="<?= SITE_URL ?>/search.php" method="GET" class="archive-header-search" role="search">
+                    <?= archiveUiIcon('magnifying-glass') ?>
+                    <?php archiveUiSearchFields($searchParams, ['q']); ?>
+                    <input aria-label="Search the collections" type="search" name="q" data-autocomplete="true" autocomplete="off" value="<?= htmlspecialchars($searchParams['q'] ?? '') ?>" placeholder="Search the collections...">
+                </form>
+            <?php endif; ?>
+            <a class="archive-account" href="<?= SITE_URL ?>/admin/index.php" aria-label="Collection administration"><?= archiveUiIcon('user') ?></a>
+            <button type="button" id="archive-menu-toggle" class="archive-menu-toggle" onclick="toggleMobileMenu()" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open main menu">
+                <span id="menu-icon-open"><?= archiveUiIcon('bars-3') ?></span>
+                <span id="menu-icon-close" hidden><?= archiveUiIcon('x-mark') ?></span>
+            </button>
         </div>
-
-        <script>
-            function toggleMobileMenu() {
-                const menu = document.getElementById('mobile-menu');
-                const openIcon = document.getElementById('menu-icon-open');
-                const closeIcon = document.getElementById('menu-icon-close');
-                menu.classList.toggle('hidden');
-                openIcon.classList.toggle('hidden');
-                closeIcon.classList.toggle('hidden');
-            }
-        </script>
+        <div id="mobile-menu" class="archive-mobile-menu" hidden>
+            <?php if (!$hideHeaderSearch): ?>
+            <form action="<?= SITE_URL ?>/search.php" method="GET" class="archive-mobile-search" role="search">
+                <?php archiveUiSearchFields($searchParams, ['q']); ?>
+                <?= archiveUiIcon('magnifying-glass') ?>
+                <input aria-label="Search the collections" type="search" name="q" placeholder="Search the collections..." value="<?= htmlspecialchars($searchParams['q'] ?? '') ?>">
+                <button type="submit">Search</button>
+            </form>
+            <?php endif; ?>
+            <?php if (function_exists('renderFrontendNav')) renderFrontendNav($currentMenu, true); ?>
         </div>
     </header>
+    <span id="archive-main" tabindex="-1"></span>
+    <script>
+        function toggleMobileMenu(forceOpen) {
+            const menu = document.getElementById('mobile-menu');
+            const toggle = document.getElementById('archive-menu-toggle');
+            const open = typeof forceOpen === 'boolean' ? forceOpen : menu.hidden;
+            menu.hidden = !open;
+            toggle.setAttribute('aria-expanded', String(open));
+            toggle.setAttribute('aria-label', open ? 'Close main menu' : 'Open main menu');
+            document.getElementById('menu-icon-open').hidden = open;
+            document.getElementById('menu-icon-close').hidden = !open;
+        }
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !document.getElementById('mobile-menu').hidden) {
+                toggleMobileMenu(false);
+                document.getElementById('archive-menu-toggle').focus();
+            }
+        });
+    </script>
