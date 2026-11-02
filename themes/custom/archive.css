@@ -1,6 +1,7 @@
 /* Reference-led archive UI. Content styles are scoped to the redesigned pages.
    Layers: sticky header 40, autocomplete 50, native dialog in the browser top layer. */
 :root {
+    color-scheme: only light;
     --archive-ink: #11234b; --archive-muted: #53627a; --archive-paper: #f8f7f6;
     --archive-surface: #fff; --archive-soft: #f1f2f5; --archive-line: #e2e4e9;
     --archive-yellow: #ffcb24; --archive-history: #eaf0fa; --archive-radius: 18px;
@@ -283,12 +284,6 @@
     .archive-lightbox button { width: 36px; height: 36px; } .archive-lightbox-caption { left: 30px; right: 30px; bottom: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .archive-ui *, .archive-header * { transition: none !important; scroll-behavior: auto !important; animation: none !important; } }
-@media (prefers-color-scheme: dark) {
-    :root { --archive-ink: #e5eaf5; --archive-muted: #adb9ce; --archive-paper: #111a2b; --archive-surface: #182337; --archive-soft: #23314a; --archive-line: #32415a; --archive-history: #1c304c; --archive-shadow: 0 4px 20px rgb(0 0 0 / 12%); }
-    .archive-brand img { filter: brightness(0) invert(1); } .archive-desktop-nav a.font-bold { background: #2c3d61; color: #f4f7ff; }
-    .archive-text-link, .archive-breadcrumbs a { color: #a9c8ff; } .archive-category-badge { background: #3d311e; color: #f6cd87; }
-    .archive-header-search input { border-color: var(--archive-line); } .archive-account { background: #354e7a; }
-}
 
 /* Search: a steady filter column and a photographic catalog grid. */
 .archive-search { padding: 22px 28px 48px; }
@@ -443,10 +438,4 @@ form[data-auto-filters] .archive-filter-submit { display: none; }
     [data-results-view="list"] .archive-result-category { flex-basis: 100%; }
     [data-results-view="list"] .archive-result-bookmark { top: 16px; left: 82px; width: 29px; height: 29px; }
     [data-results-view="list"] .archive-result-arrow { width: 25px; height: 25px; right: 11px; bottom: 13px; }
-}
-@media (prefers-color-scheme: dark) {
-    .archive-filter-heading > a, .archive-more-tags > summary { color: #a9c8ff; }
-    .archive-query-form input, .archive-year-controls > input { border-color: var(--archive-line); }
-    .archive-result-content .archive-reg { background: #2a3b64; color: #e3ebff; }
-    .archive-search-note { background: #3c311e; color: #f3dcae; }
 }

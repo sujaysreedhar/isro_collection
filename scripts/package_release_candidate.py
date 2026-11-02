@@ -12,10 +12,10 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "scripts" / "releases"
-BUILD = OUTPUT / ".build-rc1"
+BUILD = OUTPUT / ".build-rc2"
 STAGE = BUILD / "application"
-VERSION = "1.0.0-rc.1"
-NAME = "mycollection-1.0.0-rc.1-2026-11-02"
+VERSION = "1.0.0-rc.2"
+NAME = f"mycollection-{VERSION}-2026-11-02"
 RUNTIME_DIRS = ("admin", "assets", "bootstrap", "includes", "modules", "themes")
 ROOT_FILES = (
     ".htaccess", ".env.example", "index.php", "ajax.php", "ajax_search.php",
@@ -79,10 +79,12 @@ def prepare() -> None:
         copied[relative.as_posix()] = sha256(target)
     for folder in EMPTY_DIRS:
         (STAGE / folder).mkdir(parents=True, exist_ok=True)
+    changed_paths = set(subprocess.check_output(["git", "diff", "--name-only", "-z", "HEAD"], cwd=ROOT).decode().split("\0"))
+    changed_paths.update(subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=ROOT).decode().split("\0"))
     metadata = {
         "version": VERSION,
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-        "includes_uncommitted_workspace_changes": True,
+        "includes_uncommitted_workspace_changes": bool(changed_paths.intersection(copied)),
         "source_sha256": copied,
     }
     (BUILD / "source-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
@@ -139,7 +141,9 @@ Release candidate prepared on 2026-11-02.
 Includes the current workspace's home, item detail and search UI changes for
 Custom / Theme Studio, compiled CSS, application modules, and production PHP
 dependencies installed from composer.lock. The source commit is
-{metadata['source_commit']}; uncommitted UI changes are included.
+{metadata['source_commit']}.
+{'Uncommitted application changes are included.' if metadata['includes_uncommitted_workspace_changes'] else 'The packaged application source matches this commit.'}
+Custom / Theme Studio is light-only, regardless of the system color preference.
 
 DEPLOYMENT
 This is an update package for an existing installation. Extract the application
@@ -177,7 +181,7 @@ are also provided alongside the archive.
         "name": "My Collection", "version": VERSION,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "source_commit": metadata["source_commit"],
-        "includes_uncommitted_workspace_changes": True,
+        "includes_uncommitted_workspace_changes": metadata["includes_uncommitted_workspace_changes"],
         "config_excluded": "config/config.php", "production_dependencies_bundled": True,
         "manifest_excludes_itself": True,
         "files": [{"path": p.relative_to(STAGE).as_posix(), "bytes": p.stat().st_size, "sha256": sha256(p)} for p in files],

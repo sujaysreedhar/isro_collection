@@ -10,11 +10,6 @@ if (PHP_SAPI !== 'cli-server' || getenv('ARCHIVE_UI_PREVIEW') !== '1') {
 }
 $root = dirname(__DIR__);
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-if ($path === '/archive-preview-dark.css') {
-    header('Content-Type: text/css');
-    echo str_replace('@media (prefers-color-scheme: dark)', '@media screen', file_get_contents($root . '/themes/custom/archive.css'));
-    return;
-}
 if (preg_match('#^/(themes/|uploads/|includes/cache/assets/)#', $path)) return false;
 if ($path === '/ajax_search.php') {
     header('Content-Type: application/json');
@@ -36,9 +31,6 @@ $appSettings = [
 AppConfig::load($appSettings);
 require_once $root . '/includes/HookRegistry.php';
 require_once $root . '/modules/theme_studio/module.php';
-if (isset($_GET['dark'])) HookRegistry::addAction('frontend_footer', static function () {
-    echo '<link rel="stylesheet" href="/archive-preview-dark.css">';
-});
 $catalog = [
     ['id' => 103, 'reg_number' => 'PS-103', 'title' => 'National Science Day', 'production_date' => '2026-02-28', 'file_path' => 'img_103_9028527f310efc91.webp'],
     ['id' => 104, 'reg_number' => 'PS-104', 'title' => 'Chinese Fishing Nets, Kochi', 'production_date' => '2026-04-04', 'file_path' => 'img_104_ae99cd3d598b879e.webp'],
