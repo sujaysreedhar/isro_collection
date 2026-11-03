@@ -13,6 +13,7 @@ To ensure consistent environments across all deployments, any automated agent (l
 6. **Test Code Hygiene**: Any scripts, test files, or one-off tools created during development **MUST** be moved to the `scripts/` directory after use. Never leave diagnostic or testing code in the root directory.
 7. **Strict Scope**: Do not change any functionality other than what was explicitly requested. Avoid modifying irrelevant files.
 8. **Pre-execution Checklist**: Before starting any execution, you **MUST** provide a clear implementation plan (checklist) of all proposed changes and wait for user approval.
+9. **Export Hygiene**: When exporting the application or creating release packages, exclude `config/config.php`, `.env`, and environment-specific `.env.*` files containing private configuration. Sanitized templates such as `.env.example` may be included.
 
 ## Example `update.sql` entry:
 ```sql

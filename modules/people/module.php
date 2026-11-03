@@ -1,5 +1,6 @@
 <?php
 // modules/people/module.php
+require_once __DIR__ . '/PeopleSupport.php';
 
 class PeopleModule extends BaseModule
 {
@@ -16,9 +17,12 @@ class PeopleModule extends BaseModule
         });
 
         // Admin menu
-        HookRegistry::addAction('admin_menu', function () {
-            $url = SITE_URL . '/admin/module_page.php?m=people';
-            echo '<a href="' . $url . '" class="sidebar-link text-slate-300">People/Biographies</a>';
+        HookRegistry::addFilter('admin_sidebar_links', function (array $sections) {
+            $sections['content']['links']['people'] = [
+                'url' => SITE_URL . '/admin/module_page.php?m=people',
+                'label' => 'People &amp; Biographies',
+            ];
+            return $sections;
         });
 
         // Register admin page
@@ -91,7 +95,7 @@ class PeopleModule extends BaseModule
                     '_module_url' => SITE_URL . '/person/' . $person['slug'],
                     '_module_type' => 'Biography',
                     '_module_tags' => [],
-                    '_module_image_url' => $person['profile_image'] ? SITE_URL . '/uploads/display/' . $person['profile_image'] : '',
+                    '_module_image_url' => PeopleSupport::imageUrl($person['profile_image']),
                     'title' => $person['name'],
                     'production_date' => $person['birth_date'] ? $person['birth_date'] . ' - ' . ($person['death_date'] ?: 'Present') : '',
                     'reg_number' => 'Biography',
@@ -125,13 +129,13 @@ class PeopleModule extends BaseModule
 
         foreach ($people as $person) {
             $url = SITE_URL . '/person/' . urlencode($person['slug']);
-            $img = $person['profile_image'] ? SITE_URL . '/uploads/display/' . htmlspecialchars($person['profile_image']) : '';
+            $img = htmlspecialchars(PeopleSupport::imageUrl($person['profile_image']), ENT_QUOTES, 'UTF-8');
 
             echo '<a href="' . $url . '" class="group flex flex-col items-center p-8 bg-white dark:bg-gray-800/50 rounded-3xl border border-gray-200 dark:border-gray-700/50 hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-300 dark:hover:border-blue-500/50 transition-all duration-300 text-center transform hover:-translate-y-1">';
 
             if ($img) {
                 echo '<div class="relative mb-6">';
-                echo '<img src="' . $img . '" alt="' . htmlspecialchars($person['name']) . '" class="w-28 h-28 rounded-full object-cover border-[6px] border-gray-50  shadow-md group-hover:scale-105 transition-transform duration-500">';
+                echo '<img src="' . $img . '" alt="' . htmlspecialchars($person['name']) . '" class="w-28 h-28 rounded-full object-contain border-[6px] border-gray-50  shadow-md group-hover:scale-105 transition-transform duration-500">';
                 echo '<div class="absolute inset-0 rounded-full border border-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>';
                 echo '</div>';
             } else {
@@ -206,11 +210,11 @@ class PeopleModule extends BaseModule
             echo '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">';
             foreach ($people as $person) {
                 $url = SITE_URL . '/person/' . urlencode($person['slug']);
-                $img = $person['profile_image'] ? SITE_URL . '/uploads/display/' . $person['profile_image'] : '';
+                $img = PeopleSupport::imageUrl($person['profile_image']);
 
                 echo '<a href="' . $url . '" class="flex items-center p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-md transition group">';
                 if ($img) {
-                    echo '<img src="' . htmlspecialchars($img) . '" class="w-16 h-16 rounded-full object-cover border-2 border-slate-100 shadow-sm">';
+                    echo '<img src="' . htmlspecialchars($img) . '" alt="' . htmlspecialchars($person['name'], ENT_QUOTES, 'UTF-8') . '" class="w-16 h-16 rounded-lg object-contain border-2 border-slate-100 shadow-sm" loading="lazy">';
                 } else {
                     echo '<div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg></div>';
                 }

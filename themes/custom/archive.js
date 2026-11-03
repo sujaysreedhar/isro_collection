@@ -130,7 +130,7 @@
         const image = images[current];
         if (!image || !dialogImage) return;
         resetZoom();
-        dialogImage.src = image.src;
+        dialogImage.src = image.full || image.src;
         dialogImage.alt = `${item.title} - View ${current + 1}`;
         document.getElementById('archive-lightbox-caption').textContent =
             `${current + 1} / ${images.length}${image.caption ? ' · ' + image.caption : ''}`;
@@ -150,7 +150,7 @@
         }
         if (caption) { caption.textContent = image.caption; caption.hidden = !image.caption; }
         if (license) license.textContent = image.license || 'Not specified';
-        if (download) download.href = image.src;
+        if (download) { download.href = image.download || ''; download.hidden = !image.download; }
         document.querySelectorAll('.gallery-thumbnail').forEach(thumbnail => {
             const active = thumbnail === element;
             thumbnail.classList.toggle('active', active);

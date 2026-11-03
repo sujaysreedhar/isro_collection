@@ -4,6 +4,7 @@ $pageTitle = $item['title'] . ' - ' . SITE_TITLE;
 $currentMenu = '';
 $bodyClass = 'archive-ui';
 $primaryImageUrl = $primaryMedia ? MediaProcessor::url($primaryMedia['file_path'], 'display', 'image', $storage ?? null) : '';
+$primaryDownloadUrl = $primaryMedia && MediaProcessor::originalStoragePath($primaryMedia['file_path'], $storage ?? null) ? MediaProcessor::originalDownloadUrl((int)$primaryMedia['id']) : '';
 $primaryLicense = $primaryMedia['license_type'] ?? '';
 require_once ThemeManager::getHeader();
 ?>
@@ -71,7 +72,7 @@ require_once ThemeManager::getHeader();
             <div class="archive-actions">
                 <?php if ($primaryMedia): ?>
                 <button type="button" class="archive-button archive-button--primary" data-open-viewer><?= archiveUiIcon('magnifying-glass-plus') ?> View Full Size</button>
-                <a id="archive-download" class="archive-button" href="<?= htmlspecialchars($primaryImageUrl) ?>" download target="_blank" rel="noopener"><?= archiveUiIcon('arrow-down-tray') ?> Download</a>
+                <a id="archive-download" class="archive-button" href="<?= htmlspecialchars($primaryDownloadUrl) ?>" <?= $primaryDownloadUrl ? '' : 'hidden' ?>><?= archiveUiIcon('arrow-down-tray') ?> Download original</a>
                 <?php endif; ?>
                 <button type="button" class="archive-button" data-archive-favorite aria-pressed="false"><?= archiveUiIcon('heart') ?><span data-favorite-label>Add to Favorites</span></button>
                 <button type="button" class="archive-button" data-archive-share><?= archiveUiIcon('share') ?> Share</button>
@@ -145,6 +146,8 @@ require_once ThemeManager::getHeader();
 <?php
 $viewerImages = array_map(static fn($img) => [
     'src' => MediaProcessor::url($img['file_path'], 'display', 'image', $storage ?? null),
+    'full' => MediaProcessor::url($img['file_path'], 'original', 'image', $storage ?? null),
+    'download' => MediaProcessor::originalStoragePath($img['file_path'], $storage ?? null) ? MediaProcessor::originalDownloadUrl((int)$img['id']) : '',
     'caption' => $img['caption'] ?? '',
     'license' => $img['license_type'] ?? '',
 ], $imageMedia);

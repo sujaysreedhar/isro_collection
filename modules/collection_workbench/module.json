@@ -1,0 +1,8 @@
+{
+  "name": "Collection Workbench",
+  "description": "Country, year, series and theme completeness, private storage and valuation records, and bulk editing with a verified preview.",
+  "version": "1.0.0",
+  "author": "Collection Portal",
+  "admin_menu_priority": 25,
+  "wide_admin_page": true
+}

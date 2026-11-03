@@ -47,7 +47,8 @@ foreach ($imageMedia as $img) {
     $galleryImages[] = [
         'thumb'      => MediaProcessor::url($fp, 'thumbnails', 'image', $storage ?? null),
         'display'    => MediaProcessor::url($fp, 'display', 'image', $storage ?? null),
-        'full'       => MediaProcessor::variantStoragePath($fp, 'display') !== 'display/' . $fp ? MediaProcessor::url($fp, 'display', 'image', $storage ?? null) : $mvFull($fp),
+        'full'       => MediaProcessor::url($fp, 'original', 'image', $storage ?? null),
+        'download'   => MediaProcessor::originalStoragePath($fp, $storage ?? null) ? MediaProcessor::originalDownloadUrl((int)$img['id']) : '',
         'caption'    => $img['caption'] ?? '',
         'license'    => $img['license_type'] ?? '',
         'dimensions' => $img['dimensions'] ?? '',
@@ -110,6 +111,8 @@ require_once ThemeManager::getHeader();
                             <cite id="mvCaption" class="not-italic font-medium text-gray-600"><?= htmlspecialchars($galleryImages[0]['caption'] ?: 'No description provided.') ?></cite>
                             <span id="mvLicense" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800 <?= $galleryImages[0]['license'] ? '' : 'hidden' ?>"><?= htmlspecialchars($galleryImages[0]['license']) ?></span>
                         </div>
+
+                        <a id="mvDownload" href="<?= htmlspecialchars($galleryImages[0]['download']) ?>" class="inline-flex px-4 py-3 text-sm font-medium underline <?= $galleryImages[0]['download'] ? '' : 'hidden' ?>">Download original image</a>
 
                         <!-- Technical metadata (updates on image change) -->
                         <div id="mvMeta" class="bg-white border-b border-x border-gray-200 text-xs text-gray-500 p-3 rounded-b-lg flex flex-wrap gap-x-6 gap-y-2 <?= count($galleryImages) > 1 ? '' : 'mb-4' ?>">
@@ -317,7 +320,7 @@ require_once ThemeManager::getHeader();
         padding: 0; cursor: pointer; transition: border-color .15s ease, opacity .15s ease;
         opacity: .75;
     }
-    .mv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .mv-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .mv-thumb:hover { opacity: 1; }
     .mv-thumb.is-active { border-color: #111827; opacity: 1; }
 
@@ -407,6 +410,8 @@ require_once ThemeManager::getHeader();
         var g = images[current];
         mainImg.src = g.display;
         mainImg.alt = g.alt || '';
+        var download = document.getElementById('mvDownload');
+        if (download) { download.href = g.download || ''; download.classList.toggle('hidden', !g.download); }
         if (capEl) capEl.textContent = g.caption || 'No description provided.';
         if (licEl) { if (g.license) { licEl.classList.remove('hidden'); licEl.textContent = g.license; } else { licEl.classList.add('hidden'); } }
         setMetaField('.mv-m-dim',  g.dimensions, g.dimensions + ' px');

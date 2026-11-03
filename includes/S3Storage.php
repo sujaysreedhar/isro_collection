@@ -89,12 +89,35 @@ class S3Storage implements StorageInterface {
         $storagePath = MediaProcessor::normalizeStoragePath($storagePath);
         $key = $this->fullKey($storagePath);
 
-        // Build standard S3 public URL
-        return "https://{$this->bucket}.s3.{$this->region}.amazonaws.com/{$key}";
+        return $this->client->getObjectUrl($this->bucket, $key);
     }
 
     public function driverName(): string {
         return 's3';
+    }
+
+    /** Short-lived original download with an attachment disposition, including custom endpoints. */
+    public function downloadUrl(string $storagePath, string $filename): string {
+        $filename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+        $command = $this->client->getCommand('GetObject', [
+            'Bucket' => $this->bucket,
+            'Key' => $this->fullKey($storagePath),
+            'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+        return (string)$this->client->createPresignedRequest($command, '+5 minutes')->getUri();
+    }
+
+    /** Read a known storage key for a PDF; never fetch arbitrary URLs supplied in a form. */
+    public function albumImageBytes(string $storagePath): ?string {
+        try {
+            $head = $this->client->headObject(['Bucket' => $this->bucket, 'Key' => $this->fullKey($storagePath)]);
+            if ((int)$head['ContentLength'] > MediaProcessor::MAX_IMG_BYTES) return null;
+            $object = $this->client->getObject(['Bucket' => $this->bucket, 'Key' => $this->fullKey($storagePath)]);
+            return (string)$object['Body'];
+        } catch (AwsException $e) {
+            error_log('Album image unavailable: ' . $e->getAwsErrorCode());
+            return null;
+        }
     }
 
     public function getTotalSize(): int {

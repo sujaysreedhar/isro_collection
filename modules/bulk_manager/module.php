@@ -4,6 +4,14 @@
 class BulkManagerModule extends BaseModule {
 
     public function boot() {
+        // Use the preview/confirmation workflow once the collection workbench is enabled.
+        HookRegistry::addAction('admin_init_bulk_manager', function() {
+            $active = json_decode(AppConfig::get('active_modules', '[]'), true);
+            if (is_array($active) && in_array('collection_workbench', $active, true)) {
+                header('Location: ' . SITE_URL . '/admin/module_page.php?m=collection_workbench&tab=bulk');
+                exit;
+            }
+        });
         // 1. Admin Menu
         HookRegistry::addFilter('admin_sidebar_links', function($links) {
             if (!isset($links['tools'])) {

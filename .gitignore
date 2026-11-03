@@ -1,6 +1,16 @@
 # Ignore dependency/vendor directories
 vendor/
 
+# Local verification runtimes and generated fixtures (development scripts remain in scripts/).
+scripts/.runtime/
+scripts/artifacts/
+scripts/releases/
+
+# Private environment configuration is never included in source pushes.
+.env
+.env.*
+!.env.example
+
 # Ignore temporary files and directories
 tmp/*
 !tmp/.htaccess
@@ -14,5 +24,3 @@ uploads/*
 # Ignore zip archives
 *.zip
 tmp/backups/
-  
- 

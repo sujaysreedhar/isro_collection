@@ -1,436 +1,128 @@
 <?php
-// modules/people/admin_people.php
-$action = $_GET['action'] ?? 'list';
-$personId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$msg = $_GET['msg'] ?? '';
-
-// Fetch person if editing
+require_once __DIR__ . '/PeopleSupport.php';
+$action = in_array($_GET['action'] ?? '', ['add', 'edit'], true) ? $_GET['action'] : 'list';
+$personId = max(0, (int)($_GET['id'] ?? 0));
+$pe = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+$formErrors = $GLOBALS['people_form_errors'] ?? [];
 $person = null;
-if ($personId > 0) {
-    $stmt = $this->pdo->prepare("SELECT * FROM people WHERE id = ?");
+$linkedItems = [];
+if ($personId > 0 && $action === 'edit') {
+    $stmt = $this->pdo->prepare('SELECT * FROM people WHERE id = ?');
     $stmt->execute([$personId]);
-    $person = $stmt->fetch();
-    
-    // Fetch linked items
-    $stmtItems = $this->pdo->prepare("SELECT i.id, i.title, i.reg_number, ip.role FROM items i JOIN item_people ip ON i.id = ip.item_id WHERE ip.person_id = ?");
-    $stmtItems->execute([$personId]);
-    $linkedItems = $stmtItems->fetchAll();
+    $person = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$person) { $formErrors[] = 'This biography no longer exists.'; $action = 'list'; }
 }
-
-// Fetch all people for list view
+if ($action !== 'list' && isset($GLOBALS['people_form_values'])) $person = array_merge($person ?: [], $GLOBALS['people_form_values']);
+$q = is_string($_GET['q'] ?? null) ? trim($_GET['q']) : '';
+$visibility = in_array($_GET['visibility'] ?? '', ['public', 'private'], true) ? $_GET['visibility'] : '';
+$page = max(1, (int)($_GET['p'] ?? 1));
 $people = [];
+$total = 0;
 if ($action === 'list') {
-    $people = $this->pdo->query("SELECT * FROM people ORDER BY name ASC")->fetchAll();
+    $where = [];
+    $params = [];
+    if ($q !== '') { $where[] = '(p.name LIKE ? OR p.slug LIKE ? OR p.short_description LIKE ?)'; $params = array_fill(0, 3, '%' . substr($q, 0, 255) . '%'); }
+    if ($visibility !== '') { $where[] = 'p.is_public = ?'; $params[] = $visibility === 'public' ? 1 : 0; }
+    $whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+    $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM people p' . $whereSql);
+    $stmt->execute($params);
+    $total = (int)$stmt->fetchColumn();
+    $page = min($page, max(1, (int)ceil($total / 25)));
+    $offset = ($page - 1) * 25;
+    $stmt = $this->pdo->prepare('SELECT p.*, (SELECT COUNT(DISTINCT ip.item_id) FROM item_people ip JOIN items i ON i.id = ip.item_id WHERE ip.person_id = p.id) AS linked_count FROM people p' . $whereSql . ' ORDER BY p.name ASC LIMIT 25 OFFSET ' . $offset);
+    $stmt->execute($params);
+    $people = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
-$csrfToken = $_SESSION['csrf_token'] ?? '';
+$csrfToken = ensureCsrfToken();
+$msg = $_GET['msg'] ?? '';
 ?>
-
-<div class="p-6 max-w-6xl mx-auto">
-    <div class="flex justify-between items-center mb-8">
-        <div>
-            <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">People & Biographies</h2>
-            <p class="text-slate-500 mt-1">Manage historical figures and link them to collection items.</p>
-        </div>
-        <?php if ($action === 'list'): ?>
-            <a href="?m=people&action=add" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                Add Person
-            </a>
-        <?php else: ?>
-            <a href="?m=people" class="text-slate-500 hover:text-slate-700 flex items-center gap-1 font-medium">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                Back to List
-            </a>
-        <?php endif; ?>
+<style>
+.people-workspace{max-width:1200px;margin:auto;padding:24px}.people-workspace .people-panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px}.people-workspace label{display:block;font-size:14px;font-weight:600;color:#334155;margin-bottom:6px}.people-workspace input:not([type=checkbox]):not([type=file]),.people-workspace textarea,.people-workspace select{width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;padding:10px 12px;color:#0f172a;font-size:14px}.people-workspace textarea{resize:vertical;line-height:1.7}.people-workspace input:focus-visible,.people-workspace textarea:focus-visible,.people-workspace select:focus-visible,.people-workspace button:focus-visible,.people-workspace a:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}.people-workspace .people-button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 14px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:14px;font-weight:600;cursor:pointer}.people-workspace .people-primary{background:#2563eb;border-color:#2563eb;color:#fff}.people-workspace .people-button:disabled{opacity:.6;cursor:wait}.people-workspace .people-help{color:#64748b;font-size:13px;line-height:1.5;margin-top:6px}.people-workspace .people-stack{display:grid;gap:20px}.people-workspace .people-table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}.people-table th,.people-table td{padding:16px;border-bottom:1px solid #e2e8f0}.people-table th{background:#f8fafc;color:#475569;font-size:12px}.people-photo{width:160px;height:180px;object-fit:contain;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}.people-status{padding:12px 16px;border:1px solid #cbd5e1;background:#f8fafc;border-radius:8px;font-size:14px}.people-error{border-color:#fecaca;background:#fef2f2;color:#991b1b}.people-success{border-color:#bbf7d0;background:#f0fdf4;color:#166534}.people-workspace .people-link-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e2e8f0;border-radius:8px}.people-form-columns>*{min-width:0}.people-stack>*{min-width:0}.people-help{overflow-wrap:anywhere}.people-workspace input[type=file]{width:100%;max-width:100%;min-width:0;font-size:13px}.people-form-columns{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:24px}.people-two-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.people-heading{display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:24px}.people-filters{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:20px}.people-filters>div:first-child{flex:1;min-width:180px}.people-facts-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) 40px;gap:8px}.people-facts-row input{min-width:0}#people-search-results button{width:100%;text-align:left;display:block;padding:12px;border-bottom:1px solid #e2e8f0;background:#fff}#people-search-results button:hover,#people-search-results button:focus-visible{background:#eff6ff}@media(max-width:800px){.people-workspace{padding:16px}.people-form-columns{grid-template-columns:1fr}.people-workspace .people-panel{padding:16px}.people-heading{flex-direction:column}.people-two-columns{grid-template-columns:1fr}}
+</style>
+<div class="people-workspace">
+    <div class="people-heading">
+        <div><h1 class="text-2xl font-bold text-slate-900">People &amp; Biographies</h1><p class="people-help">Create historical profiles and connect their stories to collection items.</p></div>
+        <?php if ($action === 'list'): ?><a href="?m=people&amp;action=add" class="people-button people-primary">Add biography</a>
+        <?php else: ?><a href="?m=people" class="people-button">Back to biographies</a><?php endif; ?>
     </div>
-
-    <?php if ($msg === 'saved'): ?>
-        <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl flex items-center gap-3 shadow-sm">
-            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            Profile saved successfully.
-        </div>
-    <?php elseif ($msg === 'deleted'): ?>
-        <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center gap-3 shadow-sm">
-            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            Person deleted successfully.
-        </div>
-    <?php endif; ?>
-
+    <?php if ($formErrors): ?><div class="people-status people-error mb-6" role="alert"><p class="font-semibold">Please review the following:</p><ul class="list-disc pl-5"><?php foreach ($formErrors as $error): ?><li><?= $pe($error) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
+    <?php if ($msg === 'saved'): ?><p class="people-status people-success mb-6" role="status">Biography saved successfully.</p><?php elseif ($msg === 'deleted'): ?><p class="people-status people-success mb-6" role="status">Biography deleted. Its collection item links have been removed.</p><?php endif; ?>
     <?php if ($action === 'list'): ?>
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <table class="w-full text-left">
-                <thead class="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Person</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <?php if (empty($people)): ?>
-                        <tr>
-                            <td colspan="3" class="px-6 py-12 text-center text-slate-400 italic">No biographical profiles found.</td>
-                        </tr>
-                    <?php else: ?>
-                        <?php foreach ($people as $p): ?>
-                            <tr class="hover:bg-slate-50 transition-colors group">
-                                <td class="px-6 py-4">
-                                    <div class="flex items-center gap-4">
-                                        <?php if ($p['profile_image']): ?>
-                                            <img src="<?= SITE_URL ?>/uploads/display/<?= htmlspecialchars($p['profile_image']) ?>" class="w-12 h-12 rounded-full object-cover border border-slate-200">
-                                        <?php else: ?>
-                                            <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-300">
-                                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                                            </div>
-                                        <?php endif; ?>
-                                        <div>
-                                            <div class="font-bold text-slate-900"><?= htmlspecialchars($p['name']) ?></div>
-                                            <div class="text-xs text-slate-400 font-medium"><?= htmlspecialchars($p['slug']) ?></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <?php if ($p['is_public']): ?>
-                                        <span class="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold uppercase tracking-wider">Public</span>
-                                    <?php else: ?>
-                                        <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">Private</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="flex justify-end gap-2">
-                                        <a href="?m=people&action=edit&id=<?= $p['id'] ?>" class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 00-2 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                        </a>
-                                        <a href="?m=people&action=delete&id=<?= $p['id'] ?>&csrf_token=<?= $csrfToken ?>" onclick="return confirm('Really delete this profile? Connections to items will also be removed.')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-
-    <?php elseif ($action === 'add' || $action === 'edit'): ?>
-        <form method="POST" enctype="multipart/form-data" class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
-            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-            <input type="hidden" name="save_person" value="1">
-
-            <!-- Profile Info Main -->
-            <div class="lg:col-span-2 space-y-8">
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6">
-                    <h3 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4">Biographical Information</h3>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-2">Full Name</label>
-                            <input type="text" name="name" value="<?= htmlspecialchars($person['name'] ?? '') ?>" required
-                                   class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900"
-                                   id="person-name" onkeyup="updateSlug()">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-2">URL Slug</label>
-                            <input type="text" name="slug" value="<?= htmlspecialchars($person['slug'] ?? '') ?>" required
-                                   class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900 font-mono"
-                                   id="person-slug">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-2">Birth Date (e.g., 1850)</label>
-                            <input type="text" name="birth_date" value="<?= htmlspecialchars($person['birth_date'] ?? '') ?>"
-                                   class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-2">Death Date (leave blank if alive)</label>
-                            <input type="text" name="death_date" value="<?= htmlspecialchars($person['death_date'] ?? '') ?>"
-                                   class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-2">Short Description / One-liner</label>
-                        <input type="text" name="short_description" value="<?= htmlspecialchars($person['short_description'] ?? '') ?>" placeholder="e.g. Renowned Philatelist and Collector"
-                               class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-2">Biography (Wikipedia Style)</label>
-                        <textarea name="biography" rows="12" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900 font-serif leading-relaxed"><?= htmlspecialchars($person['biography'] ?? '') ?></textarea>
-                        <p class="text-xs text-slate-400 mt-2 italic">Standard paragraphs and simple HTML are supported.</p>
-                    </div>
-                </div>
-
-                <!-- Related Artifacts Tool (Only if editing) -->
-                <?php if ($personId > 0): ?>
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6" id="items">
-                        <h3 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4">Linked Collection Items</h3>
-                        
-                        <div class="flex gap-4">
-                            <div class="relative flex-grow">
-                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                </span>
-                                <input type="text" id="item-search" placeholder="Search items by Title or Reg Number..." 
-                                       class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all outline-none">
-                                <div id="search-results" class="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl hidden max-h-64 overflow-y-auto"></div>
-                            </div>
-                        </div>
-
-                        <div class="space-y-3" id="linked-items-list">
-                            <?php if (empty($linkedItems)): ?>
-                                <p class="text-center text-slate-400 py-6 italic text-sm border-2 border-dashed border-slate-100 rounded-2xl">No items linked to this person yet.</p>
-                            <?php else: ?>
-                                <?php foreach ($linkedItems as $li): ?>
-                                    <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 group">
-                                        <div class="flex flex-col">
-                                            <span class="font-bold text-slate-900"><?= htmlspecialchars($li['title']) ?></span>
-                                            <span class="text-xs text-slate-500"><?= htmlspecialchars($li['reg_number']) ?></span>
-                                        </div>
-                                        <button type="button" onclick="unlinkItem(<?= $li['id'] ?>)" class="text-red-400 hover:text-red-600 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
+        <form method="get" class="people-filters"><input type="hidden" name="m" value="people"><div><label for="people-query">Search biographies</label><input id="people-query" type="search" name="q" value="<?= $pe($q) ?>" placeholder="Name, slug or description"></div><div><label for="people-visibility">Visibility</label><select id="people-visibility" name="visibility"><option value="">All profiles</option><option value="public" <?= $visibility === 'public' ? 'selected' : '' ?>>Public</option><option value="private" <?= $visibility === 'private' ? 'selected' : '' ?>>Private</option></select></div><button class="people-button" type="submit">Filter</button><?php if ($q !== '' || $visibility !== ''): ?><a class="people-button" href="?m=people">Clear</a><?php endif; ?></form>
+        <p class="people-help mb-3"><?= number_format($total) ?> <?= $total === 1 ? 'biography' : 'biographies' ?><?= $q !== '' || $visibility !== '' ? ' matching your filters' : '' ?></p>
+        <div class="bg-white border border-slate-200 rounded-xl overflow-x-auto"><table class="people-table"><thead><tr><th scope="col">Person</th><th scope="col">Visibility</th><th scope="col">Linked items</th><th scope="col">Actions</th></tr></thead><tbody>
+        <?php if (!$people): ?><tr><td colspan="4" class="text-center py-12 text-slate-500"><?= $q !== '' || $visibility !== '' ? 'No profiles match these filters. Try a different search.' : 'Start by adding a biography, then link it to items in your collection.' ?></td></tr><?php endif; ?>
+        <?php foreach ($people as $p): ?><tr><td><div class="flex items-center gap-3"><?php if ($p['profile_image']): ?><img src="<?= $pe(PeopleSupport::imageUrl($p['profile_image'])) ?>" alt="" width="48" height="56" style="width:48px;height:56px;object-fit:contain;background:#f8fafc" loading="lazy"><?php endif; ?><div><a class="font-semibold text-blue-700" href="?m=people&amp;action=edit&amp;id=<?= (int)$p['id'] ?>"><?= $pe($p['name']) ?></a><p class="people-help"><?= $pe($p['short_description'] ?: $p['slug']) ?></p></div></div></td><td><span class="<?= $p['is_public'] ? 'text-green-700' : 'text-slate-600' ?>"><?= $p['is_public'] ? 'Public' : 'Private' ?></span></td><td><?= (int)$p['linked_count'] ?></td><td><div class="flex gap-2"><a class="people-button" href="?m=people&amp;action=edit&amp;id=<?= (int)$p['id'] ?>">Edit<span class="sr-only"> <?= $pe($p['name']) ?></span></a><form method="post" action="?m=people&amp;action=delete&amp;id=<?= (int)$p['id'] ?>" onsubmit="return confirm('Delete this biography and its item links? Collection items will be kept.')"><input type="hidden" name="csrf_token" value="<?= $pe($csrfToken) ?>"><button class="people-button" type="submit" style="color:#b91c1c">Delete<span class="sr-only"> <?= $pe($p['name']) ?></span></button></form></div></td></tr><?php endforeach; ?>
+        </tbody></table></div>
+        <?php if ($total > 25): ?><nav class="flex justify-between items-center mt-5" aria-label="Biographies pages"><?php $pageArgs = ['m' => 'people', 'q' => $q, 'visibility' => $visibility]; ?><?php if ($page > 1): ?><a class="people-button" href="?<?= $pe(http_build_query($pageArgs + ['p' => $page - 1])) ?>">Previous</a><?php else: ?><span></span><?php endif; ?><span class="people-help">Page <?= $page ?> of <?= (int)ceil($total / 25) ?></span><?php if ($page * 25 < $total): ?><a class="people-button" href="?<?= $pe(http_build_query($pageArgs + ['p' => $page + 1])) ?>">Next</a><?php else: ?><span></span><?php endif; ?></nav><?php endif; ?>
+    <?php else: ?>
+        <form id="people-editor" method="post" enctype="multipart/form-data" class="people-form-columns">
+            <input type="hidden" name="csrf_token" value="<?= $pe($csrfToken) ?>"><input type="hidden" name="save_person" value="1">
+            <div class="people-stack"><section class="people-panel people-stack"><h2 class="text-lg font-bold">Biographical information</h2>
+                <div class="people-two-columns"><div><label for="person-name">Full name <span aria-hidden="true">*</span></label><input id="person-name" name="name" maxlength="255" required value="<?= $pe($person['name'] ?? '') ?>"></div><div><label for="person-slug">URL slug <span aria-hidden="true">*</span></label><input id="person-slug" name="slug" maxlength="255" pattern="[a-zA-Z0-9]+([-_][a-zA-Z0-9]+)*" required value="<?= $pe($person['slug'] ?? '') ?>" aria-describedby="slug-help"><p class="people-help" id="slug-help">Letters, numbers, hyphens and underscores. Keep an existing slug to preserve shared links.</p></div></div>
+                <div class="people-two-columns"><div><label for="person-birth">Birth date</label><input id="person-birth" name="birth_date" maxlength="100" value="<?= $pe($person['birth_date'] ?? '') ?>" placeholder="For example, 1850 or 12 May 1850"></div><div><label for="person-death">Death date</label><input id="person-death" name="death_date" maxlength="100" value="<?= $pe($person['death_date'] ?? '') ?>"><p class="people-help">Leave empty when not applicable or unknown.</p></div></div>
+                <div><label for="person-summary">Short description</label><input id="person-summary" name="short_description" maxlength="500" value="<?= $pe($person['short_description'] ?? '') ?>" aria-describedby="summary-help"><p class="people-help" id="summary-help">A one-line introduction, up to 500 characters.</p></div>
+                <div><label for="person-biography">Biography</label><textarea id="person-biography" name="biography" rows="16" maxlength="200000" aria-describedby="biography-help"><?= $pe($person['biography'] ?? '') ?></textarea><p class="people-help" id="biography-help">Write in plain text. Paragraphs and line breaks are preserved.</p></div>
+            </section>
+            <?php if ($personId > 0): ?><section class="people-panel people-stack"><h2 class="text-lg font-bold">Linked collection items</h2><div><label for="item-search">Find an item to link</label><input id="item-search" type="search" autocomplete="off" placeholder="Search title or registration number" aria-controls="people-search-results"><div id="people-search-results" class="border border-slate-200 rounded-lg mt-2" hidden></div></div><p id="people-link-feedback" role="status" aria-live="polite" class="people-help"></p><div id="linked-items-list" class="people-stack" aria-busy="true"><p class="people-help">Loading linked items...</p></div></section><?php else: ?><p class="people-status">Save this biography to start linking collection items.</p><?php endif; ?>
             </div>
-
-            <!-- Sidebar Widgets -->
-            <div class="lg:col-span-1 space-y-8">
-                <!-- Public URL Widget -->
-                <?php if ($personId > 0 && !empty($person['slug'])): ?>
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-                    <h3 class="text-sm font-bold text-slate-900 border-b border-slate-50 pb-3">Public Profile URL</h3>
-                    <?php $publicUrl = SITE_URL . '/person/' . urlencode($person['slug']); ?>
-                    <div class="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg group">
-                        <input type="text" readonly value="<?= htmlspecialchars($publicUrl) ?>" id="public-url-input" class="bg-transparent text-[10px] text-indigo-600 font-mono w-full outline-none">
-                        <button type="button" onclick="copyPublicUrl(this)" class="p-1 px-2 bg-white border border-slate-200 text-slate-500 text-[10px] font-bold rounded-md hover:bg-slate-100 transition shadow-sm whitespace-nowrap">Copy</button>
-                        <a href="<?= $publicUrl ?>" target="_blank" class="p-1 px-2 bg-white border border-slate-200 text-slate-500 text-[10px] font-bold rounded-md hover:bg-slate-100 transition shadow-sm whitespace-nowrap">Open</a>
-                    </div>
-                </div>
-                <script>
-                    function copyPublicUrl(btn) {
-                        const input = document.getElementById('public-url-input');
-                        input.select();
-                        document.execCommand('copy');
-                        const originalText = btn.innerHTML;
-                        btn.innerHTML = 'Copied!';
-                        setTimeout(() => btn.innerHTML = originalText, 2000);
-                    }
-                </script>
-                <?php endif; ?>
-
-                <!-- Save Widget -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-                    <div class="flex items-center justify-between">
-                        <label class="text-sm font-bold text-slate-700">Display Publicly</label>
-                        <button type="button" onclick="document.getElementById('is_public_check').click()" id="toggle-btn" 
-                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none <?= ($person['is_public'] ?? 1) ? 'bg-indigo-600' : 'bg-slate-200' ?>">
-                            <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out <?= ($person['is_public'] ?? 1) ? 'translate-x-5' : 'translate-x-0' ?>"></span>
-                        </button>
-                        <input type="checkbox" name="is_public" id="is_public_check" class="hidden" <?= ($person['is_public'] ?? 1) ? 'checked' : '' ?> onchange="updateToggleUI()">
-                    </div>
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                        Save Profile
-                    </button>
-                </div>
-
-                <!-- Profile Photo -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-                    <h3 class="text-sm font-bold text-slate-900 border-b border-slate-50 pb-3">Profile Photo</h3>
-                    <div class="flex flex-col items-center">
-                        <div class="w-40 h-40 rounded-full bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden mb-4 relative group">
-                            <?php if ($person['profile_image'] ?? false): ?>
-                                <img src="<?= SITE_URL ?>/uploads/display/<?= htmlspecialchars($person['profile_image']) ?>" class="w-full h-full object-cover" id="preview-img">
-                            <?php else: ?>
-                                <svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                            <?php endif; ?>
-                            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="document.getElementById('photo-input').click()">
-                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                            </div>
-                        </div>
-                        <input type="file" name="profile_image" id="photo-input" class="hidden" onchange="previewFile(this)">
-                        <button type="button" onclick="document.getElementById('photo-input').click()" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition">Update Photo</button>
-                    </div>
-                </div>
-
-                <!-- Wikipedia Infobox Editor -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-                    <h3 class="text-sm font-bold text-slate-900 border-b border-slate-50 pb-3 flex justify-between items-center">
-                        Standard Infobox Facts
-                        <button type="button" onclick="addInfoRow()" class="text-indigo-600 hover:text-indigo-800"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>
-                    </h3>
-                    <div id="infobox-rows" class="space-y-3">
-                        <?php 
-                        $infobox = json_decode($person['infobox_data'] ?? '[]', true);
-                        if (empty($infobox)) {
-                            // Default rows for Wikipedia feel
-                            $infobox = [['label' => 'Born', 'value' => ''], ['label' => 'Occupation', 'value' => ''], ['label' => 'Nationality', 'value' => '']];
-                        }
-                        foreach ($infobox as $row):
-                        ?>
-                            <div class="flex gap-2 group/row">
-                                <input type="text" name="info_key[]" value="<?= htmlspecialchars($row['label']) ?>" placeholder="Label" class="w-1/3 text-xs font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                                <input type="text" name="info_val[]" value="<?= htmlspecialchars($row['value']) ?>" placeholder="Value" class="w-2/3 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                                <button type="button" onclick="this.parentElement.remove()" class="text-slate-300 hover:text-red-400 group-hover/row:opacity-100 transition-opacity"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <p class="text-[10px] text-slate-400">These will appear in the "Fact Card" on the profile page.</p>
-                </div>
-            </div>
+            <aside class="people-stack" style="align-content:start"><section class="people-panel people-stack"><h2 class="text-lg font-bold">Publication</h2><div class="flex items-center gap-3"><input type="checkbox" name="is_public" id="is-public" value="1" <?= ($person['is_public'] ?? 1) ? 'checked' : '' ?> style="width:20px;height:20px"><label for="is-public" style="margin:0">Display publicly</label></div><p class="people-help">Private biographies are excluded from public browsing, search, and related profiles.</p><button id="people-save" class="people-button people-primary" type="submit">Save biography</button><?php if ($personId > 0 && !empty($person['is_public'])): ?><a class="people-button" href="<?= $pe(SITE_URL . '/person/' . rawurlencode($person['slug'])) ?>" target="_blank" rel="noopener">View public biography</a><?php endif; ?></section>
+            <section class="people-panel people-stack"><h2 class="text-lg font-bold">Profile photo</h2><img id="photo-preview" class="people-photo" src="<?= $pe(PeopleSupport::imageUrl($person['profile_image'] ?? null)) ?>" alt="Profile photo preview" <?= empty($person['profile_image']) ? 'hidden' : '' ?>><div><label for="photo-input">Choose a photo</label><input id="photo-input" type="file" name="profile_image" accept="image/jpeg,image/png,image/gif,image/webp" aria-describedby="photo-help"><p id="photo-help" class="people-help">JPEG, PNG, GIF or WebP, up to 20 MiB. The complete original is preserved and previews fit without cropping.</p><p id="photo-error" class="people-help text-red-700" role="alert"></p></div><?php if (!empty($person['profile_image'])): ?><div class="flex gap-2 items-center"><input type="checkbox" id="remove-photo" name="remove_photo" value="1"><label for="remove-photo" style="margin:0">Remove current photo</label></div><?php endif; ?></section>
+            <section class="people-panel people-stack"><div class="flex justify-between items-center gap-3"><h2 class="font-bold">Infobox facts</h2><button class="people-button" type="button" id="add-fact">Add fact</button></div><div id="infobox-rows" class="people-stack"><?php $infobox = json_decode($person['infobox_data'] ?? '[]', true); if (!is_array($infobox)) $infobox = []; foreach ($infobox as $row): ?><div class="people-facts-row"><input name="info_key[]" aria-label="Fact label" maxlength="200" value="<?= $pe($row['label'] ?? '') ?>" placeholder="Label"><input name="info_val[]" aria-label="Fact value" maxlength="2000" value="<?= $pe($row['value'] ?? '') ?>" placeholder="Value"><button class="people-button remove-fact" type="button" aria-label="Remove fact">&times;</button></div><?php endforeach; ?></div><p class="people-help">Add occupation, nationality, sources, or other relevant facts.</p></section></aside>
         </form>
-
         <script>
-            function updateSlug() {
-                const name = document.getElementById('person-name').value;
-                const slugInput = document.getElementById('person-slug');
-                if (!slugInput.dataset.touched) {
-                    slugInput.value = name.toLowerCase()
-                        .replace(/[^\w\s-]/g, '')
-                        .replace(/[\s_-]+/g, '-')
-                        .replace(/^-+|-+$/g, '');
-                }
+        (() => {
+            const editor = document.getElementById('people-editor');
+            const slug = document.getElementById('person-slug');
+            let slugTouched = <?= $personId > 0 || !empty($person['slug']) ? 'true' : 'false' ?>;
+            slug.addEventListener('input', () => { slugTouched = true; });
+            document.getElementById('person-name').addEventListener('input', event => { if (!slugTouched) slug.value = event.target.value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); });
+            editor.addEventListener('submit', () => { const button = document.getElementById('people-save'); button.disabled = true; button.textContent = 'Saving...'; });
+            let photoUrl;
+            document.getElementById('photo-input').addEventListener('change', event => {
+                const file = event.target.files[0]; const error = document.getElementById('photo-error'); error.textContent = '';
+                if (!file) return;
+                if (!['image/jpeg','image/png','image/gif','image/webp'].includes(file.type) || file.size > 20 * 1024 * 1024) { error.textContent = 'Choose a JPEG, PNG, GIF or WebP image up to 20 MiB.'; event.target.value = ''; return; }
+                if (photoUrl) URL.revokeObjectURL(photoUrl);
+                photoUrl = URL.createObjectURL(file); const preview = document.getElementById('photo-preview'); preview.src = photoUrl; preview.hidden = false;
+                const remove = document.getElementById('remove-photo'); if (remove) remove.checked = false;
+            });
+            const facts = document.getElementById('infobox-rows');
+            facts.addEventListener('click', event => { const button = event.target.closest('.remove-fact'); if (button) button.parentElement.remove(); });
+            document.getElementById('add-fact').addEventListener('click', () => {
+                if (facts.children.length >= 50) return;
+                const row = document.createElement('div'); row.className = 'people-facts-row';
+                row.innerHTML = '<input name="info_key[]" aria-label="Fact label" maxlength="200" placeholder="Label"><input name="info_val[]" aria-label="Fact value" maxlength="2000" placeholder="Value"><button class="people-button remove-fact" type="button" aria-label="Remove fact">&times;</button>';
+                facts.append(row); row.querySelector('input').focus();
+            });
+            const search = document.getElementById('item-search'); if (!search) return;
+            const results = document.getElementById('people-search-results'); const list = document.getElementById('linked-items-list'); const feedback = document.getElementById('people-link-feedback');
+            const csrf = <?= json_encode($csrfToken, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+            const base = '?m=people&id=<?= $personId ?>&action=';
+            async function request(action, itemId) {
+                const options = {};
+                if (itemId !== undefined) { const form = new FormData(); form.append('item_id', itemId); form.append('csrf_token', csrf); options.method = 'POST'; options.body = form; }
+                const response = await fetch(base + action, options); const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'Unable to load collection items.'); return data;
             }
-            document.getElementById('person-slug').oninput = function() { this.dataset.touched = true; };
-
-            function updateToggleUI() {
-                const check = document.getElementById('is_public_check');
-                const btn = document.getElementById('toggle-btn');
-                const dot = btn.querySelector('span');
-                if (check.checked) {
-                    btn.classList.replace('bg-slate-200', 'bg-indigo-600');
-                    dot.classList.replace('translate-x-0', 'translate-x-5');
-                } else {
-                    btn.classList.replace('bg-indigo-600', 'bg-slate-200');
-                    dot.classList.replace('translate-x-5', 'translate-x-0');
-                }
+            async function refresh() {
+                list.setAttribute('aria-busy', 'true');
+                try {
+                    const data = await request('get_linked_items_ajax'); list.replaceChildren();
+                    if (!data.data.length) { const empty = document.createElement('p'); empty.className = 'people-help'; empty.textContent = 'No items linked yet. Use the search above to add one.'; list.append(empty); }
+                    data.data.forEach(item => { const row = document.createElement('div'); row.className = 'people-link-row'; const info = document.createElement('div'); const title = document.createElement('a'); title.href = <?= json_encode(SITE_URL . '/admin/edit_item.php?id=', JSON_HEX_TAG) ?> + Number(item.id); title.className = 'font-semibold text-blue-700'; title.textContent = item.title; const meta = document.createElement('p'); meta.className = 'people-help'; meta.textContent = item.reg_number || ''; info.append(title, meta); const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'people-button'; remove.textContent = 'Unlink'; remove.setAttribute('aria-label', 'Unlink ' + item.title); remove.addEventListener('click', async () => { remove.disabled = true; try { await request('unlink_item_ajax', Number(item.id)); feedback.textContent = 'Item unlinked. The collection record was kept.'; await refresh(); } catch(error) { feedback.textContent = error.message; remove.disabled = false; } }); row.append(info, remove); list.append(row); });
+                } catch(error) { list.textContent = error.message; } finally { list.setAttribute('aria-busy', 'false'); }
             }
-
-            function previewFile(input) {
-                if (input.files && input.files[0]) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const img = document.getElementById('preview-img');
-                        if (img) img.src = e.target.result;
-                        else {
-                            const container = input.previousElementSibling;
-                            container.innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover">`;
-                        }
-                    };
-                    reader.readAsDataURL(input.files[0]);
-                }
-            }
-
-            function addInfoRow() {
-                const container = document.getElementById('infobox-rows');
-                const div = document.createElement('div');
-                div.className = 'flex gap-2 group/row';
-                div.innerHTML = `
-                    <input type="text" name="info_key[]" placeholder="Label" class="w-1/3 text-xs font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                    <input type="text" name="info_val[]" placeholder="Value" class="w-2/3 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                    <button type="button" onclick="this.parentElement.remove()" class="text-slate-300 hover:text-red-400 opacity-100 transition-opacity"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-                `;
-                container.appendChild(div);
-            }
-
-            // AJAX Search for items
-            const searchInput = document.getElementById('item-search');
-            const searchResults = document.getElementById('search-results');
-            if (searchInput) {
-                let timer;
-                searchInput.oninput = function() {
-                    clearTimeout(timer);
-                    const q = this.value;
-                    if (q.length < 2) { searchResults.classList.add('hidden'); return; }
-                    
-                    timer = setTimeout(() => {
-                        fetch(`?m=people&action=search_items_ajax&exclude_person=<?= $personId ?>&q=${encodeURIComponent(q)}`)
-                            .then(r => r.json())
-                            .then(json => {
-                                searchResults.innerHTML = '';
-                                if (json.data && json.data.length > 0) {
-                                    json.data.forEach(item => {
-                                        const div = document.createElement('div');
-                                        div.className = 'px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0';
-                                        div.innerHTML = `<div class="font-bold text-sm text-slate-800">${item.title}</div><div class="text-[10px] text-slate-400 uppercase font-bold">${item.reg_number}</div>`;
-                                        div.onclick = () => linkItem(item.id);
-                                        searchResults.appendChild(div);
-                                    });
-                                    searchResults.classList.remove('hidden');
-                                } else {
-                                    searchResults.classList.add('hidden');
-                                }
-                            });
-                    }, 300);
-                };
-            }
-
-            function linkItem(itemId) {
-                const fd = new FormData();
-                fd.append('item_id', itemId);
-                fd.append('csrf_token', '<?= $csrfToken ?>');
-                
-                fetch(`?m=people&action=link_item_ajax&id=<?= $personId ?>`, { method: 'POST', body: fd })
-                    .then(r => r.json())
-                    .then(res => {
-                        if (res.success) {
-                            searchResults.classList.add('hidden');
-                            searchInput.value = '';
-                            loadLinkedItems();
-                        } else alert('Error linking item: ' + (res.error || 'Unknown error'));
-                    });
-            }
-
-            function unlinkItem(itemId) {
-                if (!confirm('Unlink this item?')) return;
-                const fd = new FormData();
-                fd.append('item_id', itemId);
-                fd.append('csrf_token', '<?= $csrfToken ?>');
-                
-                fetch(`?m=people&action=unlink_item_ajax&id=<?= $personId ?>`, { method: 'POST', body: fd })
-                    .then(r => r.json())
-                    .then(res => {
-                        if (res.success) loadLinkedItems();
-                    });
-            }
-
-            function loadLinkedItems() {
-                const list = document.getElementById('linked-items-list');
-                fetch(`?m=people&action=get_linked_items_ajax&id=<?= $personId ?>`)
-                    .then(r => r.json())
-                    .then(json => {
-                        if (json.data && json.data.length > 0) {
-                            list.innerHTML = json.data.map(li => `
-                                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 group">
-                                    <div class="flex flex-col">
-                                        <span class="font-bold text-slate-900">${escapeHtml(li.title)}</span>
-                                        <span class="text-xs text-slate-500">${escapeHtml(li.reg_number)}</span>
-                                    </div>
-                                    <button type="button" onclick="unlinkItem(${li.id})" class="text-red-400 hover:text-red-600 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                    </button>
-                                </div>
-                            `).join('');
-                        } else {
-                            list.innerHTML = `<p class="text-center text-slate-400 py-6 italic text-sm border-2 border-dashed border-slate-100 rounded-2xl">No items linked to this person yet.</p>`;
-                        }
-                    });
-            }
-
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
+            let timer; let searchController;
+            search.addEventListener('input', () => {
+                clearTimeout(timer); if (searchController) searchController.abort(); results.hidden = true;
+                const q = search.value.trim(); if (q.length < 2) { feedback.textContent = ''; return; }
+                timer = setTimeout(async () => { searchController = new AbortController(); feedback.textContent = 'Searching...';
+                    try { const response = await fetch(base + 'search_items_ajax&exclude_person=<?= $personId ?>&q=' + encodeURIComponent(q), {signal:searchController.signal}); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Search failed.'); if (search.value.trim() !== q) return; results.replaceChildren(); feedback.textContent = data.data.length ? 'Choose an item to link.' : 'No unlinked items match this search.'; data.data.forEach(item => { const button = document.createElement('button'); button.type = 'button'; button.textContent = item.title + (item.reg_number ? ' (' + item.reg_number + ')' : ''); button.addEventListener('click', async () => { button.disabled = true; try { await request('link_item_ajax', Number(item.id)); results.hidden = true; search.value = ''; feedback.textContent = 'Item linked successfully.'; await refresh(); } catch(error) { feedback.textContent = error.message; button.disabled = false; } }); results.append(button); }); results.hidden = !data.data.length; } catch(error) { if (error.name !== 'AbortError') feedback.textContent = error.message; }
+                }, 250);
+            });
+            refresh();
+        })();
         </script>
     <?php endif; ?>
 </div>

@@ -38,19 +38,11 @@ require_once ThemeManager::getHeader();
                         <div class="relative bg-gray-900 flex items-center justify-center h-[500px]">
                             <?php if ($primaryMedia): ?>
                                 <?php
-                                    if (isset($storage)) {
-                                        $displaySrc = $storage->url('display/' . $primaryMedia['file_path']);
-                                    } else {
-                                        $displayFile = $primaryMedia['file_path'];
-                                        $absDisplayPath = ABSPATH . '/uploads/display/' . $displayFile;
-                                        $displaySrc = file_exists($absDisplayPath)
-                                            ? SITE_URL . '/uploads/display/' . rawurlencode($displayFile)
-                                            : (SITE_URL . '/uploads/originals/' . rawurlencode($displayFile));
-                                    }
+                                    $displaySrc = MediaProcessor::url($primaryMedia['file_path'], 'display', 'image', $storage ?? null);
                                     $imageAlt = htmlspecialchars($item['title'] . ' — Registration: ' . $item['reg_number']);
                                 ?>
                                 <figure class="w-full h-full">
-                                    <img src="<?= $displaySrc ?>" alt="<?= $imageAlt ?>" class="object-cover w-full h-full">
+                                    <a href="<?= htmlspecialchars(MediaProcessor::url($primaryMedia['file_path'], 'original', 'image', $storage ?? null)) ?>" target="_blank" rel="noopener" class="block w-full h-full" aria-label="View original image"><img src="<?= htmlspecialchars($displaySrc) ?>" alt="<?= $imageAlt ?>" class="object-contain w-full h-full"></a>
                                     <figcaption class="sr-only"><?= $imageAlt ?></figcaption>
                                 </figure>
                             <?php else: ?>

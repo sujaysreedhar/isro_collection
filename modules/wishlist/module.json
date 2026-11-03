@@ -1,7 +1,8 @@
 {
-    "name": "Wishlist",
-    "description": "Create and manage a collection wishlist with theme-wise grouping and store links.",
-    "version": "1.0.0",
+    "name": "Wantlist & Seller Tracking",
+    "description": "Plan stamp and cover acquisitions, compare seller offers by currency, and preserve dated price history.",
+    "version": "2.0.0",
     "author": "Antigravity",
-    "admin_menu_priority": 40
+    "admin_menu_priority": 40,
+    "wide_admin_page": true
 }

@@ -262,6 +262,18 @@ $coverageCards = [
     ],
 ];
 
+$enabledAdminModules = json_decode($appSettings['active_modules'] ?? '[]', true);
+if (!is_array($enabledAdminModules)) $enabledAdminModules = [];
+$collectionTools = [
+    ['label' => 'Album pages', 'description' => 'Arrange items and export printable PDFs.', 'url' => SITE_URL . '/admin/album_pages.php', 'module' => null],
+    ['label' => 'Wantlist & seller prices', 'description' => 'Compare offers for stamps and covers you want.', 'url' => SITE_URL . '/admin/module_page.php?m=wishlist', 'module' => 'wishlist'],
+    ['label' => 'Collection workbench', 'description' => 'Completeness, private records, storage and bulk changes.', 'url' => SITE_URL . '/admin/module_page.php?m=collection_workbench', 'module' => 'collection_workbench'],
+    ['label' => 'People & biographies', 'description' => 'Edit profiles and connect them to collection items.', 'url' => SITE_URL . '/admin/module_page.php?m=people', 'module' => 'people'],
+];
+$collectionTools = array_filter($collectionTools, static function (array $tool) use ($enabledAdminModules): bool {
+    return $tool['module'] === null || in_array($tool['module'], $enabledAdminModules, true);
+});
+
 echo renderAdminHeader("Dashboard");
 ?>
 
@@ -286,6 +298,18 @@ echo renderAdminHeader("Dashboard");
         </a>
     </div>
 </div>
+
+<section class="mb-8 rounded-xl border border-slate-200 bg-white p-5" aria-labelledby="collection-tools-heading">
+    <h2 id="collection-tools-heading" class="text-lg font-bold text-slate-900">Collection tools</h2>
+    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <?php foreach ($collectionTools as $tool): ?>
+            <a href="<?= htmlspecialchars($tool['url'], ENT_QUOTES, 'UTF-8') ?>" class="block rounded-lg border border-slate-200 p-4 hover:bg-slate-50 transition-colors">
+                <span class="font-semibold text-blue-700"><?= htmlspecialchars($tool['label']) ?></span>
+                <p class="mt-1 text-sm text-slate-600"><?= htmlspecialchars($tool['description']) ?></p>
+            </a>
+        <?php endforeach; ?>
+    </div>
+</section>
 
 <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
     <section class="lg:col-span-7 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">

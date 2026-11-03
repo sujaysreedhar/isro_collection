@@ -19,16 +19,20 @@ main > div.max-w-7xl {
 <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 leading-tight">Manage Items</h1>
-        <p class="text-sm text-gray-500 mt-1">Server-side search · Toggle visibility · Bulk delete</p>
+        <p class="text-sm text-gray-500 mt-1">Search the catalogue, select items for album pages, and manage publication.</p>
     </div>
-    <div class="flex items-center gap-3">
-        <select id="category-filter" class="border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 text-gray-600 bg-white shadow-sm">
+    <div class="flex flex-wrap items-center gap-3">
+        <select id="category-filter" aria-label="Filter items by category" class="border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 text-gray-600 bg-white shadow-sm">
             <option value="">All Categories</option>
             <?php foreach ($categories as $cat): ?>
                 <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
             <?php endforeach; ?>
         </select>
         <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_items_list_actions'); } ?>
+        <a id="album-selected" href="<?= SITE_URL ?>/admin/album_pages.php" class="hidden px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-800 hover:bg-gray-50">Album pages</a>
+        <?php if (in_array('collection_workbench', json_decode($appSettings['active_modules'] ?? '[]', true) ?: [], true)): ?>
+        <a id="bulk-edit-selected" href="<?= SITE_URL ?>/admin/module_page.php?m=collection_workbench&tab=bulk" class="hidden px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-800 hover:bg-gray-50">Preview bulk edit</a>
+        <?php endif; ?>
         <button id="bulk-delete-btn" onclick="openBulkDeleteModal()" 
                 class="hidden items-center px-4 py-2 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -40,6 +44,8 @@ main > div.max-w-7xl {
         </a>
     </div>
 </div>
+<p id="item-selection-status" class="text-sm text-gray-600 mb-3" role="status" aria-live="polite"></p>
+<p id="item-action-error" class="hidden text-sm text-red-700 mb-3" role="alert"></p>
 
 <!-- Items DataTable  -->
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -159,7 +165,7 @@ $(document).ready(function() {
                 // Extract the item id from the Edit button URL (which is in row[6], the 7th returned field)
                 const match = row[6].match(/edit_item\.php\?id=(\d+)/);
                 const id = match ? match[1] : '';
-                return `<input type="checkbox" class="row-checkbox h-4 w-4 text-gray-900 border-gray-300 rounded" data-id="${id}">`;
+                return `<input type="checkbox" class="row-checkbox h-4 w-4 text-gray-900 border-gray-300 rounded" data-id="${id}" aria-label="Select item ${id}">`;
             }
         }],
         pageLength: 20,
@@ -201,12 +207,19 @@ $(document).ready(function() {
         selectedIds.forEach(id => {
             $(`.row-checkbox[data-id="${id}"]`).prop('checked', true);
         });
+        const boxes = $('.row-checkbox');
+        const checked = boxes.filter(':checked').length;
+        $('#select-all').prop('checked', boxes.length > 0 && checked === boxes.length).prop('indeterminate', checked > 0 && checked < boxes.length);
     });
 });
 
 function updateBulkBar() {
     const count = selectedIds.size;
     $('#selected-count').text(count);
+    const ids = Array.from(selectedIds).join(',');
+    $('#album-selected').toggleClass('hidden', count === 0).attr('href', <?= json_encode(SITE_URL . '/admin/album_pages.php?ids=') ?> + encodeURIComponent(ids));
+    $('#bulk-edit-selected').toggleClass('hidden', count === 0).attr('href', <?= json_encode(SITE_URL . '/admin/module_page.php?m=collection_workbench&tab=bulk&ids=') ?> + encodeURIComponent(ids));
+    $('#item-selection-status').text(count ? count + ' items selected across catalogue pages.' : '');
     if (count > 0) {
         $('#bulk-delete-btn').removeClass('hidden').addClass('inline-flex');
     } else {
@@ -216,11 +229,12 @@ function updateBulkBar() {
 
 // Toggle visibility via AJAX - no page reload
 function toggleVisibility(id, btn) {
+    $('#item-action-error').addClass('hidden');
     $.post(AJAX_URL, { action: 'toggle_visibility', id: id, csrf_token: CSRF_TOKEN }, function(res) {
         if (res.success) {
             dataTable.ajax.reload(null, false); // Reload preserving page position
-        }
-    }, 'json');
+        } else { $('#item-action-error').text(res.message || 'Visibility could not be updated.').removeClass('hidden'); }
+    }, 'json').fail(function() { $('#item-action-error').text('Unable to update visibility. Check your connection and try again.').removeClass('hidden'); });
 }
 
 function confirmDelete(id) {

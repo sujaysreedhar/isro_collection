@@ -59,7 +59,7 @@ require_once ThemeManager::getHeader();
                                 $first = $allMedia[0];
                                 $imageAlt = htmlspecialchars($item['title'] . ' — Registration: ' . $item['reg_number']);
                                 if ($first['media_type'] === 'image' || $first['media_type'] === 'document') {
-                                    $mediaSrc = isset($storage) ? $storage->url('display/' . $first['file_path']) : SITE_URL . '/uploads/display/' . $first['file_path'];
+                                    $mediaSrc = MediaProcessor::url($first['file_path'], 'original', 'image', $storage ?? null);
                                     echo '
                                     <figure id="main-media-figure" class="w-full">
                                         <img id="main-media" src="'.htmlspecialchars($mediaSrc).'" alt="'.$imageAlt.'" class="w-full h-auto cursor-zoom-in" onclick="openFullscreen()">
@@ -109,7 +109,7 @@ require_once ThemeManager::getHeader();
                                 
                                 $fullSrc = '';
                                 if ($m['media_type'] === 'image' || $m['media_type'] === 'document') {
-                                    $fullSrc = isset($storage) ? $storage->url('display/' . $m['file_path']) : SITE_URL . '/uploads/display/' . $m['file_path'];
+                                    $fullSrc = MediaProcessor::url($m['file_path'], 'original', 'image', $storage ?? null);
                                 } elseif ($m['media_type'] === 'youtube') {
                                     $fullSrc = "https://www.youtube.com/embed/" . $ytId;
                                 } elseif ($m['media_type'] === 'video') {

@@ -2,7 +2,7 @@
 /**
  * MediaProcessor — Image / PDF / YouTube media pipeline.
  *
- * Images  → 3 WebP sizes via GD: thumbs (200px), display (1200px), original
+ * Images  → uncropped WebP previews in thumbnails/ plus the untouched original.
  * PDFs    → stored in /uploads/pdfs/ — up to 20 MB
  * YouTube → URL stored in the database, no file needed
  */
@@ -168,7 +168,7 @@ class MediaProcessor
                 if (!$thumbnailSource) throw new RuntimeException('Cropped image could not be decoded.');
             }
             try {
-                $this->saveVariant($thumbnailSource, imagesx($thumbnailSource), imagesy($thumbnailSource), 'thumbnails', $variantNames[0], 200, true);
+                $this->saveVariant($thumbnailSource, imagesx($thumbnailSource), imagesy($thumbnailSource), 'thumbnails', $variantNames[0], 200, false);
             } finally {
                 if ($thumbnailSource !== $src) imagedestroy($thumbnailSource);
             }
@@ -374,6 +374,9 @@ class MediaProcessor
         }
 
         $storagePath = $mediaType === 'pdf' ? 'pdfs/' . $filename : self::variantStoragePath($filename, $variant);
+        if ($mediaType === 'image' && in_array($variant, ['original', 'originals', 'full'], true)) {
+            $storagePath = self::originalStoragePath($filename, $storage) ?? self::variantStoragePath($filename, 'display');
+        }
         if ($mediaType === 'image' && $variant === 'thumbnails'
             && !preg_match('/^img_\d+_[a-f0-9]{16}_1200\.webp$/', $filename)) {
             if ($storage && !$storage->exists($storagePath) && $storage->exists('thumbs/' . $filename)) {
@@ -385,6 +388,30 @@ class MediaProcessor
         }
         if ($storage) return $storage->url($storagePath);
         return SITE_URL . '/uploads/' . implode('/', array_map('rawurlencode', explode('/', $storagePath)));
+    }
+
+    /** Locate the unmodified source for both current and legacy upload names. */
+    public static function originalStoragePath(string $filename, ?StorageInterface $storage = null): ?string
+    {
+        if ($filename === '' || basename(str_replace('\\', '/', $filename)) !== $filename || str_contains($filename, "\0")) return null;
+        static $resolved = [];
+        $cacheKey = ($storage ? spl_object_id($storage) : 0) . ':' . $filename;
+        if (array_key_exists($cacheKey, $resolved)) return $resolved[$cacheKey];
+        $candidates = [];
+        if (preg_match('/^(img_\d+_[a-f0-9]{16})_1200\.webp$/', $filename, $match)) {
+            foreach (['jpg', 'png', 'webp', 'gif'] as $ext) $candidates[] = 'original/' . $match[1] . '.' . $ext;
+        }
+        foreach (['original', 'originals'] as $folder) $candidates[] = $folder . '/' . $filename;
+        $root = defined('ABSPATH') ? ABSPATH : dirname(__DIR__);
+        foreach ($candidates as $path) {
+            if ($storage ? $storage->exists($path) : is_file($root . '/uploads/' . $path)) return $resolved[$cacheKey] = $path;
+        }
+        return $resolved[$cacheKey] = null;
+    }
+
+    public static function originalDownloadUrl(int $mediaId): string
+    {
+        return SITE_URL . '/media/' . $mediaId . '/original?download=1';
     }
 
     public static function variantStoragePath(string $filename, string $variant = 'display'): string
@@ -432,10 +459,35 @@ class MediaProcessor
                 foreach (['jpg', 'png', 'gif', 'webp'] as $ext) $knownSet[$newMedia[1] . '.' . $ext] = true;
             }
         }
+        // Biography photos are referenced by people rather than the media table.
+        // Protect both original uploads and their uncropped preview variants.
+        $peopleImagesReadable = true;
+        try {
+            $profileImages = $this->db->query("SELECT profile_image FROM people WHERE profile_image IS NOT NULL AND profile_image <> ''")->fetchAll(\PDO::FETCH_COLUMN);
+            foreach ($profileImages as $profileImage) {
+                if (preg_match('#^original/(person_[a-f0-9]+)\.(jpg|png|gif|webp)$#D', $profileImage, $personImage)) {
+                    $knownSet[basename($profileImage)] = true;
+                    $knownSet[$personImage[1] . '.webp'] = true;
+                } elseif (preg_match('/^[a-zA-Z0-9_.-]+$/D', $profileImage) && !str_contains($profileImage, '..')) {
+                    $knownSet[$profileImage] = true;
+                }
+            }
+        } catch (\PDOException) {
+            // An inactive/missing module must never make its photos disposable.
+            $peopleImagesReadable = false;
+        }
+        $wishlistImagesReadable = true;
+        try {
+            foreach ($this->db->query("SELECT image_url FROM module_wishlist_items WHERE image_url IS NOT NULL AND image_url <> ''")->fetchAll(\PDO::FETCH_COLUMN) as $wishlistImage) {
+                if (preg_match('/^[a-zA-Z0-9_.-]+$/D', $wishlistImage) && !str_contains($wishlistImage, '..')) $knownSet[$wishlistImage] = true;
+            }
+        } catch (\PDOException) { $wishlistImagesReadable = false; }
         $orphans = [];
         foreach (['thumbnails', 'display', 'original', 'pdfs'] as $dir) {
             foreach (glob($this->uploadRoot . $dir . DIRECTORY_SEPARATOR . '*.*') ?: [] as $f) {
                 $base = basename($f);
+                if (!$peopleImagesReadable && preg_match('/^person_[a-f0-9]+\.(jpg|png|gif|webp)$/D', $base)) continue;
+                if (!$wishlistImagesReadable && preg_match('/^wish_[a-f0-9]+\.(jpg|png|gif|webp)$/D', $base)) continue;
                 if (!isset($knownSet[$base]))
                     $orphans[] = "$dir/$base";
             }

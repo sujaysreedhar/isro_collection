@@ -11,7 +11,7 @@
 if (!function_exists('renderAdminSidebarNav')) {
     function renderAdminSidebarNav(array $sections, string $linkClass, string $sectionClass, bool $withIcons = true): void {
         foreach ($sections as $sectionLinks) {
-            echo '<div class="' . $sectionClass . '">' . htmlspecialchars($sectionLinks['label']) . '</div>';
+            echo '<div class="admin-nav-heading ' . $sectionClass . '">' . htmlspecialchars($sectionLinks['label']) . '</div>';
             foreach ($sectionLinks['links'] as $link) {
                 echo '<a href="' . htmlspecialchars($link['url']) . '" class="' . $linkClass . ' active-link-target">';
                 if ($withIcons && !empty($link['icon'])) {
@@ -64,11 +64,25 @@ function renderAdminHeader($title, $wide = false) {
         .ts-dropdown .option { border-radius: 0.5rem !important; padding: 8px 12px !important; margin: 2px 0 !important; font-size: 0.875rem !important; }
         .ts-dropdown .active { background-color: #F8FAFC !important; color: #0F172A !important; }
         .ts-dropdown .create { padding: 8px 12px !important; color: #2563EB !important; font-weight: 500 !important; }
+        :root { --admin-accent:#2563eb; --admin-border:#cbd5e1; --admin-ink:#0f172a; }
+        .admin-shell { height:100vh; height:100dvh; }
+        .admin-skip { position:fixed;top:8px;left:8px;z-index:100;padding:12px 16px;background:white;color:#0f172a;border:2px solid #2563eb;border-radius:8px;transform:translateY(-160%); }
+        .admin-skip:focus { transform:translateY(0); }
+        a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:3px solid #93c5fd;outline-offset:2px; }
+        .admin-nav-search { width:100%;border:1px solid #475569;background:#0f172a;color:#f8fafc;border-radius:8px;padding:10px 12px;font-size:13px; }
+        .admin-nav-search::placeholder { color:#94a3b8; }
+        .admin-nav-empty { padding:16px 12px;color:#cbd5e1;font-size:13px; }
+        .admin-nav-region [hidden] { display:none !important; }
+        .admin-nav-region a[aria-current="page"] { background:rgba(37,99,235,.18);color:#93c5fd;box-shadow:inset 3px 0 #60a5fa; }
+        main table { font-variant-numeric:tabular-nums; }
+        main input,main select,main textarea { max-width:100%; }
+        @media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important;transition-duration:.01ms !important;animation-duration:.01ms !important; } }
     </style>
     <?php if (class_exists('HookRegistry')) { HookRegistry::doAction('admin_head'); } ?>
 </head>
 <body class="bg-[#f4f7f9] text-gray-800 antialiased font-sans">
-    <div class="flex h-screen overflow-hidden">
+    <a class="admin-skip" href="#admin-main">Skip to content</a>
+    <div class="admin-shell flex overflow-hidden">
 
     <?php
     $linkClass    = "sidebar-link-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-slate-300 hover:bg-white/10 hover:text-white";
@@ -96,6 +110,11 @@ function renderAdminHeader($title, $wide = false) {
                     'url'   => SITE_URL . '/admin/items.php',
                     'label' => 'Items',
                     'icon'  => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>',
+                ],
+                'album_pages' => [
+                    'url' => SITE_URL . '/admin/album_pages.php',
+                    'label' => 'Album pages',
+                    'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 3h9l4 4v14H6V3zm8 0v5h5M9 12h7M9 16h7"/>',
                 ],
                 'categories' => [
                     'url'   => SITE_URL . '/admin/categories.php',
@@ -192,9 +211,12 @@ function renderAdminHeader($title, $wide = false) {
             <?php endif; ?>
         </div>
 
-        <nav class="flex-1 py-4 px-3 overflow-y-auto sidebar-scroller">
+        <nav class="admin-nav-region flex-1 py-4 px-3 overflow-y-auto sidebar-scroller" aria-label="Admin navigation">
+            <label for="admin-nav-filter-desktop" class="sr-only">Find an admin page</label>
+            <input class="admin-nav-search" id="admin-nav-filter-desktop" type="search" placeholder="Find an admin page" autocomplete="off">
             <?php renderAdminSidebarNav($adminSidebarSections, $linkClass, $sectionClass, true); ?>
             <?= $moduleMenuLinks ?>
+            <p class="admin-nav-empty" role="status" hidden>No matching admin pages.</p>
         </nav>
 
         <div class="p-4 border-t border-sidebar-border bg-slate-900 shadow-inner">
@@ -215,32 +237,35 @@ function renderAdminHeader($title, $wide = false) {
 
     <!-- Mobile Drawer — rendered from same data structure, no icons -->
     <div id="mobile-nav-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 hidden lg:hidden transition-opacity" onclick="closeMobileNav()"></div>
-    <aside id="mobile-nav" class="fixed inset-y-0 left-0 w-[280px] max-w-[85vw] bg-sidebar z-50 transform -translate-x-full transition-transform duration-300 ease-out lg:hidden flex flex-col shadow-2xl">
+    <aside id="mobile-nav" role="dialog" aria-modal="true" aria-label="Admin navigation" aria-hidden="true" inert class="fixed inset-y-0 left-0 w-[280px] max-w-[85vw] bg-sidebar z-50 transform -translate-x-full transition-transform duration-300 ease-out lg:hidden flex flex-col shadow-2xl">
         <div class="h-16 flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
             <span class="text-white font-bold text-lg">Menu</span>
             <button type="button" onclick="closeMobileNav()" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors" aria-label="Close">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
-        <nav class="flex-1 py-4 px-3 overflow-y-auto sidebar-scroller">
+        <nav class="admin-nav-region flex-1 py-4 px-3 overflow-y-auto sidebar-scroller" aria-label="Mobile admin navigation">
+            <label for="admin-nav-filter-mobile" class="sr-only">Find an admin page</label>
+            <input class="admin-nav-search" id="admin-nav-filter-mobile" type="search" placeholder="Find an admin page" autocomplete="off">
             <?php renderAdminSidebarNav($adminSidebarSections, $linkClass, $sectionClass, false); ?>
             <?= $moduleMenuLinks ?>
+            <p class="admin-nav-empty" role="status" hidden>No matching admin pages.</p>
         </nav>
     </aside>
 
 
     <!-- Main Content wrapper -->
-    <div class="flex-1 flex flex-col min-w-0 bg-slate-50 relative">
+    <div id="admin-main-wrapper" class="flex-1 flex flex-col min-w-0 bg-slate-50 relative">
         <!-- Top Bar -->
         <header class="bg-white/80 backdrop-blur-md border-b border-slate-200/80 h-16 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm shadow-slate-200/20 sticky top-0 z-10 transition-shadow">
             <div class="flex items-center gap-4">
-                <button type="button" onclick="openMobileNav()" class="lg:hidden p-2 -ml-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors" aria-label="Open menu">
+                <button type="button" id="admin-menu-toggle" onclick="openMobileNav()" class="lg:hidden p-2 -ml-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors" aria-label="Open menu" aria-controls="mobile-nav" aria-expanded="false">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
                 <h1 class="text-xl font-bold text-slate-800 tracking-tight hidden sm:block"><?= htmlspecialchars($title) ?></h1>
             </div>
             <div class="flex items-center gap-4">
-                <a href="<?= SITE_URL ?>" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200">
+                <a href="<?= SITE_URL ?>" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200">
                     View Live Site
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                 </a>
@@ -248,7 +273,7 @@ function renderAdminHeader($title, $wide = false) {
         </header>
 
         <!-- Page Content -->
-        <main class="flex-1 overflow-y-auto <?= $wide ? '' : 'p-4 md:p-8' ?>">
+        <main id="admin-main" tabindex="-1" class="flex-1 overflow-y-auto <?= $wide ? '' : 'p-4 md:p-8' ?>">
             <div class="<?= $wide ? 'w-full' : 'max-w-7xl mx-auto w-full' ?>">
 <?php
     return ob_get_clean();
@@ -263,47 +288,66 @@ function renderAdminFooter() {
     </div><!-- /flex container -->
 
 <script>
+let adminNavReturnFocus;
 function openMobileNav() {
-    document.getElementById('mobile-nav').classList.remove('-translate-x-full');
+    const drawer = document.getElementById('mobile-nav');
+    adminNavReturnFocus = document.activeElement;
+    drawer.inert = false;
+    drawer.setAttribute('aria-hidden', 'false');
+    drawer.classList.remove('-translate-x-full');
     document.getElementById('mobile-nav-overlay').classList.remove('hidden');
+    document.getElementById('admin-menu-toggle').setAttribute('aria-expanded', 'true');
+    document.getElementById('admin-main-wrapper').inert = true;
+    drawer.querySelector('button').focus();
 }
 function closeMobileNav() {
-    document.getElementById('mobile-nav').classList.add('-translate-x-full');
+    const drawer = document.getElementById('mobile-nav');
+    if (drawer.getAttribute('aria-hidden') === 'true') return;
+    drawer.classList.add('-translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    drawer.inert = true;
     document.getElementById('mobile-nav-overlay').classList.add('hidden');
+    document.getElementById('admin-menu-toggle').setAttribute('aria-expanded', 'false');
+    document.getElementById('admin-main-wrapper').inert = false;
+    if (adminNavReturnFocus && adminNavReturnFocus.isConnected) adminNavReturnFocus.focus();
 }
-
-// Active State Logic
+document.addEventListener('keydown', event => {
+    const drawer = document.getElementById('mobile-nav');
+    if (drawer.getAttribute('aria-hidden') === 'true') return;
+    if (event.key === 'Escape') { event.preventDefault(); closeMobileNav(); return; }
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(drawer.querySelectorAll('a[href],button,input')).filter(element => !element.disabled && element.getClientRects().length);
+    const first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
+window.matchMedia('(min-width:1024px)').addEventListener('change', event => { if (event.matches) closeMobileNav(); });
 document.addEventListener('DOMContentLoaded', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const mParam = urlParams.get('m');
-    const path = window.location.pathname;
-    
+    const current = new URL(window.location.href);
+    const aliases = {'edit_item.php':'items.php','edit_category.php':'categories.php','edit_tag.php':'tags.php','edit_narrative.php':'narratives.php'};
+    const basename = pathname => pathname.split('/').pop();
+    const currentName = aliases[basename(current.pathname)] || basename(current.pathname);
     document.querySelectorAll('.active-link-target').forEach(link => {
-        const href = link.getAttribute('href');
-        if (!href) return;
-        
         try {
-            const url = new URL(href, window.location.origin);
-            const linkMParam = url.searchParams.get('m');
-            
-            let isMatch = false;
-            
-            if (mParam && linkMParam) {
-                // If we are on a module page, match the ?m= parameter and the ?page= parameter
-                const pageParam = urlParams.get('page');
-                const linkPageParam = url.searchParams.get('page');
-                isMatch = (mParam === linkMParam && pageParam === linkPageParam && path.endsWith(url.pathname.split('/').pop()));
-            } else if (!mParam && !linkMParam) {
-                // Not on a module page, match the path exactly
-                isMatch = path.endsWith(url.pathname.split('/').pop());
+            const target = new URL(link.href, window.location.origin);
+            let match = false;
+            if (current.searchParams.has('m')) {
+                match = current.searchParams.get('m') === target.searchParams.get('m') && basename(current.pathname) === basename(target.pathname) && (!target.searchParams.has('page') || current.searchParams.get('page') === target.searchParams.get('page'));
+            } else if (!target.searchParams.has('m')) {
+                match = currentName === basename(target.pathname);
             }
-
-            if (isMatch) {
-                // Apply Tailwind active classes directly
-                link.classList.add('bg-blue-600/10', 'text-blue-400');
-                link.classList.remove('text-slate-300', 'hover:bg-white/10');
-            }
-        } catch(e) {}
+            if (match) { link.setAttribute('aria-current', 'page'); link.classList.remove('text-slate-300'); }
+        } catch(error) {}
+    });
+    document.querySelectorAll('.admin-nav-region').forEach(nav => {
+        const input = nav.querySelector('.admin-nav-search');
+        input.addEventListener('input', () => {
+            const query = input.value.trim().toLocaleLowerCase();
+            let matches = 0;
+            nav.querySelectorAll('a[href]').forEach(link => { const visible = !query || link.textContent.toLocaleLowerCase().includes(query); link.hidden = !visible; if (visible) matches++; });
+            nav.querySelectorAll('.admin-nav-heading').forEach(heading => { heading.hidden = !!query; });
+            nav.querySelector('.admin-nav-empty').hidden = matches > 0;
+        });
     });
 });
 </script>

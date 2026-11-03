@@ -1,0 +1,128 @@
+/* ImageGen reference: docs/design/biography-page-reference.png.
+   Editorial page styles are scoped to the public biographies module. */
+.people-public{--bio-ink:#15233d;--bio-muted:#586578;--bio-line:#dce1e7;--bio-soft:#eef1f5;--bio-paper:#fcfcfb;--bio-blue:#164ab1;flex:1;width:100%;min-width:0;background:var(--bio-paper);color:var(--bio-ink);font-family:var(--font-body,'Segoe UI',sans-serif);font-size:16px;line-height:1.6}
+.people-public *{box-sizing:border-box}
+.people-public :where(h1,h2,h3,p,figure,dl,dd,ol){margin:0}
+.people-public :where(a){color:inherit;text-decoration:none}
+.people-public :where(a,button,input):focus-visible{outline:3px solid #2766d9;outline-offset:4px}
+.people-public [hidden]{display:none!important}
+.people-public .bio-container{width:min(100%,1280px);margin:auto;padding:28px 40px 64px}
+.people-public h1,.people-public h2,.people-public .bio-person h2{font-family:Georgia,'Times New Roman',serif;font-weight:600;letter-spacing:-.035em;line-height:1.12;color:var(--bio-ink)}
+.people-public h1{font-size:clamp(40px,4.8vw,70px);overflow-wrap:anywhere}
+.people-public h2{font-size:clamp(28px,3vw,38px)}
+.people-public .bio-icon{display:inline-flex;width:20px;height:20px;flex:0 0 20px;vertical-align:middle}
+.people-public .bio-icon svg{width:100%;height:100%;stroke-width:1.7}
+.people-public .bio-breadcrumb{font-size:14px;color:var(--bio-muted);margin-bottom:32px}
+.people-public .bio-breadcrumb ol{list-style:none;padding:0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.people-public .bio-breadcrumb li{display:flex;align-items:center;gap:12px;min-width:0;overflow-wrap:anywhere}
+.people-public .bio-breadcrumb .bio-icon{width:14px;height:14px;flex-basis:14px;color:#7b8799}
+.people-public .bio-breadcrumb a{color:var(--bio-blue);text-underline-offset:4px}
+.people-public .bio-breadcrumb a:hover{text-decoration:underline}
+.people-public .bio-hero{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(0,1.5fr);gap:clamp(32px,6vw,80px);align-items:center;padding-bottom:40px;border-bottom:1px solid var(--bio-line)}
+.people-public .bio-portrait{width:100%;min-width:0}
+.people-public .bio-portrait-image{display:flex;width:100%;aspect-ratio:4/5;max-height:490px;align-items:center;justify-content:center;background:var(--bio-soft);overflow:hidden}
+.people-public .bio-portrait-image img{width:100%;height:100%;max-height:490px;object-fit:contain;display:block}
+.people-public .bio-portrait figcaption{padding-top:12px;font-size:12px;line-height:1.5;color:var(--bio-muted)}
+.people-public .bio-portrait figcaption a{display:inline-flex;align-items:center;gap:8px;min-height:32px}
+.people-public .bio-portrait figcaption a:hover{color:var(--bio-blue);text-decoration:underline;text-underline-offset:4px}
+.people-public .bio-portrait figcaption .bio-icon{width:15px;height:15px;flex-basis:15px}
+.people-public .bio-initials{font:500 clamp(54px,8vw,112px)/1 Georgia,serif;color:#6b7b91;letter-spacing:-.04em}
+.people-public .bio-back-link{display:inline-flex;align-items:center;gap:12px;font-size:13px;color:var(--bio-blue);margin-bottom:14px;min-height:44px}
+.people-public .bio-back-link:hover{text-decoration:underline;text-underline-offset:4px}
+.people-public .bio-summary{font-size:clamp(18px,2vw,23px);line-height:1.55;margin-top:16px;max-width:35em;overflow-wrap:anywhere}
+.people-public .bio-lifespan{color:var(--bio-muted);font-size:16px;margin-top:12px;overflow-wrap:anywhere}
+.people-public .bio-glance{border-top:1px solid var(--bio-line);margin-top:28px;padding-top:22px}
+.people-public .bio-glance h2{font-size:24px;letter-spacing:-.02em;margin-bottom:16px}
+.people-public .bio-glance dl>div{display:grid;grid-template-columns:minmax(70px,.35fr) minmax(0,1fr);gap:20px;padding:5px 0;font-size:14px;line-height:1.6}
+.people-public dt{font-weight:600;overflow-wrap:anywhere}
+.people-public dd{color:var(--bio-muted);min-width:0;overflow-wrap:anywhere;white-space:pre-line}
+.people-public .bio-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.people-public .bio-button{display:inline-flex;align-items:center;justify-content:center;gap:14px;min-height:46px;padding:10px 20px;border:1px solid #b4c3df;border-radius:5px;background:transparent;color:var(--bio-blue);font:600 14px/1.4 var(--font-body,'Segoe UI',sans-serif);cursor:pointer;text-align:center;white-space:nowrap;transition:background-color .16s,color .16s,border-color .16s}
+.people-public .bio-button:hover{background:#eaf0fb;border-color:var(--bio-blue)}
+.people-public .bio-button-primary{background:var(--bio-blue);color:#fff;border-color:var(--bio-blue)}
+.people-public .bio-button-primary:hover{background:#103887;border-color:#103887;color:#fff}
+.people-public .bio-button-count{border-left:1px solid #b4c3df;padding-left:12px;font-variant-numeric:tabular-nums}
+.people-public .bio-reading-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:clamp(40px,6vw,88px);padding:48px 0}
+.people-public [data-bio-section],.people-public #main-content{scroll-margin-top:112px}
+.people-public .bio-article h2{margin-bottom:24px}
+.people-public .bio-prose{max-width:70ch;font-size:17px;line-height:1.85;overflow-wrap:anywhere}
+.people-public .bio-prose p+p{margin-top:22px}
+.people-public .bio-muted{color:var(--bio-muted)}
+.people-public .bio-reading-aside{min-width:0;border-left:1px solid var(--bio-line);padding-left:28px}
+.people-public .bio-aside-inner{position:sticky;top:112px;max-height:calc(100dvh - 136px);overflow:auto;scrollbar-width:thin}
+.people-public .bio-page-nav h2,.people-public .bio-details h2{font-size:24px;letter-spacing:-.02em;margin-bottom:14px}
+.people-public .bio-page-nav a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;font-size:14px;color:var(--bio-muted);min-height:44px}
+.people-public .bio-page-nav a:hover,.people-public .bio-page-nav a[aria-current]{color:var(--bio-blue);text-decoration:underline;text-underline-offset:4px}
+.people-public .bio-page-nav a[aria-current]{font-weight:600}
+.people-public .bio-page-nav a span{font-size:12px;color:var(--bio-muted)}
+.people-public .bio-details{border-top:1px solid var(--bio-line);margin-top:24px;padding-top:24px}
+.people-public .bio-details dl>div{padding:0 0 16px;font-size:13px;line-height:1.7}
+.people-public .bio-details dt{margin-bottom:3px}
+.people-public .bio-collection{border-top:1px solid var(--bio-line);padding-top:36px}
+.people-public .bio-section-heading{display:flex;gap:24px;justify-content:space-between;align-items:flex-end;margin-bottom:28px}
+.people-public .bio-section-heading p{font-size:14px;color:var(--bio-muted);margin-top:10px;max-width:65ch}
+.people-public .bio-text-link{display:inline-flex;align-items:center;gap:10px;min-height:44px;font-size:13px;white-space:nowrap;color:var(--bio-blue)}
+.people-public .bio-text-link:hover{text-decoration:underline;text-underline-offset:4px}
+.people-public .bio-record-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+.people-public .bio-record{display:flex;min-width:0;flex-direction:column}
+.people-public .bio-record-image{height:240px;background:#f0f1f1;display:flex;align-items:center;justify-content:center;padding:18px;border:1px solid #e6e8eb}
+.people-public .bio-record-image img{width:100%;height:100%;object-fit:contain;display:block}
+.people-public .bio-record-caption{padding:18px 0}
+.people-public .bio-record-number{font-size:11px;font-weight:600;color:var(--bio-muted);letter-spacing:.04em}
+.people-public .bio-record h3{font:600 16px/1.5 var(--font-body,'Segoe UI',sans-serif);margin:5px 0;color:var(--bio-ink);overflow-wrap:anywhere}
+.people-public .bio-record p{font-size:12px;color:var(--bio-muted)}
+.people-public .bio-record-action{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--bio-blue);margin-top:12px}
+.people-public .bio-record:hover h3{color:var(--bio-blue);text-decoration:underline;text-underline-offset:4px}
+.people-public .bio-no-image{display:flex;flex-direction:column;align-items:center;gap:14px;color:var(--bio-muted);font-size:12px}
+.people-public .bio-no-image .bio-icon{width:32px;height:32px;flex-basis:32px}
+.people-public .bio-return{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;border-top:1px solid var(--bio-line);padding-top:28px;margin-top:36px;font-size:13px;color:var(--bio-blue)}
+.people-public .bio-return a{display:inline-flex;align-items:center;gap:12px;min-height:44px}
+.people-public .bio-return a:hover{text-decoration:underline;text-underline-offset:4px}
+.people-public .bio-directory-heading{display:flex;gap:24px;align-items:flex-end;justify-content:space-between;margin:32px 0 40px}
+.people-public .bio-directory-heading h1{font-size:clamp(38px,4.6vw,62px)}
+.people-public .bio-directory-heading p{font-size:17px;color:var(--bio-muted);max-width:53ch;margin-top:20px;line-height:1.7}
+.people-public .bio-directory-count{font-size:13px;color:var(--bio-muted);white-space:nowrap;margin-bottom:6px}
+.people-public .bio-browse{border-top:1px solid var(--bio-line);border-bottom:1px solid var(--bio-line);padding:24px 0 16px;margin-bottom:32px}
+.people-public .bio-search{display:flex;gap:12px;max-width:780px;margin-bottom:24px}
+.people-public .bio-search-field{display:flex;align-items:center;gap:12px;flex:1;min-width:0;border:1px solid #bcc6d4;background:#fff;border-radius:5px;padding:0 16px}
+.people-public .bio-search-field>.bio-icon{color:var(--bio-muted)}
+.people-public .bio-search input{appearance:none;min-width:0;width:100%;height:48px;border:0;background:transparent;color:var(--bio-ink);font-size:15px;padding:8px 0;box-shadow:none}
+.people-public .bio-search input::placeholder{color:#647287;opacity:1}
+.people-public .bio-search-field:focus-within{outline:3px solid #2766d9;outline-offset:3px}
+.people-public .bio-search input:focus-visible{outline:none}
+.people-public .bio-alphabet{display:flex;align-items:center;gap:2px;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 3px 8px;scrollbar-width:thin}
+.people-public .bio-alphabet a{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:6px 9px;font-size:13px;border-radius:4px;flex-shrink:0;color:var(--bio-muted)}
+.people-public .bio-alphabet a[aria-current]{background:var(--bio-ink);color:white;font-weight:600}
+.people-public .bio-alphabet a:hover:not([aria-current]){background:var(--bio-soft);color:var(--bio-blue)}
+.people-public .bio-filter-summary{display:flex;gap:20px;align-items:center;justify-content:space-between;margin:-8px 0 28px;font-size:14px;color:var(--bio-muted);overflow-wrap:anywhere}
+.people-public .bio-filter-summary a{color:var(--bio-blue);text-decoration:underline;text-underline-offset:4px;flex-shrink:0}
+.people-public .bio-person-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:48px 32px}
+.people-public .bio-person{min-width:0;display:flex;flex-direction:column;border-bottom:1px solid var(--bio-line);padding-bottom:24px}
+.people-public .bio-person-image{height:310px;display:flex;align-items:center;justify-content:center;background:var(--bio-soft);overflow:hidden}
+.people-public .bio-person-image img{width:100%;height:100%;object-fit:contain;display:block}
+.people-public .bio-person-image .bio-initials{font-size:76px}
+.people-public .bio-person-copy{padding-top:20px;display:flex;flex-direction:column;flex:1;min-width:0}
+.people-public .bio-person h2{font-size:28px;overflow-wrap:anywhere;line-height:1.2}
+.people-public .bio-person-dates{font-size:12px;color:var(--bio-muted);margin-top:8px}
+.people-public .bio-person-description{font-size:14px;line-height:1.7;color:var(--bio-muted);margin-top:12px;overflow-wrap:anywhere}
+.people-public .bio-person-footer{margin-top:auto;padding-top:22px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;font-size:11px;color:var(--bio-muted)}
+.people-public .bio-person-read{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--bio-blue)}
+.people-public .bio-person-read .bio-icon{width:16px;height:16px;flex-basis:16px}
+.people-public .bio-person:hover h2{color:var(--bio-blue);text-decoration:underline;text-underline-offset:5px}
+.people-public .bio-pagination{margin-top:48px;display:flex;justify-content:space-between;align-items:center;gap:24px;color:var(--bio-muted);font-size:13px;flex-wrap:wrap}
+.people-public .bio-pagination>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.people-public .bio-page-number{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border-radius:5px}
+.people-public .bio-page-number[aria-current]{background:var(--bio-ink);color:white}
+.people-public .bio-page-number:hover:not([aria-current]){background:var(--bio-soft)}
+.people-public .bio-empty{text-align:center;padding:64px 24px;border:1px solid var(--bio-line);background:#fff}
+.people-public .bio-empty>.bio-icon,.people-public .bio-empty>span>.bio-icon{width:36px;height:36px;flex-basis:36px;color:var(--bio-muted)}
+.people-public .bio-empty h2{font-size:32px;margin-top:20px}
+.people-public .bio-empty p{max-width:48ch;margin:16px auto 24px;color:var(--bio-muted);font-size:15px}
+.people-public .bio-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(min-width:1600px){.people-public .bio-portrait-image{max-height:520px}.people-public .bio-portrait-image img{max-height:520px}}
+@media(max-width:1050px){.people-public .bio-container{padding-inline:28px}.people-public .bio-hero{gap:36px;grid-template-columns:minmax(240px,.85fr) minmax(0,1.4fr)}.people-public .bio-reading-layout{grid-template-columns:minmax(0,1fr) 230px;gap:36px}.people-public .bio-reading-aside{padding-left:22px}.people-public .bio-record-image{height:200px}.people-public .bio-person-grid{gap:36px 24px}.people-public .bio-person-image{height:260px}.people-public .bio-directory-heading{align-items:flex-start;flex-direction:column;gap:16px}}
+@media(max-width:760px){.people-public .bio-container{padding:24px 20px 40px}.people-public .bio-breadcrumb{margin-bottom:24px;font-size:13px}.people-public .bio-hero{grid-template-columns:1fr;gap:28px;padding-bottom:32px}.people-public .bio-portrait{max-width:440px;margin-inline:auto}.people-public .bio-portrait-image,.people-public .bio-portrait-image img{max-height:440px}.people-public .bio-introduction h1{font-size:46px}.people-public .bio-back-link{margin-bottom:14px}.people-public .bio-reading-layout{display:flex;flex-direction:column;gap:28px;padding:36px 0}.people-public .bio-reading-aside{border-left:0;padding:24px 0 0;border-top:1px solid var(--bio-line)}.people-public .bio-aside-inner{position:static;max-height:none;overflow:visible}.people-public .bio-page-nav{display:none}.people-public .bio-details{border-top:0;margin-top:0;padding-top:0}.people-public .bio-reading-aside:has(.bio-page-nav:only-child){display:none}.people-public .bio-prose{font-size:16px;line-height:1.85}.people-public .bio-record-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.people-public .bio-section-heading{align-items:flex-start;flex-direction:column;gap:12px}.people-public .bio-person-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 20px}.people-public .bio-person-image{height:230px}.people-public .bio-person h2{font-size:25px}.people-public .bio-directory-heading{margin-top:20px;margin-bottom:28px}.people-public .bio-directory-heading h1{font-size:43px}.people-public .bio-directory-heading p{font-size:16px}.people-public .bio-person-footer{flex-direction:column}.people-public .bio-pagination{margin-top:32px}}
+@media(max-width:440px){.people-public .bio-introduction h1{font-size:40px}.people-public .bio-summary{font-size:19px}.people-public .bio-glance dl>div{grid-template-columns:78px minmax(0,1fr);gap:14px}.people-public .bio-actions{gap:10px}.people-public .bio-actions .bio-button{flex:1;padding-inline:12px;gap:10px}.people-public .bio-record-grid,.people-public .bio-person-grid{grid-template-columns:1fr}.people-public .bio-record-image{height:240px}.people-public .bio-person-image{height:330px}.people-public .bio-person-footer{flex-direction:row}.people-public .bio-search{gap:8px}.people-public .bio-search-field{padding-inline:12px}.people-public .bio-search input{font-size:16px}.people-public .bio-search .bio-button{padding-inline:14px}.people-public .bio-directory-heading h1{font-size:39px}.people-public .bio-pagination .bio-button{padding-inline:12px}.people-public .bio-pagination>div{gap:4px}.people-public .bio-page-number{min-width:36px}}
+@media(max-width:440px){.people-public .bio-portrait-image,.people-public .bio-portrait-image img{max-height:340px}}
+@media(prefers-reduced-motion:reduce){.people-public *{scroll-behavior:auto!important;transition:none!important}}
+@media print{.people-public{background:#fff;color:#111}.people-public .bio-container{padding:0}.people-public .bio-actions,.people-public .bio-back-link,.people-public .bio-reading-aside,.people-public .bio-return{display:none}.people-public .bio-reading-layout{display:block}.people-public .bio-hero{grid-template-columns:180px 1fr;gap:28px}.people-public .bio-portrait-image{max-height:220px}.people-public .bio-record{break-inside:avoid}.people-public .bio-record-image{height:140px}}

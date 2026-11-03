@@ -1,7 +1,7 @@
 <?php
 // Include database connection
 if (session_status() === PHP_SESSION_NONE) session_start();
-global $pdo;
+global $pdo, $storage;
 
 // Get and validate the Item ID from the URL (rewritten by .htaccess)
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -106,18 +106,7 @@ $ogTitle = htmlspecialchars($item['title'] . ' — ' . $itemReg, ENT_QUOTES);
 $ogUrl   = SITE_URL . '/item/' . $id;
 $ogImage = '';
 
-if ($primaryMedia) {
-    if (isset($storage)) {
-        $ogImage = $storage->url('display/' . $primaryMedia['file_path']);
-    } else {
-        // Correct the display path verification
-        $displayFile = $primaryMedia['file_path'];
-        $absDisplayPath = ABSPATH . '/uploads/display/' . $displayFile;
-        $ogImage = (file_exists($absDisplayPath))
-            ? SITE_URL . '/uploads/display/'   . rawurlencode($displayFile)
-            : SITE_URL . '/uploads/originals/' . rawurlencode($displayFile);
-    }
-}
+if ($primaryMedia) $ogImage = MediaProcessor::url($primaryMedia['file_path'], 'display', 'image', $storage ?? null);
 
 $keywords = array_column($itemTags ?? [], 'name');
 
@@ -189,4 +178,20 @@ if (count($relatedItems) < 4) {
 }
 
 ?>
-<?php require_once ThemeManager::getTemplatePath('item_detail.php'); ?>
+<?php
+// All themes offer the complete source scans; default/custom also integrate originals into their viewers.
+if (class_exists('HookRegistry') && !in_array(AppConfig::get('active_theme', 'default'), ['default', 'custom'], true)) {
+    HookRegistry::addAction('item_after_content', function($record) use ($imageMedia, $storage) {
+        if (empty($record['is_visible'])) return;
+        $links = [];
+        foreach ($imageMedia as $scan) {
+            if (!MediaProcessor::originalStoragePath($scan['file_path'], $storage ?? null)) continue;
+            $label = htmlspecialchars($scan['caption'] ?: 'Original scan ' . (count($links) + 1), ENT_QUOTES, 'UTF-8');
+            $view = htmlspecialchars(MediaProcessor::url($scan['file_path'], 'original', 'image', $storage ?? null), ENT_QUOTES, 'UTF-8');
+            $download = htmlspecialchars(MediaProcessor::originalDownloadUrl((int)$scan['id']), ENT_QUOTES, 'UTF-8');
+            $links[] = '<li style="margin:12px 0"><span>' . $label . '</span> · <a style="text-decoration:underline" href="' . $view . '" target="_blank" rel="noopener">View full resolution</a> · <a style="text-decoration:underline" href="' . $download . '">Download original</a></li>';
+        }
+        if ($links) echo '<section style="margin:24px 0;padding:20px;border:1px solid #cbd5e1;border-radius:8px"><h2 style="font-size:20px;font-weight:600">Original scans</h2><ul>' . implode('', $links) . '</ul></section>';
+    }, 25);
+}
+require_once ThemeManager::getTemplatePath('item_detail.php'); ?>

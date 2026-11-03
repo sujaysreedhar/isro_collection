@@ -1,0 +1,44 @@
+<?php
+declare(strict_types=1);
+// Exercise export path inclusion and the actual router download with disposable SQLite records.
+ob_start();
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../includes/Autoloader.php';
+require_once __DIR__ . '/../modules/migrate/MigrateService.php';
+$fixture = __DIR__ . '/.runtime/export-fixture';
+@mkdir($fixture . '/uploads/original', 0755, true);
+define('ABSPATH', $fixture);
+define('SITE_URL', 'https://collection.example');
+$checks = 0;
+function ceCheck(bool $ok, string $label): void { global $checks; if (!$ok) throw new RuntimeException($label); $checks++; }
+$tables = MigrateService::contentTables();
+foreach (['collection_private_details','collection_checklists','collection_checklist_entries','module_wishlist_price_history'] as $table) ceCheck(in_array($table, $tables, true), 'Admin migration includes '.$table);
+ceCheck(!in_array('settings',$tables,true) && !in_array('admins',$tables,true) && !in_array('api_keys',$tables,true), 'Account credentials remain excluded');
+$profile = MigrateService::mediaPathsForRows('people', [['profile_image'=>'original/person_0123456789abcdef01234567.png']]);
+ceCheck(in_array('original/person_0123456789abcdef01234567.png',$profile,true), 'Biography original included');
+ceCheck(in_array('thumbnails/person_0123456789abcdef01234567.webp',$profile,true), 'Biography preview included');
+$media = MigrateService::mediaPathsForRows('media',[['file_path'=>'img_1_0123456789abcdef_1200.webp','media_type'=>'image']]);
+foreach (['thumbnails/img_1_0123456789abcdef_200.webp','thumbnails/img_1_0123456789abcdef_640.webp','thumbnails/img_1_0123456789abcdef_1200.webp','original/img_1_0123456789abcdef.png'] as $path) ceCheck(in_array($path,$media,true), 'Archive includes '.$path);
+$pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+$pdo->exec('CREATE TABLE items(id INTEGER PRIMARY KEY,is_visible INTEGER)');
+$pdo->exec('CREATE TABLE media(id INTEGER PRIMARY KEY,item_id INTEGER,file_path TEXT,media_type TEXT)');
+$pdo->exec("INSERT INTO items VALUES(1,1),(2,0); INSERT INTO media VALUES(1,1,'img_1_0123456789abcdef_1200.webp','image'),(2,2,'img_1_0123456789abcdef_1200.webp','image')");
+$storage = null;
+$image = imagecreatetruecolor(20,10);
+$source = $fixture . '/uploads/original/img_1_0123456789abcdef.png';
+imagepng($image,$source); unset($image);
+$_SERVER['REQUEST_URI'] = '/media/2/original?download=1';
+ob_start(); Router::dispatch(); $hidden = ob_get_clean();
+ceCheck(http_response_code() === 404 && !str_starts_with($hidden,"\x89PNG"), 'Hidden item original denied through real router');
+http_response_code(200);
+$_SERVER['REQUEST_URI'] = '/media/1/original?download=1';
+ob_start(); Router::dispatch(); $download = ob_get_clean();
+ceCheck(hash('sha256',$download) === hash_file('sha256',$source), 'Router downloads exact original bytes, without cropping or reencoding');
+$_SERVER['REQUEST_URI'] = '/media/999/original';
+ob_start(); Router::dispatch(); $missing = ob_get_clean();
+ceCheck(http_response_code() === 404, 'Unknown original returns404');
+$s3 = new S3Storage(['bucket'=>'fixture-bucket','region'=>'us-east-1','access_key'=>'fixture-key','secret_key'=>'fixture-secret','endpoint'=>'https://storage.example','path_prefix'=>'collection/uploads']);
+ceCheck(str_starts_with($s3->url('original/scan.png'),'https://storage.example/fixture-bucket/collection/uploads/original/scan.png'), 'Original URL honors custom S3 endpoint');
+ceCheck(str_contains($s3->downloadUrl('original/scan.png','scan.png'),'response-content-disposition='), 'S3 original download has signed attachment disposition');
+ob_end_clean();
+echo "PASS: {$checks} collection export and routed-original checks\n";

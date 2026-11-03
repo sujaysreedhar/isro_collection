@@ -120,8 +120,9 @@ try {
             $item['media'] = $mStmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($item['media'] as &$m) {
                 if ($m['media_type'] === 'image') {
-                    $m['url_thumbs'] = SITE_URL . '/uploads/thumbnails/' . rawurlencode($m['file_path']);
-                    $m['url_display'] = SITE_URL . '/uploads/display/' . rawurlencode($m['file_path']);
+                    $m['url_thumbs'] = MediaProcessor::url($m['file_path'], 'thumbnails', 'image', $storage ?? null);
+                    $m['url_display'] = MediaProcessor::url($m['file_path'], 'display', 'image', $storage ?? null);
+                    $m['url_original'] = MediaProcessor::url($m['file_path'], 'original', 'image', $storage ?? null);
                 } elseif ($m['media_type'] === 'pdf') {
                     $m['url'] = SITE_URL . '/uploads/pdfs/' . rawurlencode($m['file_path']);
                 }

@@ -684,7 +684,7 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
 
                 <!-- Image tab -->
                 <div id="tab-image" class="media-tab p-6 space-y-4">
-                    <p class="text-xs text-gray-400">JPG · PNG · WebP · max 5 MB → auto-converted to WebP in 3 sizes.
+                    <p class="text-xs text-gray-500">JPG · PNG · GIF · WebP · max 20 MB. Full-resolution originals are preserved for viewing and downloading; previews fit the whole image.
                         <span class="text-blue-600">You can select multiple files.</span></p>
                     <input type="file" name="media_upload[]" accept=".jpg,.jpeg,.png,.webp,.gif" multiple
                         class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
@@ -707,7 +707,7 @@ $preselected = json_encode(array_map('intval', $linkedNarratives));
                     </label>
                     <label class="flex items-center gap-2 mt-2 cursor-pointer">
                         <input type="checkbox" id="show-crop-check" class="h-4 w-4 rounded border-gray-300">
-                        <span class="text-sm font-medium text-blue-600">Show crop tool while upload</span>
+                        <span class="text-sm font-medium text-blue-600">Optional thumbnail crop (the original and full-size view stay complete)</span>
                     </label>
                 </div>
 

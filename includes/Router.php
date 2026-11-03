@@ -28,6 +28,9 @@ class Router {
         } elseif ($uri === 'search' || $uri === 'search.php') {
             header('Cache-Control: public, max-age=60');
             require __DIR__ . '/pages/search.php';
+        } elseif (preg_match('#^media/([0-9]+)/original/?$#', $uri, $matches)) {
+            $_GET['media_id'] = $matches[1];
+            require __DIR__ . '/pages/media_original.php';
         } elseif (preg_match('#^item/([0-9]+)(?:/[a-zA-Z0-9_-]+)?/?$#', $uri, $matches)) {
             header('Cache-Control: public, max-age=300');
             $_GET['id'] = $matches[1];

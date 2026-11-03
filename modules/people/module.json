@@ -1,8 +1,9 @@
 {
     "name": "People & Biographies",
     "slug": "people",
-    "description": "Create Wikipedia-style profiles for people related to the collection.",
-    "version": "1.0.0",
+    "description": "Editorial biographies with portrait viewing, searchable browsing, profile facts, and linked collection records.",
+    "version": "1.2.0",
+    "wide_admin_page": true,
     "author": "Antigravity",
     "enabled": false
 }

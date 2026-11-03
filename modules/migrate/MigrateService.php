@@ -32,12 +32,16 @@ class MigrateService
         'module_item_specs_config',
         'module_item_specs',
         'module_valuations',
+        'collection_private_details',
+        'collection_checklists',
+        'collection_checklist_entries',
         'module_exhibition_pages',
         'module_exhibition_items',
         'blog_posts',
         'blog_post_tag',
         'module_wishlist_items',
         'module_wishlist_stores',
+        'module_wishlist_price_history',
         'postmark_locations',
     ];
 
@@ -113,6 +117,9 @@ class MigrateService
                 if ($mediaType === 'image') {
                     self::addPath($paths, 'thumbnails/' . $filePath);
                     self::addPath($paths, 'display/' . $filePath);
+                    if (preg_match('/^(img_\d+_[a-f0-9]{16})_1200\.webp$/', $filePath, $current)) {
+                        foreach ([200, 640] as $size) self::addPath($paths, 'thumbnails/' . $current[1] . '_' . $size . '.webp');
+                    }
                     self::addOriginalCandidates($paths, $filePath);
                 }
                 continue;
@@ -123,7 +130,13 @@ class MigrateService
             } elseif ($table === 'collections') {
                 self::addPath($paths, self::folderFile('display', (string)($row['cover_image'] ?? '')));
             } elseif ($table === 'people') {
-                self::addPath($paths, self::folderFile('display', (string)($row['profile_image'] ?? '')));
+                $profile = (string)($row['profile_image'] ?? '');
+                if (preg_match('#^original/(person_[a-f0-9]+)\.(jpg|png|gif|webp)$#', $profile, $photo)) {
+                    self::addPath($paths, $profile);
+                    self::addPath($paths, 'thumbnails/' . $photo[1] . '.webp');
+                } else {
+                    self::addPath($paths, self::folderFile('display', $profile));
+                }
             } elseif ($table === 'item_panoramics') {
                 self::addPath($paths, self::folderFile('panoramics', (string)($row['file_path'] ?? '')));
             } elseif ($table === 'blog_posts') {
@@ -628,7 +641,7 @@ class MigrateService
         self::addPath($paths, 'original/' . $filePath);
         self::addPath($paths, 'originals/' . $filePath);
 
-        $base = pathinfo($filePath, PATHINFO_FILENAME);
+        $base = preg_match('/^(img_\d+_[a-f0-9]{16})_1200\.webp$/', $filePath, $current) ? $current[1] : pathinfo($filePath, PATHINFO_FILENAME);
         if ($base === '') {
             return;
         }
