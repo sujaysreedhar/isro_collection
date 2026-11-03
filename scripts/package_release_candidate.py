@@ -5,26 +5,31 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "scripts" / "releases"
-BUILD = OUTPUT / ".build-rc2"
-STAGE = BUILD / "application"
-VERSION = "1.0.0-rc.2"
-NAME = f"mycollection-{VERSION}-2026-11-02"
+BUILD: Path
+STAGE: Path
+VERSION: str
+RELEASE_DATE: str
+NAME: str
+NOTES: Path
 RUNTIME_DIRS = ("admin", "assets", "bootstrap", "includes", "modules", "themes")
 ROOT_FILES = (
     ".htaccess", ".env.example", "index.php", "ajax.php", "ajax_search.php",
     "update.php", "update.sql", "composer.json", "composer.lock",
     "package.json", "package-lock.json",
+    "docs/operations/collection-tools.md",
 )
 OPERATIONAL_SCRIPTS = (
     "scripts/update.php", "scripts/run_auto_backup.php",
     "scripts/rebuild_search_vocabulary.php",
+    "scripts/wishlist_offers_update.sql", "scripts/collection_workbench_update.sql",
 )
 EMPTY_DIRS = (
     "config", "includes/cache", "tmp", "uploads/branding", "uploads/categories",
@@ -55,14 +60,32 @@ def source_allowed(path: Path) -> bool:
 
 
 def source_paths() -> list[Path]:
+    tracked = set(subprocess.check_output(
+        ["git", "ls-files", "-z"], cwd=ROOT
+    ).decode("utf-8").split("\0"))
     files = [ROOT / name for name in ROOT_FILES + OPERATIONAL_SCRIPTS]
     files += [ROOT / "uploads/.htaccess", ROOT / "tmp/.htaccess"]
     for folder in RUNTIME_DIRS:
-        files += [p for p in (ROOT / folder).rglob("*") if p.is_file() and source_allowed(p)]
+        files += [ROOT / name for name in tracked
+                  if name.startswith(folder + "/") and source_allowed(ROOT / name)]
     for path in files:
         if not path.is_file() or path.is_symlink():
             raise RuntimeError(f"Missing source or unexpected symbolic link: {path.relative_to(ROOT)}")
     return sorted(files)
+
+
+def configure(version: str, release_date: str, notes: str) -> None:
+    global BUILD, STAGE, VERSION, RELEASE_DATE, NAME, NOTES
+    if not re.fullmatch(r"\d+\.\d+\.\d+-rc\.\d+", version):
+        raise ValueError("Version must use the form 1.0.0-rc.3")
+    RELEASE_DATE = date.fromisoformat(release_date).isoformat()
+    VERSION = version
+    NAME = f"mycollection-{VERSION}-{RELEASE_DATE}"
+    BUILD = OUTPUT / f".build-{NAME}"
+    STAGE = BUILD / "application"
+    NOTES = (ROOT / notes).resolve()
+    if not NOTES.is_relative_to(ROOT / "docs" / "releases") or not NOTES.is_file():
+        raise ValueError("Release notes must be an existing file under docs/releases/")
 
 
 def prepare() -> None:
@@ -83,10 +106,14 @@ def prepare() -> None:
     changed_paths.update(subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=ROOT).decode().split("\0"))
     metadata = {
         "version": VERSION,
+        "release_date": RELEASE_DATE,
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "includes_uncommitted_workspace_changes": bool(changed_paths.intersection(copied)),
         "source_sha256": copied,
+        "notes_sha256": sha256(NOTES),
     }
+    if metadata["includes_uncommitted_workspace_changes"] or NOTES.relative_to(ROOT).as_posix() in changed_paths:
+        raise RuntimeError("Commit application source and release notes before preparing a release.")
     (BUILD / "source-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"stage": str(STAGE), "source_files": len(copied), "config_excluded": not (STAGE / "config/config.php").exists()}))
 
@@ -123,6 +150,11 @@ def inspect_stage() -> None:
 
 def finalize() -> None:
     metadata = json.loads((BUILD / "source-metadata.json").read_text(encoding="utf-8"))
+    if metadata["version"] != VERSION or metadata["release_date"] != RELEASE_DATE:
+        raise RuntimeError("Release metadata does not match the selected version/date.")
+    current_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    if current_commit != metadata["source_commit"] or sha256(NOTES) != metadata["notes_sha256"]:
+        raise RuntimeError("Source commit or release notes changed during packaging.")
     for name, expected_hash in metadata["source_sha256"].items():
         if sha256(ROOT / name) != expected_hash or sha256(STAGE / name) != expected_hash:
             raise RuntimeError(f"Source changed during packaging: {name}")
@@ -131,50 +163,14 @@ def finalize() -> None:
         "themes/custom/archive-search.js", "themes/custom/partials/archive_helpers.php",
         "themes/custom/assets/archive-hero.webp", "themes/common/dist/tailwind.css",
         "vendor/autoload.php", "vendor/ralouphie/getallheaders/src/getallheaders.php",
+        "vendor/dompdf/dompdf/src/Dompdf.php", "vendor/bacon/bacon-qr-code/src/Writer.php",
+        "modules/people/assets/people-public.css", "includes/AlbumPages.php",
+        "modules/collection_workbench/module.json",
     )
     for name in required:
         if not (STAGE / name).is_file():
             raise RuntimeError(f"Required release file missing: {name}")
-    notes = f"""My Collection {VERSION}
-Release candidate prepared on 2026-11-02.
-
-Includes the current workspace's home, item detail and search UI changes for
-Custom / Theme Studio, compiled CSS, application modules, and production PHP
-dependencies installed from composer.lock. The source commit is
-{metadata['source_commit']}.
-{'Uncommitted application changes are included.' if metadata['includes_uncommitted_workspace_changes'] else 'The packaged application source matches this commit.'}
-Custom / Theme Studio is light-only, regardless of the system color preference.
-
-DEPLOYMENT
-This is an update package for an existing installation. Extract the application
-files into a staging copy of that installation, retaining config/config.php,
-any private .env file, existing uploads and the existing database. The config
-file and uploaded collection media are intentionally absent from this archive.
-Ensure uploads/, includes/cache/ and tmp/ remain writable by the application.
-The UI changes introduce no database schema or persistent settings migrations;
-the existing cumulative update.sql and operational update runner are included.
-Select Custom in Theme Studio to use the redesigned pages. Existing configured
-hero image/text and display settings continue to take precedence where used.
-
-VERIFICATION
-The UI was checked on desktop/mobile using isolated sample data. Search sorting,
-pagination, combined filters and the existing search regression checks passed.
-Application PHP syntax and Composer autoload/platform requirements were checked
-for this package using PHP 8.3.36. The locked dependencies require PHP 8.2 or
-newer, plus the extensions listed by Composer and the application's PDO MySQL,
-GD and fileinfo extensions. Final target-database integration is still to be
-checked with the retained installation configuration.
-
-EXCLUSIONS
-config/config.php; private environment/credential files; uploads and caches;
-Git/agent metadata; node_modules; local vendor contents; development, preview
-and test scripts/artifacts. A clean production vendor directory is bundled.
-
-INTEGRITY
-RELEASE-MANIFEST.json records each included file's size and SHA-256 checksum,
-excluding the manifest itself. A matching manifest and ZIP SHA-256 checksum
-are also provided alongside the archive.
-"""
+    notes = NOTES.read_text(encoding="utf-8").rstrip() + f"\n\nPackaged source commit: {metadata['source_commit']}\n"
     (STAGE / "RELEASE-NOTES.txt").write_text(notes, encoding="utf-8")
     files = sorted(p for p in STAGE.rglob("*") if p.is_file())
     manifest = {
@@ -224,5 +220,9 @@ are also provided alongside the archive.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("phase", choices=("prepare", "check", "finalize"))
+    parser.add_argument("--version", required=True, help="Release candidate version, for example 1.0.0-rc.3")
+    parser.add_argument("--date", required=True, help="Release date in YYYY-MM-DD form")
+    parser.add_argument("--notes", required=True, help="Release notes path under docs/releases/")
     arguments = parser.parse_args()
+    configure(arguments.version, arguments.date, arguments.notes)
     {"prepare": prepare, "check": inspect_stage, "finalize": finalize}[arguments.phase]()
