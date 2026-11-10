@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.toggleAcquired = function (id, newStatus) {
         var fd = new FormData();
         fd.append('id', id); fd.append('new_status', newStatus); fd.append('csrf_token', csrfToken);
-        fetch(siteUrl + '/modules/postmark_atlas/ajax_toggle.php', { method: 'POST', body: fd })
+        fetch('../modules/postmark_atlas/ajax_toggle.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => { if (data.success) window.location.reload(); else alert('Error: ' + (data.error||'?')); })
             .catch(e  => alert('Network error: ' + e.message));

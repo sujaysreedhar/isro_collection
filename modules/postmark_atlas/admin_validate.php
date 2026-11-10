@@ -545,7 +545,7 @@ tr.row-updated {
 <script>
 /* ── Constants ── */
 const GMAPS_KEY  = '<?= htmlspecialchars($gmapsKey) ?>';
-const AJAX_URL   = '<?= SITE_URL ?>/admin/ajax.php';
+const AJAX_URL   = 'ajax.php';
 const CSRF_TOKEN = '<?= htmlspecialchars(ensureCsrfToken()) ?>';
 
 /* ── Google Maps REST Geocoding ── */

@@ -213,7 +213,7 @@ echo renderAdminHeader($id > 0 ? "Edit Story" : "New Story");
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-const AJAX_URL = '<?= SITE_URL ?>/admin/ajax.php';
+const AJAX_URL = 'ajax.php';
 
 // Quill WYSIWYG editor
 const quill = new Quill('#quill-editor', {

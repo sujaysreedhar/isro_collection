@@ -204,7 +204,7 @@ function formatBytes($bytes, $precision = 2) {
             formData.append('csrf_token', csrfToken);
             formData.append('auto_backup_enabled', nextState ? '1' : '0');
 
-            const response = await fetch(<?= json_encode(SITE_URL . '/admin/ajax.php') ?>, {
+            const response = await fetch('ajax.php', {
                 method: 'POST',
                 body: formData,
             });
@@ -246,7 +246,7 @@ function formatBytes($bytes, $precision = 2) {
             formData.append('csrf_token', csrfToken);
             formData.append('type', type);
 
-            const response = await fetch(<?= json_encode(SITE_URL . '/admin/ajax.php') ?>, {
+            const response = await fetch('ajax.php', {
                 method: 'POST',
                 body: formData,
             });
@@ -287,7 +287,7 @@ function formatBytes($bytes, $precision = 2) {
                 formData.append('csrf_token', csrfToken);
                 formData.append('folder_name', folder);
 
-                const response = await fetch(<?= json_encode(SITE_URL . '/admin/ajax.php') ?>, {
+                const response = await fetch('ajax.php', {
                     method: 'POST',
                     body: formData,
                 });

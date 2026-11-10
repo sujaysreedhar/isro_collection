@@ -362,7 +362,7 @@ article.vm-card:hover {
 
 <script>
 (() => {
-const AJAX = <?= json_encode(SITE_URL . '/admin/ajax.php') ?>;
+const AJAX = 'ajax.php';
 const BASE = <?= json_encode($baseUrl) ?>;
 const CSRF = <?= json_encode($csrf) ?>;
 const config = <?= json_encode([

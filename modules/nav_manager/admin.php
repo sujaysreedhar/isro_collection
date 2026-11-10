@@ -255,7 +255,7 @@ foreach ($moduleFrontends as $moduleSlug => $page) {
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <script>
-    const API_URL = '<?= SITE_URL ?>/admin/ajax.php';
+    const API_URL = 'ajax.php';
     const CSRF_TOKEN = '<?= ensureCsrfToken() ?>';
     
     let currentMenuId = null;

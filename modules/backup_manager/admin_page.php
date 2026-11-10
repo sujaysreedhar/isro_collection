@@ -158,7 +158,7 @@ $webhookSample = htmlspecialchars(SITE_URL . '/runback?type=files_db&key=' . raw
             formData.append('csrf_token', csrfToken);
             formData.append('backup_manager_webhook_key', webhookInput.value.trim());
 
-            const response = await fetch(<?= json_encode(SITE_URL . '/admin/ajax.php') ?>, {
+            const response = await fetch('ajax.php', {
                 method: 'POST',
                 body: formData,
             });
@@ -192,7 +192,7 @@ $webhookSample = htmlspecialchars(SITE_URL . '/runback?type=files_db&key=' . raw
             formData.append('csrf_token', csrfToken);
             formData.append('type', backupType.value);
 
-            const response = await fetch(<?= json_encode(SITE_URL . '/admin/ajax.php') ?>, {
+            const response = await fetch('ajax.php', {
                 method: 'POST',
                 body: formData,
             });

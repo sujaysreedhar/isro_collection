@@ -6,7 +6,7 @@ if (!defined('SITE_URL'))
 global $pdo, $appSettings;
 
 $s = static fn(string $k, string $d = '') => $appSettings[$k] ?? $d;
-$ajaxUrl = SITE_URL . '/admin/ajax.php';
+$ajaxUrl = 'ajax.php';
 $saveUrl = SITE_URL . '/modules/theme_studio/ajax_save.php';
 $csrf = htmlspecialchars(ensureCsrfToken());
 

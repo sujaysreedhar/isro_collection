@@ -131,7 +131,8 @@ main > div.max-w-7xl {
 </style>
 
 <script>
-const AJAX_URL = '<?= SITE_URL ?>/admin/ajax.php';
+// Keep AJAX on this page's origin, including HTTPS behind a reverse proxy.
+const AJAX_URL = 'ajax.php';
 const CSRF_TOKEN = '<?= htmlspecialchars(ensureCsrfToken()) ?>';
 let selectedIds = new Set();
 let dataTable;

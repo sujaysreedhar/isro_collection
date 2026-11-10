@@ -19,7 +19,7 @@ $safeLink = static function ($url): bool { return is_string($url) && filter_var(
 <section class="wantlist" aria-labelledby="wantlist-title">
     <div class="wl-heading">
         <div><h1 id="wantlist-title">Wantlist & seller tracking</h1><p>Keep each stamp or cover together with its seller links and dated price observations. Visible to administrators only.</p></div>
-        <div class="wl-actions"><a class="wl-button" href="<?= $h(SITE_URL) ?>/admin/ajax.php?action=wishlist_export">Export CSV</a><button class="wl-button" type="button" id="wl-bulk-open">Add several items</button><button class="wl-button wl-primary" type="button" id="wl-add">Add wanted item</button></div>
+        <div class="wl-actions"><a class="wl-button" href="ajax.php?action=wishlist_export">Export CSV</a><button class="wl-button" type="button" id="wl-bulk-open">Add several items</button><button class="wl-button wl-primary" type="button" id="wl-add">Add wanted item</button></div>
     </div>
     <div class="wl-summary"><span><strong><?= count($items) ?></strong> wanted items</span><span><strong><?= $pending ?></strong> still to acquire</span><span><strong><?= $offerCount ?></strong> seller offers</span></div>
     <div id="wl-notice" role="status" aria-live="polite" hidden></div>
@@ -89,5 +89,5 @@ $safeLink = static function ($url): bool { return is_string($url) && filter_var(
 
 <dialog id="wl-bulk-dialog" class="wl-dialog wl-bulk-dialog" aria-labelledby="wl-bulk-title"><form id="wl-bulk-form"><header class="wl-dialog-heading"><h2 id="wl-bulk-title">Add several wanted items</h2><button class="wl-button" type="button" data-close="wl-bulk-dialog">Close</button></header><div class="wl-error" id="wl-bulk-error" role="alert" hidden></div><label>One item name per line (up to 100)<textarea name="names" rows="9" required maxlength="25600"></textarea></label><div class="wl-form-grid"><label>Type<select name="item_type"><option value="stamp">Stamp</option><option value="cover">Cover</option><option value="other">Other</option></select></label><label>Theme<select name="theme_id"><option value="">Unassigned</option><?php foreach ($themes as $theme): ?><option value="<?= (int)$theme['id'] ?>"><?= $h($theme['name']) ?></option><?php endforeach; ?></select></label></div><footer class="wl-dialog-footer"><button type="button" class="wl-button" data-close="wl-bulk-dialog">Cancel</button><button type="submit" class="wl-button wl-primary">Add items</button></footer></form></dialog>
 
-<script type="application/json" id="wl-data"><?= json_encode(['items'=>$items,'ajaxUrl'=>SITE_URL . '/admin/ajax.php','siteUrl'=>SITE_URL,'csrf'=>ensureCsrfToken()], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
+<script type="application/json" id="wl-data"><?= json_encode(['items'=>$items,'ajaxUrl'=>'ajax.php','siteUrl'=>SITE_URL,'csrf'=>ensureCsrfToken()], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
 <script src="<?= $h(SITE_URL) ?>/modules/wishlist/assets/wishlist.js" defer></script>
