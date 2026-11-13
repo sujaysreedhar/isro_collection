@@ -140,7 +140,9 @@ $searchParams   = $searchParams   ?? ['q' => ''];
                     <input aria-label="Search the collections" type="search" name="q" data-autocomplete="true" autocomplete="off" value="<?= htmlspecialchars($searchParams['q'] ?? '') ?>" placeholder="Search the collections...">
                 </form>
             <?php endif; ?>
-            <a class="archive-account" href="<?= SITE_URL ?>/admin/index.php" aria-label="Collection administration"><?= archiveUiIcon('user') ?></a>
+            <?php if ($currentMenu !== 'home'): ?>
+                <a class="archive-account" href="<?= SITE_URL ?>/admin/index.php" aria-label="Collection administration"><?= archiveUiIcon('user') ?></a>
+            <?php endif; ?>
             <button type="button" id="archive-menu-toggle" class="archive-menu-toggle" onclick="toggleMobileMenu()" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open main menu">
                 <span id="menu-icon-open"><?= archiveUiIcon('bars-3') ?></span>
                 <span id="menu-icon-close" hidden><?= archiveUiIcon('x-mark') ?></span>

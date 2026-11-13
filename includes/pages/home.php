@@ -42,5 +42,5 @@ if ($featuredItems) {
         $featuredTags[$row['item_id']][] = $row;
     }
 }
-?>
-<?php require_once ThemeManager::getTemplatePath('index.php'); ?>
+$isHomePage = true;
+require_once ThemeManager::getTemplatePath('index.php');
