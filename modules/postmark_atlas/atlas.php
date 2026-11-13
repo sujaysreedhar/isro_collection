@@ -14,8 +14,14 @@ if (!$isAtlasActive) {
 
 // Fetch all locations with linked item details
 require_once __DIR__ . '/PublicLocations.php';
-$locations = PublicLocations::all($pdo, false);
-$jsonLocations = json_encode($locations);
+$locations = PublicLocations::all($pdo, false, true);
+foreach ($locations as &$location) {
+    $location['preview_url'] = !empty($location['preview_file_path'])
+        ? MediaProcessor::url($location['preview_file_path'], 'thumbnails', 'image', $storage ?? null)
+        : null;
+    unset($location['preview_file_path']);
+}
+unset($location);
 
 ?>
 <?php require_once ThemeManager::getTemplatePath('atlas.php'); ?>

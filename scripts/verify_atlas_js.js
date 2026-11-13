@@ -3,10 +3,8 @@ const path = require('path');
 const vm = require('vm');
 
 const files = [
-    'themes/default/atlas.php',
-    'themes/dark/atlas.php',
-    'themes/glass/atlas.php',
-    'themes/modern_blue/atlas.php',
+    'assets/js/atlas_public.js',
+    'assets/js/atlas_text.js',
     'modules/postmark_atlas/admin_map.php'
 ];
 
@@ -15,6 +13,16 @@ let allPassed = true;
 files.forEach(file => {
     const fullPath = path.join(__dirname, '..', file);
     const content = fs.readFileSync(fullPath, 'utf8');
+    if (file.endsWith('.js')) {
+        try {
+            new vm.Script(content, {filename: file});
+            console.log(`[PASS] JS Syntax OK in ${file}`);
+        } catch (e) {
+            console.error(`[FAIL] JS Syntax Error in ${file}:`, e.message);
+            allPassed = false;
+        }
+        return;
+    }
 
     // Extract content inside <script> tags
     const scriptMatches = content.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/gi);
